@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +17,14 @@ export default function WaitingScreen() {
   const {
     partnerName,
     myName,
+    dayStatus,
     isPartnerCompleted,
-    togglePartnerSimulation,
+    isSupabaseReady,
+    refreshDayStatus,
   } = useApp();
 
-  // パルスアニメーション (React 19 適合)
   const [pulseAnim] = useState(() => new Animated.Value(1));
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     Animated.loop(
@@ -39,6 +42,33 @@ export default function WaitingScreen() {
       ])
     ).start();
   }, [pulseAnim]);
+
+  // 相手の回答状況を定期ポーリング（5秒間隔）
+  useEffect(() => {
+    if (!isSupabaseReady || isPartnerCompleted) return;
+
+    void refreshDayStatus();
+    const timer = setInterval(() => {
+      void refreshDayStatus();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [isSupabaseReady, isPartnerCompleted, refreshDayStatus]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshDayStatus();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const partnerProgressText = isPartnerCompleted
+    ? '回答完了'
+    : dayStatus.partnerAnsweredCount > 0
+      ? `${dayStatus.partnerAnsweredCount} / ${dayStatus.totalQuestions} 問回答中`
+      : '回答待ち';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -58,7 +88,6 @@ export default function WaitingScreen() {
         </Animated.View>
       </View>
 
-      {/* ステータステキスト */}
       <View style={styles.textSection}>
         <Text style={styles.statusTitle}>
           {isPartnerCompleted
@@ -72,7 +101,6 @@ export default function WaitingScreen() {
         </Text>
       </View>
 
-      {/* 2人の状況インジケーター */}
       <View style={[styles.statusCard, SHADOWS.card]}>
         <Text style={styles.cardHeaderTitle}>回答状況</Text>
 
@@ -105,60 +133,37 @@ export default function WaitingScreen() {
                 isPartnerCompleted ? styles.userStatusDone : styles.userStatusPending
               }
             >
-              {isPartnerCompleted ? '回答完了' : '回答待ち'}
+              {partnerProgressText}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* 結果を見るボタン（揃ったら活性化） */}
-      {isPartnerCompleted && (
+      {isPartnerCompleted ? (
         <TouchableOpacity
           style={styles.resultButton}
           activeOpacity={0.8}
-          onPress={() => router.push('/result')}
+          onPress={() => router.replace('/result')}
         >
           <Text style={styles.resultButtonText}>結果画面へ進む</Text>
           <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
         </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.refreshButton}
+          activeOpacity={0.7}
+          onPress={handleManualRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Ionicons name="refresh-outline" size={17} color={COLORS.primary} />
+          )}
+          <Text style={styles.refreshButtonText}>最新の状況を確認する</Text>
+        </TouchableOpacity>
       )}
 
-      {/* 動作確認用デバッグエリア */}
-      <View style={styles.debugBox}>
-        <View style={styles.debugHeader}>
-          <Ionicons name="bug-outline" size={16} color={COLORS.textMuted} />
-          <Text style={styles.debugTitle}>動作確認・テスト用スイッチ</Text>
-        </View>
-        <Text style={styles.debugDesc}>
-          現在はローカルモック環境です。下のボタンを押すと相手の回答完了状態を切り替えられます。
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.debugButton,
-            isPartnerCompleted ? styles.debugButtonActive : null,
-          ]}
-          activeOpacity={0.7}
-          onPress={togglePartnerSimulation}
-        >
-          <Ionicons
-            name={isPartnerCompleted ? 'checkmark-circle' : 'play-circle-outline'}
-            size={18}
-            color={isPartnerCompleted ? '#4A7C59' : COLORS.primary}
-          />
-          <Text
-            style={[
-              styles.debugButtonText,
-              isPartnerCompleted && { color: '#4A7C59' },
-            ]}
-          >
-            {isPartnerCompleted
-              ? '相手を「未回答」に戻す'
-              : '相手の回答完了をシミュレートする（ロック解除）'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ホームへ戻る */}
       <TouchableOpacity
         style={styles.backHomeBtn}
         onPress={() => router.replace('/')}
@@ -277,7 +282,7 @@ const styles = StyleSheet.create({
   userStatusPending: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#B5AAA3',
+    color: '#8D8179',
   },
   resultButton: {
     width: '100%',
@@ -296,50 +301,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  debugBox: {
+  refreshButton: {
     width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 20,
-  },
-  debugHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  debugTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  debugDesc: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    lineHeight: 16,
-    marginBottom: 12,
-  },
-  debugButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    paddingVertical: 13,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: COLORS.primary,
     gap: 8,
+    marginBottom: 16,
   },
-  debugButtonActive: {
-    borderColor: '#4A7C59',
-    backgroundColor: '#F2F7F4',
-  },
-  debugButtonText: {
-    fontSize: 13,
+  refreshButtonText: {
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.primary,
   },

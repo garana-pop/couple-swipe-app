@@ -1,5 +1,7 @@
 export type SwipeDirection = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
+export type MatchRule = 'exact' | 'mirror_up_down';
+
 export interface QuestionChoice {
   direction: SwipeDirection;
   label: string;
@@ -7,10 +9,10 @@ export interface QuestionChoice {
 }
 
 export interface QuestionHistoryItem {
-  date: string; // 例: '3ヶ月前 (8月21日)'
+  date: string; // 例: '2026-08-21 (90日前)'
   myAnswer: SwipeDirection;
   partnerAnswer: SwipeDirection;
-  note?: string; // 変化についての簡単なメモ
+  note?: string;
 }
 
 export interface Question {
@@ -18,6 +20,7 @@ export interface Question {
   category: string;
   title: string;
   choices: Record<SwipeDirection, string>;
+  matchRule?: MatchRule; // 省略時は 'exact'
   repeatBadge?: string; // 例: '90日ぶりの質問'
   pastHistory?: QuestionHistoryItem; // 過去の同じ質問への回答記録
 }
@@ -29,14 +32,14 @@ export interface PairUser {
   isMe: boolean;
 }
 
-export interface QuizSessionState {
-  questions: Question[];
-  myAnswers: Record<string, SwipeDirection>;
-  partnerAnswers: Record<string, SwipeDirection>;
-  isPartnerCompleted: boolean;
-  partnerName: string;
-  myName: string;
-  pairCode: string;
-  isPairConnected: boolean;
-  hasSeenTutorial: boolean;
+export interface HistoryDayAnswer {
+  question: Question;
+  myAnswer?: SwipeDirection;
+  partnerAnswer?: SwipeDirection;
+  isMatched: boolean;
+}
+
+export interface HistoryDayItem {
+  quizDate: string; // YYYY-MM-DD
+  items: HistoryDayAnswer[];
 }

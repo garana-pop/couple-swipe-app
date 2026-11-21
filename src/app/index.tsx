@@ -9,51 +9,154 @@ import {
   Alert,
   Modal,
   Pressable,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../context/AppContext';
 import { TutorialModal } from '../components/TutorialModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 
+function formatDisplayDate(dateStr: string): string {
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  return `${m}月${d}日 のお題`;
+}
+
 export default function HomeScreen() {
   const {
-    pairCode,
+    isInitialized,
+    isLoading,
+    isSupabaseReady,
+    authError,
+    hasPair,
     isPairConnected,
-    partnerName,
+    pairCode,
     myName,
+    partnerName,
+    todayDate,
+    questions,
     isMyCompleted,
     isPartnerCompleted,
     matchSummary,
     isTutorialVisible,
     completeTutorial,
     showTutorial,
-    connectPair,
-    resetAnswers,
+    createPair,
+    joinPair,
+    leavePair,
+    regenerateInviteCode,
+    updateMyName,
+    refreshState,
+    deleteAccount,
   } = useApp();
 
   const [inputCode, setInputCode] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
+    if (!pairCode) return;
+    await Clipboard.setStringAsync(pairCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    Alert.alert('招待コードをコピーしました', `「${pairCode}」をパートナーに送ってアプリに招待しましょう。`);
+    Alert.alert(
+      '招待コードをコピーしました',
+      `「${pairCode}」をパートナーに送ってアプリに招待しましょう。`
+    );
   };
 
-  const handleConnect = () => {
+  const handleCreatePair = async () => {
+    setSubmitting(true);
+    const res = await createPair();
+    setSubmitting(false);
+    if (!res.ok) {
+      Alert.alert('作成エラー', res.error ?? 'ペアの作成に失敗しました。');
+    }
+  };
+
+  const handleConnect = async () => {
     if (!inputCode.trim()) {
       Alert.alert('入力エラー', '招待コードを入力してください。');
       return;
     }
-    connectPair(inputCode);
+    setSubmitting(true);
+    const res = await joinPair(inputCode.trim());
+    setSubmitting(false);
+    if (!res.ok) {
+      Alert.alert('連携エラー', res.error ?? 'ペアリングに失敗しました。');
+      return;
+    }
     Alert.alert('連携完了', 'パートナーと正常にペアリングされました。');
     setInputCode('');
   };
 
+  const handleLeavePair = () => {
+    Alert.alert(
+      'ペアを解除しますか？',
+      '解除すると、このペアから抜けます。誤って二人とも招待コードを作ってしまった場合のリカバリにも使えます。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '解除する',
+          style: 'destructive',
+          onPress: async () => {
+            setIsMenuOpen(false);
+            const res = await leavePair();
+            if (!res.ok) {
+              Alert.alert('エラー', res.error ?? 'ペア解除に失敗しました。');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'アカウントとデータを削除',
+      'あなたの回答データ・プロフィール・ペア情報がすべて削除されます。この操作は取り消せません。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除する',
+          style: 'destructive',
+          onPress: async () => {
+            setIsMenuOpen(false);
+            const res = await deleteAccount();
+            if (res.ok) {
+              Alert.alert('削除完了', 'アカウントとデータを削除しました。');
+            } else {
+              Alert.alert('エラー', res.error ?? '削除に失敗しました。');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveName = async () => {
+    const res = await updateMyName(nameInput);
+    if (!res.ok) {
+      Alert.alert('エラー', res.error ?? '表示名の更新に失敗しました。');
+      return;
+    }
+    setIsEditingName(false);
+  };
+
   // 今日の質問ボタンの挙動
   const handleQuizAction = () => {
+    if (isSupabaseReady && !hasPair) {
+      Alert.alert('ペア連携が必要です', 'まずは招待コードを発行するか、パートナーのコードを入力してペアを作成してください。');
+      return;
+    }
     if (!isMyCompleted) {
       router.push('/quiz');
     } else if (!isPartnerCompleted) {
@@ -65,7 +168,7 @@ export default function HomeScreen() {
 
   const getQuizButtonText = () => {
     if (!isMyCompleted) {
-      return '今日の質問へ進む（3問）';
+      return `今日の質問へ進む（${questions.length}問）`;
     } else if (!isPartnerCompleted) {
       return '相手の回答待ち（待機画面へ）';
     } else {
@@ -87,13 +190,8 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.outerContainer}>
-      {/* 初回起動時（またはメニューからのリクエスト時）に表示されるウォークスルーチュートリアル */}
-      <TutorialModal
-        visible={isTutorialVisible}
-        onClose={completeTutorial}
-      />
+      <TutorialModal visible={isTutorialVisible} onClose={completeTutorial} />
 
-      {/* ヘッダー右上にハンバーガーメニューアイコンを配置 */}
       <Stack.Screen
         options={{
           title: 'ふたりスワイプ',
@@ -110,7 +208,13 @@ export default function HomeScreen() {
         }}
       />
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl refreshing={isLoading} onRefresh={refreshState} tintColor={COLORS.primary} />
+        }
+      >
         {/* ウェルカムバナー */}
         <View style={styles.heroSection}>
           <View style={styles.heroBadge}>
@@ -123,14 +227,62 @@ export default function HomeScreen() {
           </Text>
         </View>
 
+        {!isSupabaseReady && (
+          <View style={styles.noticeBanner}>
+            <Ionicons name="information-circle-outline" size={18} color="#9E6B24" />
+            <Text style={styles.noticeBannerText}>
+              Supabase 未設定のためローカル表示モードです。.env.local に接続情報を設定すると同期が有効になります。
+            </Text>
+          </View>
+        )}
+
+        {authError && (
+          <View style={[styles.noticeBanner, { backgroundColor: '#FDECEC', borderColor: '#F5C2C2' }]}>
+            <Ionicons name="alert-circle-outline" size={18} color="#B84A39" />
+            <Text style={[styles.noticeBannerText, { color: '#B84A39' }]}>{authError}</Text>
+          </View>
+        )}
+
         {/* ペア連携ステータスカード */}
         <View style={[styles.card, SHADOWS.card]}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="people" size={20} color={COLORS.primary} />
-            <Text style={styles.cardTitle}>ペア連携状況</Text>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="people" size={20} color={COLORS.primary} />
+              <Text style={styles.cardTitle}>ペア連携状況</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.editNameTrigger}
+              onPress={() => {
+                setNameInput(myName);
+                setIsEditingName((v) => !v);
+              }}
+            >
+              <Ionicons name="create-outline" size={14} color={COLORS.primaryDark} />
+              <Text style={styles.editNameTriggerText}>名前: {myName}</Text>
+            </TouchableOpacity>
           </View>
 
-          {isPairConnected ? (
+          {isEditingName && (
+            <View style={styles.nameEditBox}>
+              <TextInput
+                style={styles.input}
+                placeholder="あなたの表示名"
+                value={nameInput}
+                onChangeText={setNameInput}
+                maxLength={20}
+              />
+              <TouchableOpacity style={styles.connectButton} onPress={handleSaveName}>
+                <Text style={styles.connectButtonText}>保存</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!isInitialized ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator color={COLORS.primary} />
+              <Text style={styles.loadingText}>接続状態を確認中...</Text>
+            </View>
+          ) : isPairConnected ? (
             <View style={styles.pairedContainer}>
               <View style={styles.avatarRow}>
                 <View style={styles.avatarBox}>
@@ -169,35 +321,83 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          ) : (
+          ) : hasPair ? (
             <View style={styles.unpairedContainer}>
               <Text style={styles.unpairedDesc}>
-                パートナーとペアリングして、今日の質問を一緒に始めましょう。
+                招待コードを発行しました！パートナーがこのコードを入力するとペア連携が完了します。
               </Text>
 
-              {/* あなたのコード */}
               <View style={styles.myCodeBox}>
-                <Text style={styles.inputLabel}>あなたの招待コード：</Text>
+                <Text style={styles.inputLabel}>あなたの招待コード（有効期限7日間）：</Text>
                 <View style={styles.codeRow}>
                   <Text style={styles.myCodeText}>{pairCode}</Text>
                   <TouchableOpacity style={styles.codeCopyBtn} onPress={handleCopyCode}>
-                    <Text style={styles.codeCopyBtnText}>共有・コピー</Text>
+                    <Text style={styles.codeCopyBtnText}>
+                      {copied ? 'コピー済み' : 'コピー'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* パートナーのコード入力 */}
+              <View style={styles.pendingActionsRow}>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={refreshState}>
+                  <Ionicons name="refresh-outline" size={15} color={COLORS.primaryDark} />
+                  <Text style={styles.secondaryBtnText}>参加を確認</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={async () => {
+                    const res = await regenerateInviteCode();
+                    if (!res.ok) Alert.alert('エラー', res.error);
+                  }}
+                >
+                  <Ionicons name="key-outline" size={15} color={COLORS.primaryDark} />
+                  <Text style={styles.secondaryBtnText}>コード再発行</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={handleLeavePair}>
+                  <Ionicons name="close-circle-outline" size={15} color="#B84A39" />
+                  <Text style={[styles.secondaryBtnText, { color: '#B84A39' }]}>解除</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.unpairedContainer}>
+              <Text style={styles.unpairedDesc}>
+                どちらか1人が「招待コードを発行」し、もう1人がコードを入力してペアリングしましょう。
+              </Text>
+
+              <TouchableOpacity
+                style={styles.createPairBtn}
+                activeOpacity={0.8}
+                disabled={submitting}
+                onPress={handleCreatePair}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.createPairBtnText}>新しいペアを作る（招待コード発行）</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
               <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>相手の招待コードを入力：</Text>
+                <Text style={styles.inputLabel}>パートナーの招待コードを入力して参加：</Text>
                 <View style={styles.inputRow}>
                   <TextInput
                     style={styles.input}
-                    placeholder="例: LOVE-1234"
+                    placeholder="例: K7M9P2X4"
                     value={inputCode}
                     onChangeText={setInputCode}
                     autoCapitalize="characters"
+                    autoCorrect={false}
                   />
-                  <TouchableOpacity style={styles.connectButton} onPress={handleConnect}>
+                  <TouchableOpacity
+                    style={styles.connectButton}
+                    disabled={submitting}
+                    onPress={handleConnect}
+                  >
                     <Text style={styles.connectButtonText}>連携する</Text>
                   </TouchableOpacity>
                 </View>
@@ -210,10 +410,8 @@ export default function HomeScreen() {
         <View style={[styles.card, SHADOWS.card, styles.actionCard]}>
           <View style={styles.actionHeader}>
             <View>
-              <Text style={styles.actionTitle}>今日の3問</Text>
-              <Text style={styles.actionDate}>
-                {new Date().getMonth() + 1}月{new Date().getDate()}日 のお題
-              </Text>
+              <Text style={styles.actionTitle}>今日の{questions.length}問</Text>
+              <Text style={styles.actionDate}>{formatDisplayDate(todayDate)}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
               <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
@@ -221,18 +419,14 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.questionPreviewList}>
-            <View style={styles.previewItem}>
-              <Text style={styles.previewNumber}>Q1</Text>
-              <Text style={styles.previewText}>どっちが家事に厳しい？</Text>
-            </View>
-            <View style={styles.previewItem}>
-              <Text style={styles.previewNumber}>Q2</Text>
-              <Text style={styles.previewText}>理想の休日はどう過ごしたい？</Text>
-            </View>
-            <View style={styles.previewItem}>
-              <Text style={styles.previewNumber}>Q3</Text>
-              <Text style={styles.previewText}>記念日や誕生日の過ごし方は？</Text>
-            </View>
+            {questions.map((q, idx) => (
+              <View key={q.id} style={styles.previewItem}>
+                <Text style={styles.previewNumber}>Q{idx + 1}</Text>
+                <Text style={styles.previewText} numberOfLines={1}>
+                  {q.title}
+                </Text>
+              </View>
+            ))}
           </View>
 
           <TouchableOpacity
@@ -249,26 +443,9 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-
-        {/* デバッグ用リセットボタン（画面最下部に控えめに配置） */}
-        <View style={styles.debugSection}>
-          <TouchableOpacity
-            style={styles.resetButton}
-            activeOpacity={0.7}
-            onPress={() => {
-              resetAnswers();
-              Alert.alert('リセット完了', '回答状況を初期状態に戻しました。最初からスワイプを試せます。');
-            }}
-          >
-            <Ionicons name="refresh-circle-outline" size={17} color={COLORS.textLight} />
-            <Text style={styles.resetButtonText}>【動作確認用】回答状況を初期状態にリセット</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
 
-      {/* ========================================================
-          ハンバーガーメニュー（スライドモーダル）
-          ======================================================== */}
+      {/* ハンバーガーメニュー（スライドモーダル） */}
       <Modal
         visible={isMenuOpen}
         transparent
@@ -276,10 +453,8 @@ export default function HomeScreen() {
         onRequestClose={() => setIsMenuOpen(false)}
       >
         <View style={styles.modalOverlay}>
-          {/* 背景タップで閉じる */}
           <Pressable style={styles.backdrop} onPress={() => setIsMenuOpen(false)} />
 
-          {/* 右から表示されるメニューパネル */}
           <View style={[styles.menuDrawer, SHADOWS.cardFloating]}>
             <View style={styles.drawerHeader}>
               <Text style={styles.drawerTitle}>メニュー</Text>
@@ -293,17 +468,15 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.drawerContent}>
-              {/* ペア情報ミニバナー */}
               <View style={styles.drawerUserBanner}>
                 <Ionicons name="heart" size={16} color={COLORS.primary} />
                 <Text style={styles.drawerUserText}>
-                  {myName} & {partnerName}
+                  {isPairConnected ? `${myName} & ${partnerName}` : `${myName}（ペア未連携）`}
                 </Text>
               </View>
 
               <View style={styles.drawerSectionDivider} />
 
-              {/* メニュー項目1: 質問の回答比較タイムライン */}
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.7}
@@ -322,7 +495,6 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
 
-              {/* メニュー項目2: 相性分析レポート（AI診断） */}
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.7}
@@ -341,7 +513,6 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
 
-              {/* メニュー項目3: 使い方チュートリアル */}
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.7}
@@ -360,45 +531,56 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
 
-              {/* メニュー項目4: 招待コード共有 */}
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  handleCopyCode();
-                }}
-              >
-                <View style={[styles.menuItemIconBox, { backgroundColor: '#F5ECE3' }]}>
-                  <Ionicons name="share-social-outline" size={20} color={COLORS.textMuted} />
-                </View>
-                <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>招待コードを共有</Text>
-                  <Text style={styles.menuItemSubtext}>{pairCode}</Text>
-                </View>
-                <Ionicons name="copy-outline" size={16} color={COLORS.textLight} />
-              </TouchableOpacity>
+              {pairCode ? (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.7}
+                  onPress={handleCopyCode}
+                >
+                  <View style={[styles.menuItemIconBox, { backgroundColor: '#F5ECE3' }]}>
+                    <Ionicons name="share-social-outline" size={20} color={COLORS.textMuted} />
+                  </View>
+                  <View style={styles.menuItemTextBox}>
+                    <Text style={styles.menuItemTitle}>招待コードを共有</Text>
+                    <Text style={styles.menuItemSubtext}>{pairCode}</Text>
+                  </View>
+                  <Ionicons name="copy-outline" size={16} color={COLORS.textLight} />
+                </TouchableOpacity>
+              ) : null}
 
-              {/* メニュー項目5: 回答状況リセット */}
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsMenuOpen(false);
-                  resetAnswers();
-                  Alert.alert('リセット完了', '回答状況を初期状態に戻しました。');
-                }}
-              >
-                <View style={[styles.menuItemIconBox, { backgroundColor: '#F4ECE4' }]}>
-                  <Ionicons name="refresh-outline" size={20} color={COLORS.textMuted} />
-                </View>
-                <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>回答状況をリセット</Text>
-                  <Text style={styles.menuItemSubtext}>動作確認用</Text>
-                </View>
-              </TouchableOpacity>
+              {hasPair && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.7}
+                  onPress={handleLeavePair}
+                >
+                  <View style={[styles.menuItemIconBox, { backgroundColor: '#FDF1EC' }]}>
+                    <Ionicons name="unlink-outline" size={20} color="#B84A39" />
+                  </View>
+                  <View style={styles.menuItemTextBox}>
+                    <Text style={[styles.menuItemTitle, { color: '#B84A39' }]}>ペアを解除する</Text>
+                    <Text style={styles.menuItemSubtext}>別の相手とペアを組み直す</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {isSupabaseReady && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.7}
+                  onPress={handleDeleteAccount}
+                >
+                  <View style={[styles.menuItemIconBox, { backgroundColor: '#FDECEC' }]}>
+                    <Ionicons name="trash-outline" size={20} color="#B84A39" />
+                  </View>
+                  <View style={styles.menuItemTextBox}>
+                    <Text style={[styles.menuItemTitle, { color: '#B84A39' }]}>アカウント削除</Text>
+                    <Text style={styles.menuItemSubtext}>すべてのデータを削除</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* ドロワー下部 */}
             <View style={styles.drawerFooter}>
               <Text style={styles.drawerVersionText}>ふたりスワイプ v1.0.0</Text>
             </View>
@@ -458,6 +640,23 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 19,
   },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FDF6E9',
+    borderWidth: 1,
+    borderColor: '#F0DEC0',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+  noticeBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#8C6226',
+    lineHeight: 17,
+  },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 22,
@@ -466,16 +665,49 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+  },
+  editNameTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  editNameTriggerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+  },
+  nameEditBox: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  loadingBox: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
   },
   pairedContainer: {
     alignItems: 'center',
@@ -554,6 +786,21 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
+  createPairBtn: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  createPairBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
   myCodeBox: {
     backgroundColor: COLORS.surface,
     padding: 12,
@@ -582,6 +829,28 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  pendingActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  secondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  secondaryBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
   },
   inputSection: {
     marginTop: 4,
@@ -666,6 +935,7 @@ const styles = StyleSheet.create({
     width: 24,
   },
   previewText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
@@ -684,26 +954,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  debugSection: {
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  resetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  resetButtonText: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    fontWeight: '600',
-  },
-
-  // ----------------------------------------------------
-  // ハンバーガーメニューモーダル
-  // ----------------------------------------------------
   modalOverlay: {
     flex: 1,
     flexDirection: 'row',
