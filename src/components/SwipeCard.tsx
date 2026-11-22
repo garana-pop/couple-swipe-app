@@ -15,10 +15,10 @@ import { COLORS, SHADOWS } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// カードと左右スロットの寸法バランス（重ならず綺麗に見える設計）
-const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.64, 245);
-const CARD_HEIGHT = 240;
-const SIDE_SLOT_WIDTH = Math.max((SCREEN_WIDTH - CARD_WIDTH) / 2 - 12, 60);
+// カードと左右スロットの寸法バランス（左右に十分な呼吸スペースを確保）
+const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.56, 224);
+const CARD_HEIGHT = 236;
+const SIDE_SLOT_WIDTH = Math.max((SCREEN_WIDTH - CARD_WIDTH) / 2 - 18, 60);
 
 const VERTICAL_OVERLAP_MIN = 12;
 const HORIZONTAL_OVERLAP_MIN = 20;
@@ -105,15 +105,11 @@ function createStablePanHandlers() {
 
 interface SwipeCardProps {
   question: Question;
-  questionIndex: number;
-  totalQuestions: number;
   onSwipe: (direction: SwipeDirection) => void;
 }
 
 export const SwipeCard: React.FC<SwipeCardProps> = ({
   question,
-  questionIndex,
-  totalQuestions,
   onSwipe,
 }) => {
   // Animated インスタンス
@@ -279,14 +275,10 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
     [pan.x]
   );
 
-  // ドラッグ方向に応じたカードボーダー色と背景色（淡いトーン）
-  const cardBorderColor = activeDirection
-    ? COLORS.directions[activeDirection].color
-    : COLORS.border;
-
-  const cardBgColor = activeDirection
-    ? COLORS.directions[activeDirection].bg
-    : COLORS.card;
+  // ドラッグ方向に応じたカードボーダー色とアクセントカラー
+  const activeColor = activeDirection ? COLORS.directions[activeDirection].color : null;
+  const cardBorderColor = activeColor ?? COLORS.darkCardBorder;
+  const cardAccentColor = activeColor ?? COLORS.primary;
 
   return (
     <View
@@ -296,7 +288,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
       }}
     >
       {/* ========================================================
-          4方向の立体スロット（奥行きと厚みのあるトレイデザイン）
+          4方向の枠なしミニマルスロット（矢印アイコン＋選択肢テキスト）
           ======================================================== */}
 
       {/* 上：UP スロット */}
@@ -307,24 +299,25 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.slotPlate,
           styles.slotTop,
-          styles.slotUpStyle,
-          activeDirection === 'UP' && styles.slotActiveUp,
+          activeDirection === 'UP' && {
+            backgroundColor: COLORS.directions.UP.bg,
+            borderColor: COLORS.directions.UP.color,
+            transform: [{ scale: 1.04 }],
+          },
         ]}
       >
-        <View style={styles.slotHeaderRow}>
-          <Ionicons
-            name="arrow-up-circle"
-            size={18}
-            color={COLORS.directions.UP.color}
-          />
-          <Text style={[styles.slotDirectionLabel, { color: COLORS.directions.UP.color }]}>
-            上にスワイプ
-          </Text>
-        </View>
+        <Ionicons
+          name="arrow-up"
+          size={18}
+          color={COLORS.directions.UP.color}
+        />
         <Text
           style={[
             styles.slotTextHorizontal,
-            activeDirection === 'UP' && styles.slotTextActive,
+            activeDirection === 'UP' && {
+              color: COLORS.directions.UP.color,
+              fontWeight: '800',
+            },
           ]}
           numberOfLines={2}
         >
@@ -332,7 +325,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         </Text>
       </View>
 
-      {/* 左：LEFT スロット（立体縦長トレイ） */}
+      {/* 左：LEFT スロット */}
       <View
         onLayout={(e) => {
           slotLayoutsRef.current.LEFT = e.nativeEvent.layout;
@@ -340,20 +333,25 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.slotPlate,
           styles.slotLeft,
-          styles.slotLeftStyle,
-          activeDirection === 'LEFT' && styles.slotActiveLeft,
+          activeDirection === 'LEFT' && {
+            backgroundColor: COLORS.directions.LEFT.bg,
+            borderColor: COLORS.directions.LEFT.color,
+            transform: [{ scale: 1.04 }],
+          },
         ]}
       >
         <Ionicons
-          name="arrow-back-circle"
-          size={20}
+          name="arrow-back"
+          size={18}
           color={COLORS.directions.LEFT.color}
-          style={styles.slotSideIcon}
         />
         <Text
           style={[
             styles.slotTextVertical,
-            activeDirection === 'LEFT' && styles.slotTextActive,
+            activeDirection === 'LEFT' && {
+              color: COLORS.directions.LEFT.color,
+              fontWeight: '800',
+            },
           ]}
           numberOfLines={4}
         >
@@ -361,7 +359,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         </Text>
       </View>
 
-      {/* 右：RIGHT スロット（立体縦長トレイ） */}
+      {/* 右：RIGHT スロット */}
       <View
         onLayout={(e) => {
           slotLayoutsRef.current.RIGHT = e.nativeEvent.layout;
@@ -369,20 +367,25 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.slotPlate,
           styles.slotRight,
-          styles.slotRightStyle,
-          activeDirection === 'RIGHT' && styles.slotActiveRight,
+          activeDirection === 'RIGHT' && {
+            backgroundColor: COLORS.directions.RIGHT.bg,
+            borderColor: COLORS.directions.RIGHT.color,
+            transform: [{ scale: 1.04 }],
+          },
         ]}
       >
         <Ionicons
-          name="arrow-forward-circle"
-          size={20}
+          name="arrow-forward"
+          size={18}
           color={COLORS.directions.RIGHT.color}
-          style={styles.slotSideIcon}
         />
         <Text
           style={[
             styles.slotTextVertical,
-            activeDirection === 'RIGHT' && styles.slotTextActive,
+            activeDirection === 'RIGHT' && {
+              color: COLORS.directions.RIGHT.color,
+              fontWeight: '800',
+            },
           ]}
           numberOfLines={4}
         >
@@ -398,36 +401,37 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.slotPlate,
           styles.slotBottom,
-          styles.slotDownStyle,
-          activeDirection === 'DOWN' && styles.slotActiveDown,
+          activeDirection === 'DOWN' && {
+            backgroundColor: COLORS.directions.DOWN.bg,
+            borderColor: COLORS.directions.DOWN.color,
+            transform: [{ scale: 1.04 }],
+          },
         ]}
       >
-        <View style={styles.slotHeaderRow}>
-          <Ionicons
-            name="arrow-down-circle"
-            size={18}
-            color={COLORS.directions.DOWN.color}
-          />
-          <Text style={[styles.slotDirectionLabel, { color: COLORS.directions.DOWN.color }]}>
-            下にスワイプ
-          </Text>
-        </View>
         <Text
           style={[
             styles.slotTextHorizontal,
-            activeDirection === 'DOWN' && styles.slotTextActive,
+            activeDirection === 'DOWN' && {
+              color: COLORS.directions.DOWN.color,
+              fontWeight: '800',
+            },
           ]}
           numberOfLines={2}
         >
           {question.choices.DOWN}
         </Text>
+        <Ionicons
+          name="arrow-down"
+          size={18}
+          color={COLORS.directions.DOWN.color}
+        />
       </View>
 
       {/* ========================================================
-          中央カードエリア（奥のカードスタックで奥行きを演出）
+          中央カードエリア（ダーク主役カード＋水平スタック）
           ======================================================== */}
 
-      {/* 奥にあるカード（スタックの奥行き効果） */}
+      {/* 奥にあるカード（水平スタックで奥行き感を演出） */}
       <View
         onLayout={(e) => {
           cardRestLayoutRef.current = e.nativeEvent.layout;
@@ -441,10 +445,9 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.card,
           styles.cardFront,
-          SHADOWS.cardFloating,
+          SHADOWS.darkCardFloating,
           {
             borderColor: cardBorderColor,
-            backgroundColor: cardBgColor,
             transform: [
               { translateX: pan.x },
               { translateY: pan.y },
@@ -453,45 +456,64 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           },
         ]}
       >
-        {/* カード上部：シンプルなカテゴリ＆カウント */}
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Text style={styles.categoryText}>{question.category}</Text>
-            {question.repeatBadge && (
-              <View style={styles.repeatBadge}>
-                <Ionicons name="time-outline" size={11} color={COLORS.primaryDark} />
-                <Text style={styles.repeatBadgeText}>{question.repeatBadge}</Text>
+        <View style={styles.cardInner}>
+          {/* 上部アクセントライン */}
+          <View style={[styles.cardAccentBar, { backgroundColor: cardAccentColor }]} />
+
+          <View style={styles.cardBody}>
+            {/* カード上部：カテゴリ＆グリップアイコン */}
+            <View style={styles.cardHeader}>
+              <View style={styles.cardHeaderLeft}>
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryText}>{question.category}</Text>
+                </View>
+                {question.repeatBadge && (
+                  <View style={styles.repeatBadge}>
+                    <Ionicons name="time-outline" size={11} color={COLORS.secondary} />
+                    <Text style={styles.repeatBadgeText}>{question.repeatBadge}</Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-          <Text style={styles.counterText}>
-            {questionIndex + 1} / {totalQuestions}
-          </Text>
-        </View>
+              <Ionicons
+                name="ellipsis-horizontal"
+                size={16}
+                color="rgba(255, 255, 255, 0.35)"
+              />
+            </View>
 
-        {/* 質問文 */}
-        <View style={styles.questionBox}>
-          <Text style={styles.questionTitle}>{question.title}</Text>
-        </View>
+            {/* 質問文 */}
+            <View style={styles.questionBox}>
+              <Text style={styles.questionTitle}>{question.title}</Text>
+            </View>
 
-        {/* カード下部：シンプルなジェスチャーガイド */}
-        <View style={styles.cardFooter}>
-          <View style={styles.swipeGuidePill}>
-            <Ionicons
-              name="move-outline"
-              size={16}
-              color={activeDirection ? COLORS.directions[activeDirection].color : COLORS.primary}
-            />
-            <Text
-              style={[
-                styles.swipeGuideText,
-                activeDirection && { color: COLORS.directions[activeDirection].color, fontWeight: '700' },
-              ]}
-            >
-              {activeDirection
-                ? `「${question.choices[activeDirection]}」`
-                : '上下左右にスワイプ'}
-            </Text>
+            {/* カード下部：ジェスチャーガイド */}
+            <View style={styles.cardFooter}>
+              <View
+                style={[
+                  styles.swipeGuidePill,
+                  activeColor ? { backgroundColor: activeColor } : null,
+                ]}
+              >
+                <Ionicons
+                  name="move-outline"
+                  size={15}
+                  color={activeColor ? COLORS.darkCardText : COLORS.secondary}
+                />
+                <Text
+                  style={[
+                    styles.swipeGuideText,
+                    activeColor
+                      ? { color: COLORS.darkCardText, fontWeight: '700' }
+                      : null,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {activeDirection
+                    ? `「${question.choices[activeDirection]}」`
+                    : '上下左右にスワイプ'}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
       </Animated.View>
@@ -510,161 +532,119 @@ const styles = StyleSheet.create({
   },
 
   // ----------------------------------------------------
-  // 立体スロット（厚み・ベベルと奥行きを持たせたデザイン）
+  // 4方向ミニマルスロット（通常時は枠なし・矢印＋テキストのみ）
   // ----------------------------------------------------
   slotPlate: {
     position: 'absolute',
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1.5,
-    borderBottomWidth: 4, // 物理的な厚み（3Dプレート感）
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
     zIndex: 1,
-    ...SHADOWS.depthSlot,
   },
 
   // 上スロット
   slotTop: {
     top: 16,
-    left: 20,
-    right: 20,
+    left: 24,
+    right: 24,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     alignItems: 'center',
-  },
-  slotUpStyle: {
-    backgroundColor: COLORS.directions.UP.bg,
-    borderColor: COLORS.directions.UP.border,
-    borderBottomColor: COLORS.directions.UP.color,
-  },
-  slotActiveUp: {
-    transform: [{ scale: 1.04 }],
-    borderColor: COLORS.directions.UP.color,
-    ...SHADOWS.depthSlotActive,
+    gap: 4,
   },
 
   // 下スロット
   slotBottom: {
-    bottom: 24,
-    left: 20,
-    right: 20,
+    bottom: 22,
+    left: 24,
+    right: 24,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  slotDownStyle: {
-    backgroundColor: COLORS.directions.DOWN.bg,
-    borderColor: COLORS.directions.DOWN.border,
-    borderBottomColor: COLORS.directions.DOWN.color,
-  },
-  slotActiveDown: {
-    transform: [{ scale: 1.04 }],
-    borderColor: COLORS.directions.DOWN.color,
-    ...SHADOWS.depthSlotActive,
-  },
-
-  // 左スロット（縦長トレイ・中央カードと干渉しない幅）
-  slotLeft: {
-    left: 8,
-    top: '50%',
-    marginTop: -85,
-    width: SIDE_SLOT_WIDTH,
-    height: 170,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slotLeftStyle: {
-    backgroundColor: COLORS.directions.LEFT.bg,
-    borderColor: COLORS.directions.LEFT.border,
-    borderBottomColor: COLORS.directions.LEFT.color,
-  },
-  slotActiveLeft: {
-    transform: [{ scale: 1.05 }],
-    borderColor: COLORS.directions.LEFT.color,
-    borderBottomWidth: 5,
-    ...SHADOWS.depthSlotActive,
-  },
-
-  // 右スロット（縦長トレイ・中央カードと干渉しない幅）
-  slotRight: {
-    right: 8,
-    top: '50%',
-    marginTop: -85,
-    width: SIDE_SLOT_WIDTH,
-    height: 170,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slotRightStyle: {
-    backgroundColor: COLORS.directions.RIGHT.bg,
-    borderColor: COLORS.directions.RIGHT.border,
-    borderBottomColor: COLORS.directions.RIGHT.color,
-  },
-  slotActiveRight: {
-    transform: [{ scale: 1.05 }],
-    borderColor: COLORS.directions.RIGHT.color,
-    borderBottomWidth: 5,
-    ...SHADOWS.depthSlotActive,
-  },
-
-  // スロット共通内部パーツ
-  slotHeaderRow: {
-    flexDirection: 'row',
+    paddingHorizontal: 14,
     alignItems: 'center',
     gap: 4,
-    marginBottom: 2,
   },
-  slotDirectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+
+  // 左スロット（中央カードとの間に十分な呼吸スペースを確保）
+  slotLeft: {
+    left: 6,
+    top: '50%',
+    marginTop: -85,
+    width: SIDE_SLOT_WIDTH,
+    height: 170,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
+
+  // 右スロット
+  slotRight: {
+    right: 6,
+    top: '50%',
+    marginTop: -85,
+    width: SIDE_SLOT_WIDTH,
+    height: 170,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+
+  // スロットテキスト
   slotTextHorizontal: {
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
     textAlign: 'center',
-  },
-  slotSideIcon: {
-    marginBottom: 8,
+    lineHeight: 19,
   },
   slotTextVertical: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.text,
     textAlign: 'center',
-    lineHeight: 16,
-  },
-  slotTextActive: {
-    color: COLORS.text,
-    fontWeight: '800',
+    lineHeight: 17,
   },
 
   // ----------------------------------------------------
-  // 中央カード（レイヤードカードスタック）
+  // 中央カード（ダークエスプレッソ主役カード＋水平スタック）
   // ----------------------------------------------------
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: 24,
-    backgroundColor: COLORS.card,
-    padding: 18,
-    justifyContent: 'space-between',
+    backgroundColor: COLORS.darkCard,
   },
-  // 奥のカード（奥行き感を演出）
+  // 奥のカード（水平スタックで奥行き感を演出）
   cardBehind: {
     position: 'absolute',
-    backgroundColor: '#F7EFE7',
-    borderWidth: 1.5,
-    borderColor: '#E8DCCF',
-    transform: [{ rotate: '-3deg' }, { scale: 0.94 }],
+    backgroundColor: COLORS.darkCardBehind,
+    borderWidth: 1,
+    borderColor: COLORS.darkCardBehindBorder,
+    transform: [{ translateY: 10 }, { scale: 0.94 }],
     zIndex: 5,
   },
   // 手前のメイン操作カード
   cardFront: {
     borderWidth: 2,
     zIndex: 10,
+  },
+  cardInner: {
+    flex: 1,
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  cardAccentBar: {
+    height: 5,
+    width: '100%',
+  },
+  cardBody: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -675,49 +655,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 1,
+  },
+  categoryBadge: {
+    backgroundColor: 'rgba(242, 160, 126, 0.18)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.secondary,
   },
   repeatBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
   repeatBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: COLORS.primaryDark,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primaryDark,
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  counterText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textLight,
+    color: COLORS.darkCardMuted,
   },
   questionBox: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 6,
+    paddingHorizontal: 2,
   },
   questionTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '800',
-    color: COLORS.text,
+    color: COLORS.darkCardText,
     textAlign: 'center',
-    lineHeight: 27,
+    lineHeight: 26,
     letterSpacing: -0.3,
   },
   cardFooter: {
@@ -727,14 +706,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 16,
+    maxWidth: '100%',
   },
   swipeGuideText: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.textMuted,
+    color: COLORS.darkCardMuted,
+    flexShrink: 1,
   },
 });

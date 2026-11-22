@@ -5,13 +5,19 @@ export const COLORS = {
   primaryLight: '#FDF1EC',
   primaryDark: '#C85338',
   secondary: '#F2A07E',    // ほっこりアプリコット
-  background: '#FAF6F0',   // やわらかなリネン・ラテベージュ
+  background: '#F5EFE7',   // 輪郭が引き締まるリネン・ラテベージュ
   card: '#FFFFFF',
+  darkCard: '#3A302C',     // 質問カード主役用ダークエスプレッソ
+  darkCardBorder: '#2C2320',
+  darkCardBehind: '#6B5C55',
+  darkCardBehindBorder: '#574A44',
+  darkCardText: '#FFFFFF',
+  darkCardMuted: '#E2D6CE',
   text: '#2D2522',         // 温かみのあるダークブラウン
   textMuted: '#7D716A',    // ウォームトープ
   textLight: '#B0A59E',
-  border: '#EFE7DE',
-  surface: '#F4ECE4',
+  border: '#E4D8CA',
+  surface: '#ECE3D8',
 
   // 4方向のカラー（落ち着きと温もりのあるアース＆パステルトーン）
   directions: {
@@ -67,6 +73,13 @@ export const SHADOWS = {
     shadowOpacity: 0.16,
     shadowRadius: 20,
     elevation: 8,
+  },
+  darkCardFloating: {
+    shadowColor: '#2D2522',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 10,
   },
   // 選択肢エリアの奥行き・立体感シャドウ
   depthSlot: {

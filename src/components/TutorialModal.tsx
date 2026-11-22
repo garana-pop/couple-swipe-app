@@ -29,40 +29,45 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ visible, onClose }
           {/* 上 */}
           <View style={[styles.diagramSlot, styles.slotUp]}>
             <Ionicons name="arrow-up" size={14} color={COLORS.directions.UP.color} />
-            <Text style={[styles.diagramSlotText, { color: COLORS.directions.UP.color }]}>上へスワイプ</Text>
+            <Text style={styles.diagramSlotText}>上へスワイプ</Text>
           </View>
 
           {/* 中段（左・中央カード・右） */}
           <View style={styles.diagramMiddleRow}>
             {/* 左 */}
-            <View style={[styles.diagramSlot, styles.slotLeft]}>
+            <View style={styles.diagramSlot}>
               <Ionicons name="arrow-back" size={14} color={COLORS.directions.LEFT.color} />
-              <Text style={[styles.diagramSlotText, { color: COLORS.directions.LEFT.color }]}>左へ</Text>
+              <Text style={styles.diagramSlotText}>左へ</Text>
             </View>
 
-            {/* 中央カード */}
+            {/* 中央カード（ダーク主役カード） */}
             <View style={[styles.diagramCenterCard, SHADOWS.cardSmall]}>
-              <View style={styles.diagramCategoryTag}>
-                <Text style={styles.diagramCategoryText}>質問カード</Text>
-              </View>
-              <Text style={styles.diagramCardTitle}>質問文</Text>
-              <View style={styles.diagramSwipeHint}>
-                <Ionicons name="move" size={14} color={COLORS.primary} />
-                <Text style={styles.diagramSwipeText}>ドラッグ</Text>
+              <View style={styles.diagramCardInner}>
+                <View style={styles.diagramCardAccent} />
+                <View style={styles.diagramCardBody}>
+                  <View style={styles.diagramCategoryTag}>
+                    <Text style={styles.diagramCategoryText}>質問カード</Text>
+                  </View>
+                  <Text style={styles.diagramCardTitle}>質問文</Text>
+                  <View style={styles.diagramSwipeHint}>
+                    <Ionicons name="move" size={11} color={COLORS.secondary} />
+                    <Text style={styles.diagramSwipeText}>ドラッグ</Text>
+                  </View>
+                </View>
               </View>
             </View>
 
             {/* 右 */}
-            <View style={[styles.diagramSlot, styles.slotRight]}>
+            <View style={styles.diagramSlot}>
+              <Text style={styles.diagramSlotText}>右へ</Text>
               <Ionicons name="arrow-forward" size={14} color={COLORS.directions.RIGHT.color} />
-              <Text style={[styles.diagramSlotText, { color: COLORS.directions.RIGHT.color }]}>右へ</Text>
             </View>
           </View>
 
           {/* 下 */}
           <View style={[styles.diagramSlot, styles.slotDown]}>
+            <Text style={styles.diagramSlotText}>下へスワイプ</Text>
             <Ionicons name="arrow-down" size={14} color={COLORS.directions.DOWN.color} />
-            <Text style={[styles.diagramSlotText, { color: COLORS.directions.DOWN.color }]}>下へスワイプ</Text>
           </View>
         </View>
       ),
@@ -269,7 +274,7 @@ const styles = StyleSheet.create({
   graphicArea: {
     width: '100%',
     height: 180,
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.background,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -319,7 +324,7 @@ const styles = StyleSheet.create({
   },
 
   // ----------------------------------------------------
-  // 図解1: 4方向スワイプダイアグラム
+  // 図解1: 4方向スワイプダイアグラム（ダークカード＋枠なしスロット）
   // ----------------------------------------------------
   diagramContainer: {
     alignItems: 'center',
@@ -327,81 +332,84 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   diagramSlot: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 4,
   },
   slotUp: {
-    backgroundColor: COLORS.directions.UP.bg,
-    borderColor: COLORS.directions.UP.border,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   slotDown: {
-    backgroundColor: COLORS.directions.DOWN.bg,
-    borderColor: COLORS.directions.DOWN.border,
-    marginTop: 6,
-  },
-  slotLeft: {
-    backgroundColor: COLORS.directions.LEFT.bg,
-    borderColor: COLORS.directions.LEFT.border,
-  },
-  slotRight: {
-    backgroundColor: COLORS.directions.RIGHT.bg,
-    borderColor: COLORS.directions.RIGHT.border,
+    marginTop: 8,
   },
   diagramSlotText: {
     fontSize: 10,
     fontWeight: '700',
+    color: COLORS.text,
   },
   diagramMiddleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   diagramCenterCard: {
-    width: 108,
-    height: 74,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    width: 112,
+    height: 82,
+    backgroundColor: COLORS.darkCard,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: COLORS.darkCardBorder,
+  },
+  diagramCardInner: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  diagramCardAccent: {
+    height: 3,
+    width: '100%',
+    backgroundColor: COLORS.primary,
+  },
+  diagramCardBody: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 6,
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
   },
   diagramCategoryTag: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: 'rgba(242, 160, 126, 0.18)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    marginBottom: 2,
   },
   diagramCategoryText: {
     fontSize: 8,
     fontWeight: '700',
-    color: COLORS.primaryDark,
+    color: COLORS.secondary,
   },
   diagramCardTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: COLORS.text,
+    color: COLORS.darkCardText,
   },
   diagramSwipeHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    marginTop: 2,
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   diagramSwipeText: {
-    fontSize: 9,
-    color: COLORS.primaryDark,
+    fontSize: 8,
+    color: COLORS.darkCardMuted,
     fontWeight: '600',
   },
 

@@ -61,8 +61,6 @@ export default function QuizScreen() {
             <SwipeCard
               key={currentQuestion.id}
               question={currentQuestion}
-              questionIndex={currentIndex}
-              totalQuestions={total}
               onSwipe={handleSwipeAnswer}
             />
           )}
@@ -88,7 +86,7 @@ const styles = StyleSheet.create({
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: '#EDE5DC',
+    backgroundColor: COLORS.border,
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 8,

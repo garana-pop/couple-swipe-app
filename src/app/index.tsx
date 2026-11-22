@@ -188,6 +188,45 @@ export default function HomeScreen() {
 
   const badge = getStatusBadge();
 
+  const renderActionCard = () => (
+    <View style={[styles.card, SHADOWS.card]}>
+      <View style={styles.actionHeader}>
+        <View>
+          <Text style={styles.actionTitle}>今日の{questions.length}問</Text>
+          <Text style={styles.actionDate}>{formatDisplayDate(todayDate)}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
+          <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
+        </View>
+      </View>
+
+      <View style={styles.questionPreviewList}>
+        {questions.map((q, idx) => (
+          <View key={q.id} style={styles.previewItem}>
+            <Text style={styles.previewNumber}>Q{idx + 1}</Text>
+            <Text style={styles.previewText} numberOfLines={1}>
+              {q.title}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <TouchableOpacity
+        style={styles.mainButton}
+        activeOpacity={0.8}
+        onPress={handleQuizAction}
+      >
+        <Ionicons
+          name={!isMyCompleted ? 'play' : !isPartnerCompleted ? 'lock-closed' : 'sparkles'}
+          size={18}
+          color="#FFFFFF"
+        />
+        <Text style={styles.mainButtonText}>{getQuizButtonText()}</Text>
+        <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.outerContainer}>
       <TutorialModal visible={isTutorialVisible} onClose={completeTutorial} />
@@ -215,18 +254,6 @@ export default function HomeScreen() {
           <RefreshControl refreshing={isLoading} onRefresh={refreshState} tintColor={COLORS.primary} />
         }
       >
-        {/* ウェルカムバナー */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroBadge}>
-            <Ionicons name="heart" size={13} color={COLORS.primary} />
-            <Text style={styles.heroBadgeText}>二人同時4択スワイプ診断</Text>
-          </View>
-          <Text style={styles.heroTitle}>ふたりスワイプ</Text>
-          <Text style={styles.heroSubtitle}>
-            1日3問、4方向スワイプで答える。{'\n'}お互いが回答を終えて初めて結果がひらく。
-          </Text>
-        </View>
-
         {!isSupabaseReady && (
           <View style={styles.noticeBanner}>
             <Ionicons name="information-circle-outline" size={18} color="#9E6B24" />
@@ -243,206 +270,215 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ペア連携ステータスカード */}
-        <View style={[styles.card, SHADOWS.card]}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="people" size={20} color={COLORS.primary} />
-              <Text style={styles.cardTitle}>ペア連携状況</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.editNameTrigger}
-              onPress={() => {
-                setNameInput(myName);
-                setIsEditingName((v) => !v);
-              }}
-            >
-              <Ionicons name="create-outline" size={14} color={COLORS.primaryDark} />
-              <Text style={styles.editNameTriggerText}>名前: {myName}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {isEditingName && (
-            <View style={styles.nameEditBox}>
-              <TextInput
-                style={styles.input}
-                placeholder="あなたの表示名"
-                value={nameInput}
-                onChangeText={setNameInput}
-                maxLength={20}
-              />
-              <TouchableOpacity style={styles.connectButton} onPress={handleSaveName}>
-                <Text style={styles.connectButtonText}>保存</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!isInitialized ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator color={COLORS.primary} />
-              <Text style={styles.loadingText}>接続状態を確認中...</Text>
-            </View>
-          ) : isPairConnected ? (
-            <View style={styles.pairedContainer}>
-              <View style={styles.avatarRow}>
-                <View style={styles.avatarBox}>
-                  <View style={[styles.avatarCircle, { backgroundColor: '#FDF0EC' }]}>
-                    <Text style={styles.avatarInitial}>{myName.slice(0, 1)}</Text>
+        {isInitialized && isPairConnected ? (
+          <>
+            {/* コンパクトペアステータスバー */}
+            <View style={[styles.compactPairBar, SHADOWS.cardSmall]}>
+              <View style={styles.compactPairBarMain}>
+                <View style={styles.compactPairIdentity}>
+                  <View style={styles.compactAvatars}>
+                    <View style={[styles.compactAvatarCircle, { backgroundColor: '#FDF0EC' }]}>
+                      <Text style={styles.compactAvatarInitial}>{myName.slice(0, 1)}</Text>
+                    </View>
+                    <Ionicons name="heart" size={13} color={COLORS.primary} />
+                    <View style={[styles.compactAvatarCircle, { backgroundColor: '#F0F5F9' }]}>
+                      <Text style={styles.compactAvatarInitial}>{partnerName.slice(0, 1)}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.avatarName}>{myName} (あなた)</Text>
+                  <Text style={styles.compactPairNames} numberOfLines={1}>
+                    {myName} & {partnerName}
+                  </Text>
                 </View>
 
-                <View style={styles.heartConnector}>
-                  <Ionicons name="heart" size={22} color={COLORS.primary} />
-                  <Text style={styles.connectedText}>連携中</Text>
-                </View>
-
-                <View style={styles.avatarBox}>
-                  <View style={[styles.avatarCircle, { backgroundColor: '#F0F5F9' }]}>
-                    <Text style={styles.avatarInitial}>{partnerName.slice(0, 1)}</Text>
-                  </View>
-                  <Text style={styles.avatarName}>{partnerName} (パートナー)</Text>
-                </View>
-              </View>
-
-              <View style={styles.pairCodeInfo}>
-                <Text style={styles.pairCodeLabel}>二人の招待コード：</Text>
-                <TouchableOpacity
-                  style={styles.copyButton}
-                  activeOpacity={0.7}
-                  onPress={handleCopyCode}
-                >
-                  <Text style={styles.pairCodeValue}>{pairCode}</Text>
-                  <Ionicons
-                    name={copied ? 'checkmark-circle' : 'copy-outline'}
-                    size={15}
-                    color={copied ? '#4A7C59' : COLORS.textMuted}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : hasPair ? (
-            <View style={styles.unpairedContainer}>
-              <Text style={styles.unpairedDesc}>
-                招待コードを発行しました！パートナーがこのコードを入力するとペア連携が完了します。
-              </Text>
-
-              <View style={styles.myCodeBox}>
-                <Text style={styles.inputLabel}>あなたの招待コード（有効期限7日間）：</Text>
-                <View style={styles.codeRow}>
-                  <Text style={styles.myCodeText}>{pairCode}</Text>
-                  <TouchableOpacity style={styles.codeCopyBtn} onPress={handleCopyCode}>
-                    <Text style={styles.codeCopyBtnText}>
-                      {copied ? 'コピー済み' : 'コピー'}
-                    </Text>
+                <View style={styles.compactPairActions}>
+                  <TouchableOpacity
+                    style={styles.compactActionChip}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setNameInput(myName);
+                      setIsEditingName((v) => !v);
+                    }}
+                  >
+                    <Ionicons name="create-outline" size={13} color={COLORS.primaryDark} />
+                    <Text style={styles.compactActionChipText}>名前</Text>
                   </TouchableOpacity>
+                  {pairCode ? (
+                    <TouchableOpacity
+                      style={styles.compactActionChip}
+                      activeOpacity={0.7}
+                      onPress={handleCopyCode}
+                    >
+                      <Text style={styles.compactCodeText}>{pairCode}</Text>
+                      <Ionicons
+                        name={copied ? 'checkmark-circle' : 'copy-outline'}
+                        size={13}
+                        color={copied ? '#4A7C59' : COLORS.textMuted}
+                      />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
 
-              <View style={styles.pendingActionsRow}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={refreshState}>
-                  <Ionicons name="refresh-outline" size={15} color={COLORS.primaryDark} />
-                  <Text style={styles.secondaryBtnText}>参加を確認</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={async () => {
-                    const res = await regenerateInviteCode();
-                    if (!res.ok) Alert.alert('エラー', res.error);
-                  }}
-                >
-                  <Ionicons name="key-outline" size={15} color={COLORS.primaryDark} />
-                  <Text style={styles.secondaryBtnText}>コード再発行</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={handleLeavePair}>
-                  <Ionicons name="close-circle-outline" size={15} color="#B84A39" />
-                  <Text style={[styles.secondaryBtnText, { color: '#B84A39' }]}>解除</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.unpairedContainer}>
-              <Text style={styles.unpairedDesc}>
-                どちらか1人が「招待コードを発行」し、もう1人がコードを入力してペアリングしましょう。
-              </Text>
-
-              <TouchableOpacity
-                style={styles.createPairBtn}
-                activeOpacity={0.8}
-                disabled={submitting}
-                onPress={handleCreatePair}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.createPairBtnText}>新しいペアを作る（招待コード発行）</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>パートナーの招待コードを入力して参加：</Text>
-                <View style={styles.inputRow}>
+              {isEditingName && (
+                <View style={styles.compactNameEditBox}>
                   <TextInput
                     style={styles.input}
-                    placeholder="例: K7M9P2X4"
-                    value={inputCode}
-                    onChangeText={setInputCode}
-                    autoCapitalize="characters"
-                    autoCorrect={false}
+                    placeholder="あなたの表示名"
+                    value={nameInput}
+                    onChangeText={setNameInput}
+                    maxLength={20}
                   />
-                  <TouchableOpacity
-                    style={styles.connectButton}
-                    disabled={submitting}
-                    onPress={handleConnect}
-                  >
-                    <Text style={styles.connectButtonText}>連携する</Text>
+                  <TouchableOpacity style={styles.connectButton} onPress={handleSaveName}>
+                    <Text style={styles.connectButtonText}>保存</Text>
                   </TouchableOpacity>
                 </View>
+              )}
+            </View>
+
+            {/* 今日の質問メインアクションカード（連携済み時は最上部に配置） */}
+            {renderActionCard()}
+          </>
+        ) : (
+          <>
+            {/* ウェルカムバナー（ヘッダーとのタイトル重複を解消） */}
+            <View style={styles.heroSection}>
+              <View style={styles.heroBadge}>
+                <Ionicons name="heart" size={13} color={COLORS.primary} />
+                <Text style={styles.heroBadgeText}>二人同時4択スワイプ診断</Text>
               </View>
+              <Text style={styles.heroSubtitle}>
+                1日3問、4方向スワイプで答える。{'\n'}お互いが回答を終えて初めて結果がひらく。
+              </Text>
             </View>
-          )}
-        </View>
 
-        {/* 今日の質問メインアクションカード */}
-        <View style={[styles.card, SHADOWS.card, styles.actionCard]}>
-          <View style={styles.actionHeader}>
-            <View>
-              <Text style={styles.actionTitle}>今日の{questions.length}問</Text>
-              <Text style={styles.actionDate}>{formatDisplayDate(todayDate)}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-              <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
-            </View>
-          </View>
-
-          <View style={styles.questionPreviewList}>
-            {questions.map((q, idx) => (
-              <View key={q.id} style={styles.previewItem}>
-                <Text style={styles.previewNumber}>Q{idx + 1}</Text>
-                <Text style={styles.previewText} numberOfLines={1}>
-                  {q.title}
-                </Text>
+            {/* ペア連携ステータスカード */}
+            <View style={[styles.card, SHADOWS.card]}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="people" size={20} color={COLORS.primary} />
+                  <Text style={styles.cardTitle}>ペア連携状況</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.editNameTrigger}
+                  onPress={() => {
+                    setNameInput(myName);
+                    setIsEditingName((v) => !v);
+                  }}
+                >
+                  <Ionicons name="create-outline" size={14} color={COLORS.primaryDark} />
+                  <Text style={styles.editNameTriggerText}>名前: {myName}</Text>
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
 
-          <TouchableOpacity
-            style={styles.mainButton}
-            activeOpacity={0.8}
-            onPress={handleQuizAction}
-          >
-            <Ionicons
-              name={!isMyCompleted ? 'play' : !isPartnerCompleted ? 'lock-closed' : 'sparkles'}
-              size={18}
-              color="#FFFFFF"
-            />
-            <Text style={styles.mainButtonText}>{getQuizButtonText()}</Text>
-            <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+              {isEditingName && (
+                <View style={styles.nameEditBox}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="あなたの表示名"
+                    value={nameInput}
+                    onChangeText={setNameInput}
+                    maxLength={20}
+                  />
+                  <TouchableOpacity style={styles.connectButton} onPress={handleSaveName}>
+                    <Text style={styles.connectButtonText}>保存</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!isInitialized ? (
+                <View style={styles.loadingBox}>
+                  <ActivityIndicator color={COLORS.primary} />
+                  <Text style={styles.loadingText}>接続状態を確認中...</Text>
+                </View>
+              ) : hasPair ? (
+                <View style={styles.unpairedContainer}>
+                  <Text style={styles.unpairedDesc}>
+                    招待コードを発行しました！パートナーがこのコードを入力するとペア連携が完了します。
+                  </Text>
+
+                  <View style={styles.myCodeBox}>
+                    <Text style={styles.inputLabel}>あなたの招待コード（有効期限7日間）：</Text>
+                    <View style={styles.codeRow}>
+                      <Text style={styles.myCodeText}>{pairCode}</Text>
+                      <TouchableOpacity style={styles.codeCopyBtn} onPress={handleCopyCode}>
+                        <Text style={styles.codeCopyBtnText}>
+                          {copied ? 'コピー済み' : 'コピー'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.pendingActionsRow}>
+                    <TouchableOpacity style={styles.secondaryBtn} onPress={refreshState}>
+                      <Ionicons name="refresh-outline" size={15} color={COLORS.primaryDark} />
+                      <Text style={styles.secondaryBtnText}>参加を確認</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.secondaryBtn}
+                      onPress={async () => {
+                        const res = await regenerateInviteCode();
+                        if (!res.ok) Alert.alert('エラー', res.error);
+                      }}
+                    >
+                      <Ionicons name="key-outline" size={15} color={COLORS.primaryDark} />
+                      <Text style={styles.secondaryBtnText}>コード再発行</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryBtn} onPress={handleLeavePair}>
+                      <Ionicons name="close-circle-outline" size={15} color="#B84A39" />
+                      <Text style={[styles.secondaryBtnText, { color: '#B84A39' }]}>解除</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.unpairedContainer}>
+                  <Text style={styles.unpairedDesc}>
+                    どちらか1人が「招待コードを発行」し、もう1人がコードを入力してペアリングしましょう。
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.createPairBtn}
+                    activeOpacity={0.8}
+                    disabled={submitting}
+                    onPress={handleCreatePair}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.createPairBtnText}>新しいペアを作る（招待コード発行）</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.inputSection}>
+                    <Text style={styles.inputLabel}>パートナーの招待コードを入力して参加：</Text>
+                    <View style={styles.inputRow}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="例: K7M9P2X4"
+                        value={inputCode}
+                        onChangeText={setInputCode}
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={styles.connectButton}
+                        disabled={submitting}
+                        onPress={handleConnect}
+                      >
+                        <Text style={styles.connectButtonText}>連携する</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* 今日の質問メインアクションカード */}
+            {renderActionCard()}
+          </>
+        )}
       </ScrollView>
 
       {/* ハンバーガーメニュー（スライドモーダル） */}
@@ -610,7 +646,8 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     alignItems: 'center',
-    marginVertical: 14,
+    marginTop: 4,
+    marginBottom: 16,
   },
   heroBadge: {
     flexDirection: 'row',
@@ -627,18 +664,91 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
-  heroTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: COLORS.text,
-    letterSpacing: -0.5,
-  },
   heroSubtitle: {
     fontSize: 13,
     color: COLORS.textMuted,
     textAlign: 'center',
-    marginTop: 6,
     lineHeight: 19,
+  },
+  compactPairBar: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  compactPairBarMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  compactPairIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    minWidth: 0,
+  },
+  compactAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactAvatarCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  compactAvatarInitial: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  compactPairNames: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.text,
+    flexShrink: 1,
+  },
+  compactPairActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  compactActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  compactActionChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+  },
+  compactCodeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+    letterSpacing: 0.6,
+  },
+  compactNameEditBox: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
   noticeBanner: {
     flexDirection: 'row',
@@ -708,76 +818,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 12,
     color: COLORS.textMuted,
-  },
-  pairedContainer: {
-    alignItems: 'center',
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingVertical: 8,
-  },
-  avatarBox: {
-    alignItems: 'center',
-  },
-  avatarCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  avatarInitial: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
-  avatarName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  heartConnector: {
-    alignItems: 'center',
-  },
-  connectedText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginTop: 2,
-  },
-  pairCodeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  pairCodeLabel: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-  },
-  copyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  pairCodeValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.primaryDark,
-    letterSpacing: 1,
   },
   unpairedContainer: {},
   unpairedDesc: {
@@ -887,9 +927,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
-  },
-  actionCard: {
-    borderColor: COLORS.primaryLight,
   },
   actionHeader: {
     flexDirection: 'row',

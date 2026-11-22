@@ -97,7 +97,9 @@ export default function ResultScreen() {
                 {/* 自分の回答 */}
                 <View style={styles.answerRow}>
                   <View style={styles.userTag}>
-                    <Text style={styles.userTagText}>{myName} (あなた)</Text>
+                    <Text style={styles.userTagText} numberOfLines={1} ellipsizeMode="tail">
+                      {myName} (あなた)
+                    </Text>
                   </View>
                   <View style={styles.answerContent}>
                     <View style={[styles.dirIconBox, { backgroundColor: myBadge.color }]}>
@@ -112,7 +114,11 @@ export default function ResultScreen() {
                 {/* パートナーの回答 */}
                 <View style={styles.answerRow}>
                   <View style={[styles.userTag, { backgroundColor: '#F0F5F9' }]}>
-                    <Text style={[styles.userTagText, { color: '#4D779E' }]}>
+                    <Text
+                      style={[styles.userTagText, { color: '#4D779E' }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       {partnerName}
                     </Text>
                   </View>
@@ -300,10 +306,12 @@ const styles = StyleSheet.create({
   },
   userTag: {
     backgroundColor: '#FDF1EC',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
-    width: 85,
+    minWidth: 72,
+    maxWidth: 132,
+    flexShrink: 0,
     alignItems: 'center',
   },
   userTagText: {
