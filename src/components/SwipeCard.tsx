@@ -6,18 +6,60 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  LayoutRectangle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Question, SwipeDirection } from '../types';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = 70; // スワイプ決定のしきい値(px)
 
 // カードと左右スロットの寸法バランス（重ならず綺麗に見える設計）
 const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.64, 245);
 const CARD_HEIGHT = 240;
 const SIDE_SLOT_WIDTH = Math.max((SCREEN_WIDTH - CARD_WIDTH) / 2 - 12, 60);
+
+const VERTICAL_OVERLAP_MIN = 12;
+const HORIZONTAL_OVERLAP_MIN = 20;
+
+function getOverlappingDirection(
+  cardRect: LayoutRectangle,
+  slotLayouts: Partial<Record<SwipeDirection, LayoutRectangle>>
+): SwipeDirection | null {
+  const cardLeft = cardRect.x;
+  const cardRight = cardRect.x + cardRect.width;
+  const cardTop = cardRect.y;
+  const cardBottom = cardRect.y + cardRect.height;
+
+  let bestDir: SwipeDirection | null = null;
+  let bestArea = 0;
+
+  const directions: SwipeDirection[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+  for (const dir of directions) {
+    const slot = slotLayouts[dir];
+    if (!slot) continue;
+
+    const overlapX = Math.max(0, Math.min(cardRight, slot.x + slot.width) - Math.max(cardLeft, slot.x));
+    const overlapY = Math.max(0, Math.min(cardBottom, slot.y + slot.height) - Math.max(cardTop, slot.y));
+
+    if (overlapX <= 0 || overlapY <= 0) continue;
+
+    const meetsThreshold =
+      dir === 'UP' || dir === 'DOWN'
+        ? overlapY >= VERTICAL_OVERLAP_MIN
+        : overlapX >= HORIZONTAL_OVERLAP_MIN;
+
+    if (!meetsThreshold) continue;
+
+    const area = overlapX * overlapY;
+    if (area > bestArea) {
+      bestArea = area;
+      bestDir = dir;
+    }
+  }
+
+  return bestDir;
+}
 
 interface SwipeCardProps {
   question: Question;
@@ -37,21 +79,26 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
   const [activeDirection, setActiveDirection] = useState<SwipeDirection | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // 方向判定ヘルパー
-  const getSwipeDirection = useCallback((dx: number, dy: number): SwipeDirection | null => {
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
+  const [slotLayouts, setSlotLayouts] = useState<Partial<Record<SwipeDirection, LayoutRectangle>>>({});
+  const [cardRestLayout, setCardRestLayout] = useState<LayoutRectangle | null>(null);
 
-    if (absX < 30 && absY < 30) {
-      return null;
-    }
+  // カードが答えのエリア（スロット）に重なっているかを判定
+  const getOverlapForGesture = useCallback(
+    (dx: number, dy: number): SwipeDirection | null => {
+      if (!cardRestLayout) return null;
 
-    if (absX > absY) {
-      return dx > 0 ? 'RIGHT' : 'LEFT';
-    } else {
-      return dy > 0 ? 'DOWN' : 'UP';
-    }
-  }, []);
+      return getOverlappingDirection(
+        {
+          x: cardRestLayout.x + dx,
+          y: cardRestLayout.y + dy,
+          width: cardRestLayout.width,
+          height: cardRestLayout.height,
+        },
+        slotLayouts
+      );
+    },
+    [cardRestLayout, slotLayouts]
+  );
 
   // スワイプアウトのアニメーション
   const animateSwipeOut = useCallback(
@@ -99,24 +146,18 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           if (isAnimating) return;
           pan.setValue({ x: gesture.dx, y: gesture.dy });
 
-          const dir = getSwipeDirection(gesture.dx, gesture.dy);
-          const distance = Math.hypot(gesture.dx, gesture.dy);
-          if (distance >= 30) {
-            setActiveDirection(dir);
-          } else {
-            setActiveDirection(null);
-          }
+          const dir = getOverlapForGesture(gesture.dx, gesture.dy);
+          setActiveDirection(dir);
         },
         onPanResponderRelease: (_, gesture) => {
           if (isAnimating) return;
 
-          const distance = Math.hypot(gesture.dx, gesture.dy);
-          const dir = getSwipeDirection(gesture.dx, gesture.dy);
+          const dir = getOverlapForGesture(gesture.dx, gesture.dy);
 
-          if (distance > SWIPE_THRESHOLD && dir) {
+          if (dir) {
             animateSwipeOut(dir);
           } else {
-            // しきい値未満はスプリングで戻る
+            // 重なっていない場合はスプリングで戻る
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
               friction: 6,
@@ -127,7 +168,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           }
         },
       }),
-    [animateSwipeOut, getSwipeDirection, isAnimating, pan]
+    [animateSwipeOut, getOverlapForGesture, isAnimating, pan]
   );
 
   // カードの回転計算
@@ -157,6 +198,10 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
 
       {/* 上：UP スロット */}
       <View
+        onLayout={(e) => {
+          const layout = e.nativeEvent.layout;
+          setSlotLayouts((prev) => ({ ...prev, UP: layout }));
+        }}
         style={[
           styles.slotPlate,
           styles.slotTop,
@@ -187,6 +232,10 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
 
       {/* 左：LEFT スロット（立体縦長トレイ） */}
       <View
+        onLayout={(e) => {
+          const layout = e.nativeEvent.layout;
+          setSlotLayouts((prev) => ({ ...prev, LEFT: layout }));
+        }}
         style={[
           styles.slotPlate,
           styles.slotLeft,
@@ -213,6 +262,10 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
 
       {/* 右：RIGHT スロット（立体縦長トレイ） */}
       <View
+        onLayout={(e) => {
+          const layout = e.nativeEvent.layout;
+          setSlotLayouts((prev) => ({ ...prev, RIGHT: layout }));
+        }}
         style={[
           styles.slotPlate,
           styles.slotRight,
@@ -239,6 +292,10 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
 
       {/* 下：DOWN スロット */}
       <View
+        onLayout={(e) => {
+          const layout = e.nativeEvent.layout;
+          setSlotLayouts((prev) => ({ ...prev, DOWN: layout }));
+        }}
         style={[
           styles.slotPlate,
           styles.slotBottom,
@@ -272,7 +329,12 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           ======================================================== */}
 
       {/* 奥にあるカード（スタックの奥行き効果） */}
-      <View style={[styles.card, styles.cardBehind, SHADOWS.cardSmall]} />
+      <View
+        onLayout={(e) => {
+          setCardRestLayout(e.nativeEvent.layout);
+        }}
+        style={[styles.card, styles.cardBehind, SHADOWS.cardSmall]}
+      />
 
       {/* 手前の操作可能カード */}
       <Animated.View
