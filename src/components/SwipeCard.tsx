@@ -301,7 +301,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           styles.slotTop,
           activeDirection === 'UP' && {
             backgroundColor: COLORS.directions.UP.bg,
-            borderColor: COLORS.directions.UP.color,
             transform: [{ scale: 1.04 }],
           },
         ]}
@@ -309,13 +308,13 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         <Ionicons
           name="arrow-up"
           size={18}
-          color={COLORS.directions.UP.color}
+          color={activeDirection === 'UP' ? COLORS.directions.UP.activeText : COLORS.directions.UP.color}
         />
         <Text
           style={[
             styles.slotTextHorizontal,
             activeDirection === 'UP' && {
-              color: COLORS.directions.UP.color,
+              color: COLORS.directions.UP.activeText,
               fontWeight: '800',
             },
           ]}
@@ -335,7 +334,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           styles.slotLeft,
           activeDirection === 'LEFT' && {
             backgroundColor: COLORS.directions.LEFT.bg,
-            borderColor: COLORS.directions.LEFT.color,
             transform: [{ scale: 1.04 }],
           },
         ]}
@@ -343,13 +341,13 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         <Ionicons
           name="arrow-back"
           size={18}
-          color={COLORS.directions.LEFT.color}
+          color={activeDirection === 'LEFT' ? COLORS.directions.LEFT.activeText : COLORS.directions.LEFT.color}
         />
         <Text
           style={[
             styles.slotTextVertical,
             activeDirection === 'LEFT' && {
-              color: COLORS.directions.LEFT.color,
+              color: COLORS.directions.LEFT.activeText,
               fontWeight: '800',
             },
           ]}
@@ -369,7 +367,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           styles.slotRight,
           activeDirection === 'RIGHT' && {
             backgroundColor: COLORS.directions.RIGHT.bg,
-            borderColor: COLORS.directions.RIGHT.color,
             transform: [{ scale: 1.04 }],
           },
         ]}
@@ -377,13 +374,13 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         <Ionicons
           name="arrow-forward"
           size={18}
-          color={COLORS.directions.RIGHT.color}
+          color={activeDirection === 'RIGHT' ? COLORS.directions.RIGHT.activeText : COLORS.directions.RIGHT.color}
         />
         <Text
           style={[
             styles.slotTextVertical,
             activeDirection === 'RIGHT' && {
-              color: COLORS.directions.RIGHT.color,
+              color: COLORS.directions.RIGHT.activeText,
               fontWeight: '800',
             },
           ]}
@@ -403,7 +400,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           styles.slotBottom,
           activeDirection === 'DOWN' && {
             backgroundColor: COLORS.directions.DOWN.bg,
-            borderColor: COLORS.directions.DOWN.color,
             transform: [{ scale: 1.04 }],
           },
         ]}
@@ -412,7 +408,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           style={[
             styles.slotTextHorizontal,
             activeDirection === 'DOWN' && {
-              color: COLORS.directions.DOWN.color,
+              color: COLORS.directions.DOWN.activeText,
               fontWeight: '800',
             },
           ]}
@@ -423,7 +419,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         <Ionicons
           name="arrow-down"
           size={18}
-          color={COLORS.directions.DOWN.color}
+          color={activeDirection === 'DOWN' ? COLORS.directions.DOWN.activeText : COLORS.directions.DOWN.color}
         />
       </View>
 
@@ -461,7 +457,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           <View style={[styles.cardAccentBar, { backgroundColor: cardAccentColor }]} />
 
           <View style={styles.cardBody}>
-            {/* カード上部：カテゴリ＆グリップアイコン */}
+            {/* カード上部：カテゴリ＆リマインドバッジ */}
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderLeft}>
                 <View style={styles.categoryBadge}>
@@ -474,11 +470,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
                   </View>
                 )}
               </View>
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={16}
-                color="rgba(255, 255, 255, 0.35)"
-              />
             </View>
 
             {/* 質問文 */}
@@ -537,8 +528,6 @@ const styles = StyleSheet.create({
   slotPlate: {
     position: 'absolute',
     borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
     backgroundColor: 'transparent',
     zIndex: 1,
   },
@@ -565,28 +554,26 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 
-  // 左スロット（中央カードとの間に十分な呼吸スペースを確保）
+  // 左スロット（上下スロットと干渉しない範囲で縦長に確保）
   slotLeft: {
     left: 6,
-    top: '50%',
-    marginTop: -85,
+    top: 100,
+    bottom: 106,
     width: SIDE_SLOT_WIDTH,
-    height: 170,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
 
-  // 右スロット
+  // 右スロット（上下スロットと干渉しない範囲で縦長に確保）
   slotRight: {
     right: 6,
-    top: '50%',
-    marginTop: -85,
+    top: 100,
+    bottom: 106,
     width: SIDE_SLOT_WIDTH,
-    height: 170,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',

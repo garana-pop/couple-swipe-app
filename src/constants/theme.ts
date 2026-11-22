@@ -23,33 +23,40 @@ export const COLORS = {
   directions: {
     UP: {
       color: '#4A7C59',      // セージグリーン
-      bg: '#F2F7F4',
+      activeText: '#2F593C',
+      bg: '#CFE5D6',
       border: '#C8E2D1',
       shadow: 'rgba(74, 124, 89, 0.25)',
       label: '上へスワイプ',
     },
     DOWN: {
       color: '#D45D6E',      // ダスティローズ
-      bg: '#FDF2F4',
+      activeText: '#A83B4B',
+      bg: '#F6D0D7',
       border: '#F8CBD2',
       shadow: 'rgba(212, 93, 110, 0.25)',
       label: '下へスワイプ',
     },
     LEFT: {
       color: '#4D779E',      // スモーキーブルー
-      bg: '#F1F6F9',
+      activeText: '#33587A',
+      bg: '#CCE0EF',
       border: '#CBE0ED',
       shadow: 'rgba(77, 119, 158, 0.25)',
       label: '左へスワイプ',
     },
     RIGHT: {
       color: '#C97A2B',      // ハニーアンバー
-      bg: '#FDF6EE',
+      activeText: '#9B5816',
+      bg: '#F6D8B4',
       border: '#F7DEC1',
       shadow: 'rgba(201, 122, 43, 0.25)',
       label: '右へスワイプ',
     },
-  } as Record<SwipeDirection, { color: string; bg: string; border: string; shadow: string; label: string }>,
+  } as Record<
+    SwipeDirection,
+    { color: string; activeText: string; bg: string; border: string; shadow: string; label: string }
+  >,
 };
 
 export const SHADOWS = {
