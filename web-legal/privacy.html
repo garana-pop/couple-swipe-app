@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>プライバシーポリシー | ふたりスワイプ</title>
+  <style>
+    :root { --bg: #FAF6F1; --card: #FFFFFF; --text: #3A322C; --muted: #6E635B; --primary: #D97559; --border: #EADFD4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif; background: var(--bg); color: var(--text); line-height: 1.75; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px; }
+    h1 { font-size: 24px; margin: 0 0 6px; }
+    .meta { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+    h2 { font-size: 16px; margin: 26px 0 8px; padding-left: 10px; border-left: 4px solid var(--primary); }
+    p, li { font-size: 14px; color: var(--text); }
+    ul { padding-left: 20px; }
+    a { color: #B8563A; }
+    .back { display: inline-block; margin-bottom: 16px; font-size: 13px; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./index.html">← トップへ戻る</a>
+    <div class="card">
+      <h1>プライバシーポリシー</h1>
+      <div class="meta">最終改定日: 2026年11月23日 ／ 対象アプリ: ふたりスワイプ（<code>com.garanapop.coupleswipeapp</code>）</div>
+
+      <p>本プライバシーポリシーは、アプリ「ふたりスワイプ」（以下「本アプリ」）におけるユーザー情報の取り扱いについて定めるものです。</p>
+
+      <h2>1. 取得する情報</h2>
+      <ul>
+        <li><strong>アカウント識別子</strong>：匿名認証により自動発行されるユーザーID。機種変更引き継ぎのために Google アカウント連携を行った場合のみ、Google アカウントのメールアドレス・認証識別子を取得します。</li>
+        <li><strong>ユーザーが入力する情報</strong>：表示名（ニックネーム）、ペア招待コード、日々の質問に対する選択方向（上下左右）の回答履歴。</li>
+        <li><strong>通知用トークン</strong>：パートナーの回答完了通知を配信するための Expo Push Token（プッシュ通知を許可した端末のみ）。</li>
+        <li><strong>課金ステータス情報</strong>：有料プラン（「ふたりプレミアムプラン」）の契約状態・有効期限・商品識別子（決済カード情報自体は Google Play が処理し、本アプリでは保持しません）。</li>
+      </ul>
+
+      <h2>2. 利用目的</h2>
+      <ul>
+        <li>ペア間の出題同期、双方回答完了後の結果公開、および過去の回答比較機能の提供</li>
+        <li>パートナーの回答通知の配信</li>
+        <li>有料プラン加入ペアに対する AI 相性レポートの生成・表示</li>
+        <li>機種変更時のデータ引き継ぎ、不正利用防止（招待コード試行制限・レート制限）</li>
+      </ul>
+
+      <h2>3. 第三者提供・外部サービスの利用</h2>
+      <p>本アプリは機能提供のため、以下の信頼できる外部サービスを利用しています。法令に基づく場合を除き、ユーザーデータを広告目的で販売・提供することはありません。</p>
+      <ul>
+        <li><strong>Supabase</strong>（データベース・認証・サーバー処理）</li>
+        <li><strong>Expo / Firebase Cloud Messaging (FCM)</strong>（プッシュ通知配信）</li>
+        <li><strong>Google Play Billing / RevenueCat</strong>（サブスクリプション決済および購入状態の検証）</li>
+        <li><strong>Google Gemini API</strong>（有料プラン加入ペアが AI 相性レポート生成を実行した場合に限り、回答履歴テキストを分析のために送信します。無料ユーザーのデータは AI API へ送信されません）</li>
+      </ul>
+
+      <h2>4. データの保管期間と自動削除</h2>
+      <ul>
+        <li>長期間利用されていないペアデータ（最終利用から180日以上経過）は、自動的にデータベースから削除されます。</li>
+        <li>ユーザーはアプリ内または Web ページからいつでも即時にアカウントおよび関連データを削除できます。詳しくは <a href="./account-deletion.html">アカウント・データ削除のご案内</a> をご覧ください。</li>
+      </ul>
+
+      <h2>5. 安全管理措置</h2>
+      <p>通信はすべて HTTPS (TLS) により暗号化され、データベースには Row Level Security (RLS) を適用し、所属ペア以外の第三者および回答完了前の相手から回答内容を参照できないアクセス制御を行っています。</p>
+
+      <h2>6. お問い合わせ</h2>
+      <p>本ポリシーやデータの取り扱いに関するお問い合わせは、Google Play ストア掲載のデベロッパー連絡先、または GitHub リポジトリ（<a href="https://github.com/garana-pop/couple-swipe-app/issues" target="_blank" rel="noopener">garana-pop/couple-swipe-app</a>）よりご連絡ください。</p>
+    </div>
+  </main>
+</body>
+</html>

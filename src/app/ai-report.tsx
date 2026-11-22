@@ -1,25 +1,187 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { showAlert } from '../lib/alert';
+import {
+  BillingOfferingPrices,
+  fetchPairEntitlement,
+  generateServerAiReport,
+  initializeBilling,
+  purchaseSubscriptionPlan,
+  restoreSubscriptionPurchases,
+} from '../lib/billing';
+import type { AiReportData, PairAiReportRecord, PairEntitlement } from '../types';
+
+const SAMPLE_REPORT: AiReportData = {
+  overallScore: 84,
+  myType: {
+    tag: 'しっかり計画派リーダー',
+    desc: '見通しを立てて安心したいタイプ。ルールや時間を大切にする傾向。',
+  },
+  partnerType: {
+    tag: '柔軟な癒やしマイペース',
+    desc: 'その場の空気や気分を大切にするタイプ。大らかで包容力がある。',
+  },
+  chemistrySummary:
+    '「計画性」と「柔軟性」という正反対の長所を持つ補完関係です。一方がリードし、もう一方が場を和ませる理想的な凸凹ペア！',
+  riskPoints: [
+    {
+      title: '家事・ルールの基準の違い',
+      level: '中',
+      desc: '「家事に厳しい度」の回答差から、掃除や片付けのタイミングで不満が溜まりやすい傾向があります。',
+      advice:
+        '「気づいた方がやる」ではなく、「ゴミ出しは相手、水回りは私」のように明確に分担を可視化しましょう。',
+    },
+    {
+      title: '休日の過ごし方の温度差',
+      level: '低',
+      desc: '外出派とのんびり派で適度な自由時間を尊重し合えているため、現在のところ良好です。',
+      advice: '月1回はお互いが主役の休日を交互に企画すると、さらに満足度が上がります。',
+    },
+  ],
+  nextActionTip: '週末にカフェで15分だけ、お互いが最近嬉しかったことを1つずつ共有してみましょう。',
+};
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 export default function AiReportScreen() {
-  const { partnerName, myName } = useApp();
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const {
+    userId,
+    isSupabaseReady,
+    isPairConnected,
+    partnerName,
+    myName,
+    getQuestionsById,
+  } = useApp();
 
-  const handleSubscribeMock = () => {
-    Alert.alert(
-      'サブスクリプション（UIモック）',
-      `どちらか1人が加入すると、${myName}さんと${partnerName}さんの2人とも無制限で全レポート・診断機能をご利用いただけます！`
-    );
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const [loadingEntitlement, setLoadingEntitlement] = useState(true);
+  const [entitlement, setEntitlement] = useState<PairEntitlement | null>(null);
+  const [reportRecord, setReportRecord] = useState<PairAiReportRecord | null>(null);
+  const [offering, setOffering] = useState<BillingOfferingPrices>({
+    isStoreReady: false,
+    yearlyPriceLabel: '¥3,600 / 年',
+    monthlyPriceLabel: '¥500 / 月',
+  });
+  const [generating, setGenerating] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+
+  const refreshEntitlementAndBilling = useCallback(async () => {
+    const [ent, offer] = await Promise.all([
+      isSupabaseReady ? fetchPairEntitlement() : Promise.resolve(null),
+      userId ? initializeBilling(userId) : Promise.resolve(null),
+    ]);
+    if (ent) {
+      setEntitlement(ent);
+      setReportRecord(ent.latestReport);
+    }
+    if (offer) {
+      setOffering(offer);
+    }
+  }, [isSupabaseReady, userId]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        await refreshEntitlementAndBilling();
+      } finally {
+        if (active) setLoadingEntitlement(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [refreshEntitlementAndBilling]);
+
+  const isPremium = Boolean(entitlement?.isPremium);
+  const displayReport: AiReportData = isPremium && reportRecord ? reportRecord.report : SAMPLE_REPORT;
+  const isShowingSample = !isPremium || !reportRecord;
+
+  const handleGenerateReport = async (forceRefresh: boolean) => {
+    if (!isSupabaseReady) {
+      showAlert('未接続', 'Supabase に接続してからお試しください。');
+      return;
+    }
+    setGenerating(true);
+    try {
+      const res = await generateServerAiReport(getQuestionsById(), forceRefresh);
+      if (!res.ok) {
+        showAlert('AI診断エラー', res.error ?? 'レポートの生成に失敗しました。');
+        return;
+      }
+      if (res.reportRecord) {
+        setReportRecord(res.reportRecord);
+      }
+      if (res.cached) {
+        showAlert(
+          '最新レポートを表示中',
+          '前回の分析から新しい回答が増えていないため、最新の分析結果を表示しています。'
+        );
+      } else {
+        showAlert('AI診断が完了しました', '最新の回答データから二人の相性レポートを作成しました！');
+      }
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    if (!offering.isStoreReady) {
+      showAlert(
+        'ストア課金の準備について',
+        offering.unavailableReason ??
+          'Google Play 課金（RevenueCat）は EAS ビルド版のアプリで利用できます。'
+      );
+      return;
+    }
+
+    setPurchasing(true);
+    try {
+      const res = await purchaseSubscriptionPlan(selectedPlan);
+      if (res.cancelled) return;
+      if (!res.ok) {
+        showAlert('購入エラー', res.error ?? '購入処理に失敗しました。');
+        return;
+      }
+
+      // サーバー側で課金状態を同期（Webhook 到着前でも generate-ai-report / get_pair_entitlement で反映）
+      await refreshEntitlementAndBilling();
+      showAlert(
+        'ご加入ありがとうございます！',
+        `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。`
+      );
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setPurchasing(true);
+    try {
+      const res = await restoreSubscriptionPurchases();
+      if (!res.ok) {
+        showAlert('復元エラー', res.error ?? '購入情報の復元に失敗しました。');
+        return;
+      }
+      await refreshEntitlementAndBilling();
+      showAlert('復元処理が完了しました', '最新の契約状態をサーバーと同期しました。');
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   return (
@@ -32,148 +194,223 @@ export default function AiReportScreen() {
         </View>
         <Text style={styles.heroTitle}>ふたりの深層AI診断レポート</Text>
         <Text style={styles.heroDesc}>
-          毎日のスワイプ回答から、AIが二人の性格傾向・潜在的な価値観のズレ・関係改善のヒントを導き出します。
+          毎日のスワイプ回答履歴をサーバー側AIが分析し、二人の性格傾向・価値観のすれ違い予防策をレポートします。
         </Text>
         <View style={styles.shareBadge}>
-          <Ionicons name="gift-outline" size={14} color="#FFFFFF" />
+          <Ionicons
+            name={isPremium ? 'checkmark-circle' : 'gift-outline'}
+            size={14}
+            color="#FFFFFF"
+          />
           <Text style={styles.shareBadgeText}>
-            片方の課金でパートナーも一緒に閲覧OK！
+            {isPremium
+              ? entitlement?.paidByPartner && !entitlement?.paidByMe
+                ? `${partnerName}さんのプランで解放済み！`
+                : 'ふたりプレミアムプラン有効中'
+              : '片方の課金でパートナーも一緒に閲覧OK！'}
           </Text>
         </View>
       </View>
 
+      {/* 有料ペア向け：実レポート生成／更新アクションカード */}
+      {loadingEntitlement ? (
+        <View style={[styles.card, SHADOWS.card, styles.loadingBox]}>
+          <ActivityIndicator color={COLORS.primary} />
+          <Text style={styles.loadingText}>課金状態と最新レポートを確認中...</Text>
+        </View>
+      ) : isPremium ? (
+        <View style={[styles.card, SHADOWS.card, styles.premiumControlCard]}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="sparkles" size={18} color="#4A7C59" />
+            <Text style={styles.cardTitle}>
+              {reportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
+            </Text>
+          </View>
+          <Text style={styles.premiumMetaText}>
+            公開済みの回答データ：{entitlement?.revealedDaysCount ?? 0}日分
+            {reportRecord
+              ? ` ／ 最終更新: ${formatDateTime(reportRecord.createdAt)}（${reportRecord.analyzedAnswers}問を分析）`
+              : ''}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.generateBtn}
+            activeOpacity={0.85}
+            disabled={generating || !isPairConnected}
+            onPress={() => void handleGenerateReport(Boolean(reportRecord))}
+          >
+            {generating ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="sparkles-outline" size={17} color="#FFFFFF" />
+                <Text style={styles.generateBtnText}>
+                  {reportRecord ? '最新データでレポートを更新する' : 'AI相性レポートを生成する'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.sampleNoticeBanner}>
+          <Ionicons name="eye-outline" size={16} color="#9E6B24" />
+          <Text style={styles.sampleNoticeText}>
+            以下はサンプルプレビューです。プレミアムプランに加入（またはパートナーが加入）すると、二人の実データ（現在 {entitlement?.revealedDaysCount ?? 0}日分）から AI が専用レポートを生成します。
+          </Text>
+        </View>
+      )}
+
       {/* セクション1: AI性格タイプ分析 */}
       <View style={[styles.card, SHADOWS.card]}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="analytics" size={19} color={COLORS.primary} />
-          <Text style={styles.cardTitle}>AI性格タイプ・ケミストリー</Text>
+        <View style={styles.cardHeaderBetween}>
+          <View style={styles.cardHeaderInline}>
+            <Ionicons name="analytics" size={19} color={COLORS.primary} />
+            <Text style={styles.cardTitle}>AI性格タイプ・ケミストリー</Text>
+          </View>
+          <View style={styles.scoreBadge}>
+            <Text style={styles.scoreBadgeText}>
+              {isShowingSample ? 'サンプル' : `相性 ${displayReport.overallScore}点`}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.coupleTypes}>
           <View style={styles.typeBox}>
             <Text style={styles.typeUser}>{myName}</Text>
-            <Text style={styles.typeTag}>しっかり計画派リーダー</Text>
-            <Text style={styles.typeDesc}>
-              見通しを立てて安心したいタイプ。ルールや時間を尊重する傾向。
-            </Text>
+            <Text style={styles.typeTag}>{displayReport.myType.tag}</Text>
+            <Text style={styles.typeDesc}>{displayReport.myType.desc}</Text>
           </View>
           <View style={styles.plusSign}>
             <Text style={styles.plusText}>×</Text>
           </View>
           <View style={styles.typeBox}>
             <Text style={styles.typeUser}>{partnerName}</Text>
-            <Text style={styles.typeTag}>柔軟な癒やしマイペース</Text>
-            <Text style={styles.typeDesc}>
-              その場の空気や気分を大切にするタイプ。大らかで包容力がある。
-            </Text>
+            <Text style={styles.typeTag}>{displayReport.partnerType.tag}</Text>
+            <Text style={styles.typeDesc}>{displayReport.partnerType.desc}</Text>
           </View>
         </View>
 
         <View style={styles.chemistryNote}>
           <Text style={styles.chemistryTitle}>AI分析サマリー</Text>
-          <Text style={styles.chemistryText}>
-            「計画性」と「柔軟性」という正反対の長所を持つ補完関係です。一方がリードし、もう一方が場を和ませる理想的な凸凹ペア！
-          </Text>
+          <Text style={styles.chemistryText}>{displayReport.chemistrySummary}</Text>
         </View>
       </View>
 
-      {/* セクション2: 別れの原因診断（プレミアム機能モック） */}
+      {/* セクション2: すれ違い予防・別れの原因診断 */}
       <View style={[styles.card, SHADOWS.card, styles.riskCard]}>
         <View style={styles.riskHeader}>
           <View style={styles.riskBadge}>
             <Ionicons name="warning" size={13} color="#C85338" />
-            <Text style={styles.riskBadgeText}>要注意ポイント</Text>
+            <Text style={styles.riskBadgeText}>
+              {isShowingSample ? 'サンプルプレビュー' : '要注意ポイント'}
+            </Text>
           </View>
-          <Text style={styles.riskTitle}>別れの原因診断（AI予測）</Text>
+          <Text style={styles.riskTitle}>すれ違い予防診断（AI予測）</Text>
         </View>
 
         <Text style={styles.riskLead}>
-          過去のスワイプ履歴から、将来ふたりが衝突しやすい「すれ違いトリガー」を早期予測しました。
+          過去のスワイプ履歴から、将来ふたりが衝突しやすい「すれ違いトリガー」と対策を整理しました。
         </Text>
 
-        <View style={styles.riskItem}>
-          <View style={styles.riskMeterRow}>
-            <Text style={styles.riskItemTitle}>① 家事・ルールの基準の違い</Text>
-            <Text style={styles.riskItemLevel}>リスク度: 中</Text>
-          </View>
-          <Text style={styles.riskItemDesc}>
-            「家事に厳しい度」の回答差から、掃除や片付けのタイミングで不満が溜まりやすい傾向があります。
-          </Text>
-          <View style={styles.rxBox}>
-            <Text style={styles.rxTitle}>AIのアドバイス</Text>
-            <Text style={styles.rxText}>
-              「気づいた方がやる」ではなく、「月曜のゴミ出しは相手、水回りは私」のように明確に分担を可視化しましょう。
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.riskItem}>
-          <View style={styles.riskMeterRow}>
-            <Text style={styles.riskItemTitle}>② 休日の過ごし方の温度差</Text>
-            <Text style={styles.riskItemLevel}>リスク度: 低</Text>
-          </View>
-          <Text style={styles.riskItemDesc}>
-            外出派とのんびり派で適度な自由時間を尊重し合えているため、現在のところ良好です。
-          </Text>
-        </View>
-      </View>
-
-      {/* サブスクリプション料金モックカード */}
-      <View style={[styles.card, SHADOWS.card, styles.subCard]}>
-        <View style={styles.subHeader}>
-          <Ionicons name="diamond" size={22} color="#C97A2B" />
-          <Text style={styles.subTitle}>ふたりプレミアムプラン</Text>
-        </View>
-        <Text style={styles.subSubtitle}>
-          1人が加入すれば、2人とも全ての診断・過去ログ・詳細分析を見放題
-        </Text>
-
-        {/* プラン選択 */}
-        <View style={styles.planSelector}>
-          <TouchableOpacity
-            style={[
-              styles.planCard,
-              selectedPlan === 'yearly' && styles.planCardActive,
-            ]}
-            onPress={() => setSelectedPlan('yearly')}
-          >
-            <View style={styles.planBestBadge}>
-              <Text style={styles.planBestText}>人気No.1（40% OFF）</Text>
+        {displayReport.riskPoints.map((risk, idx) => (
+          <View key={`${risk.title}-${idx}`} style={styles.riskItem}>
+            <View style={styles.riskMeterRow}>
+              <Text style={styles.riskItemTitle}>
+                {idx + 1}. {risk.title}
+              </Text>
+              <Text style={styles.riskItemLevel}>リスク度: {risk.level}</Text>
             </View>
-            <Text style={styles.planName}>年額プラン</Text>
-            <Text style={styles.planPrice}>¥3,600 / 年</Text>
-            <Text style={styles.planSubPrice}>(月換算 ¥300・2人分)</Text>
+            <Text style={styles.riskItemDesc}>{risk.desc}</Text>
+            {risk.advice ? (
+              <View style={styles.rxBox}>
+                <Text style={styles.rxTitle}>AIのアドバイス</Text>
+                <Text style={styles.rxText}>{risk.advice}</Text>
+              </View>
+            ) : null}
+          </View>
+        ))}
+
+        {displayReport.nextActionTip ? (
+          <View style={styles.nextActionBox}>
+            <Ionicons name="bulb-outline" size={15} color={COLORS.primaryDark} />
+            <Text style={styles.nextActionText}>{displayReport.nextActionTip}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* サブスクリプション購入カード（未加入時のみ表示） */}
+      {!isPremium && (
+        <View style={[styles.card, SHADOWS.card, styles.subCard]}>
+          <View style={styles.subHeader}>
+            <Ionicons name="diamond" size={22} color="#C97A2B" />
+            <Text style={styles.subTitle}>ふたりプレミアムプラン</Text>
+          </View>
+          <Text style={styles.subSubtitle}>
+            1人が加入すれば、2人とも全ての AI 診断レポートを見放題（Google Play Billing / RevenueCat 管理）
+          </Text>
+
+          <View style={styles.planSelector}>
+            <TouchableOpacity
+              style={[
+                styles.planCard,
+                selectedPlan === 'yearly' && styles.planCardActive,
+              ]}
+              onPress={() => setSelectedPlan('yearly')}
+            >
+              <View style={styles.planBestBadge}>
+                <Text style={styles.planBestText}>人気No.1（40% OFF）</Text>
+              </View>
+              <Text style={styles.planName}>年額プラン</Text>
+              <Text style={styles.planPrice}>{offering.yearlyPriceLabel}</Text>
+              <Text style={styles.planSubPrice}>(2人分・ペア共有)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.planCard,
+                selectedPlan === 'monthly' && styles.planCardActive,
+              ]}
+              onPress={() => setSelectedPlan('monthly')}
+            >
+              <Text style={styles.planName}>月額プラン</Text>
+              <Text style={styles.planPrice}>{offering.monthlyPriceLabel}</Text>
+              <Text style={styles.planSubPrice}>(2人分・ペア共有)</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.subscribeBtn}
+            activeOpacity={0.8}
+            disabled={purchasing}
+            onPress={handleSubscribe}
+          >
+            {purchasing ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="lock-open" size={17} color="#FFFFFF" />
+                <Text style={styles.subscribeBtnText}>
+                  {selectedPlan === 'yearly'
+                    ? `${offering.yearlyPriceLabel} で全レポートを解放`
+                    : `${offering.monthlyPriceLabel} で全レポートを解放`}
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.planCard,
-              selectedPlan === 'monthly' && styles.planCardActive,
-            ]}
-            onPress={() => setSelectedPlan('monthly')}
+            style={styles.restoreBtn}
+            disabled={purchasing}
+            onPress={handleRestore}
           >
-            <Text style={styles.planName}>月額プラン</Text>
-            <Text style={styles.planPrice}>¥500 / 月</Text>
-            <Text style={styles.planSubPrice}>(1人あたり ¥250)</Text>
+            <Text style={styles.restoreBtnText}>以前の購入を復元する</Text>
           </TouchableOpacity>
-        </View>
 
-        <TouchableOpacity
-          style={styles.subscribeBtn}
-          activeOpacity={0.8}
-          onPress={handleSubscribeMock}
-        >
-          <Ionicons name="lock-open" size={17} color="#FFFFFF" />
-          <Text style={styles.subscribeBtnText}>
-            {selectedPlan === 'yearly'
-              ? '年額 ¥3,600 で全レポートを解放する'
-              : '月額 ¥500 で全レポートを解放する'}
+          <Text style={styles.subNotes}>
+            いつでも Google Play から解約可能・ペア共有対応
           </Text>
-        </TouchableOpacity>
-        <Text style={styles.subNotes}>
-          いつでも解約可能・広告非表示・無制限AI診断
-        </Text>
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -188,7 +425,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   heroBanner: {
-    backgroundColor: '#3E3430', // 温かみのあるダークエスプレッソ
+    backgroundColor: '#3E3430',
     borderRadius: 22,
     padding: 20,
     marginBottom: 16,
@@ -232,6 +469,56 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  loadingBox: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  premiumControlCard: {
+    backgroundColor: '#F4FAF6',
+    borderColor: '#C8E2D1',
+  },
+  premiumMetaText: {
+    fontSize: 12,
+    color: '#3B6347',
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  generateBtn: {
+    backgroundColor: '#4A7C59',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 14,
+    gap: 8,
+  },
+  generateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  sampleNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FDF6E9',
+    borderWidth: 1,
+    borderColor: '#F0DEC0',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  sampleNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#8C6226',
+    lineHeight: 18,
+  },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 20,
@@ -244,12 +531,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 8,
+  },
+  cardHeaderBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 14,
+  },
+  cardHeaderInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+  },
+  scoreBadge: {
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  scoreBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primaryDark,
   },
   coupleTypes: {
     flexDirection: 'row',
@@ -353,9 +664,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 6,
   },
   riskItemTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.text,
@@ -389,6 +702,22 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     lineHeight: 15,
   },
+  nextActionBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: COLORS.surface,
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  nextActionText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text,
+    lineHeight: 17,
+  },
   subCard: {
     borderWidth: 1.5,
     borderColor: '#F6E5D0',
@@ -409,6 +738,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     marginBottom: 14,
+    lineHeight: 17,
   },
   planSelector: {
     flexDirection: 'row',
@@ -467,12 +797,23 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   subscribeBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  restoreBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  restoreBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+    textDecorationLine: 'underline',
   },
   subNotes: {
     fontSize: 11,

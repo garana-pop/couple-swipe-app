@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Modal,
   Pressable,
   ActivityIndicator,
@@ -18,6 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../context/AppContext';
 import { TutorialModal } from '../components/TutorialModal';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { showAlert, showConfirm } from '../lib/alert';
 
 function formatDisplayDate(dateStr: string): string {
   const parts = dateStr.split('-');
@@ -33,6 +33,7 @@ export default function HomeScreen() {
     isLoading,
     isSupabaseReady,
     authError,
+    accountAuth,
     hasPair,
     isPairConnected,
     pairCode,
@@ -67,7 +68,7 @@ export default function HomeScreen() {
     await Clipboard.setStringAsync(pairCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    Alert.alert(
+    showAlert(
       '招待コードをコピーしました',
       `「${pairCode}」をパートナーに送ってアプリに招待しましょう。`
     );
@@ -78,74 +79,62 @@ export default function HomeScreen() {
     const res = await createPair();
     setSubmitting(false);
     if (!res.ok) {
-      Alert.alert('作成エラー', res.error ?? 'ペアの作成に失敗しました。');
+      showAlert('作成エラー', res.error ?? 'ペアの作成に失敗しました。');
     }
   };
 
   const handleConnect = async () => {
     if (!inputCode.trim()) {
-      Alert.alert('入力エラー', '招待コードを入力してください。');
+      showAlert('入力エラー', '招待コードを入力してください。');
       return;
     }
     setSubmitting(true);
     const res = await joinPair(inputCode.trim());
     setSubmitting(false);
     if (!res.ok) {
-      Alert.alert('連携エラー', res.error ?? 'ペアリングに失敗しました。');
+      showAlert('連携エラー', res.error ?? 'ペアリングに失敗しました。');
       return;
     }
-    Alert.alert('連携完了', 'パートナーと正常にペアリングされました。');
+    showAlert('連携完了', 'パートナーと正常にペアリングされました。');
     setInputCode('');
   };
 
   const handleLeavePair = () => {
-    Alert.alert(
+    showConfirm(
       'ペアを解除しますか？',
       '解除すると、このペアから抜けます。誤って二人とも招待コードを作ってしまった場合のリカバリにも使えます。',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '解除する',
-          style: 'destructive',
-          onPress: async () => {
-            setIsMenuOpen(false);
-            const res = await leavePair();
-            if (!res.ok) {
-              Alert.alert('エラー', res.error ?? 'ペア解除に失敗しました。');
-            }
-          },
-        },
-      ]
+      '解除する',
+      async () => {
+        setIsMenuOpen(false);
+        const res = await leavePair();
+        if (!res.ok) {
+          showAlert('エラー', res.error ?? 'ペア解除に失敗しました。');
+        }
+      }
     );
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
+    showConfirm(
       'アカウントとデータを削除',
       'あなたの回答データ・プロフィール・ペア情報がすべて削除されます。この操作は取り消せません。',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除する',
-          style: 'destructive',
-          onPress: async () => {
-            setIsMenuOpen(false);
-            const res = await deleteAccount();
-            if (res.ok) {
-              Alert.alert('削除完了', 'アカウントとデータを削除しました。');
-            } else {
-              Alert.alert('エラー', res.error ?? '削除に失敗しました。');
-            }
-          },
-        },
-      ]
+      '削除する',
+      async () => {
+        setIsMenuOpen(false);
+        const res = await deleteAccount();
+        if (res.ok) {
+          showAlert('削除完了', 'アカウントとデータを削除しました。');
+        } else {
+          showAlert('エラー', res.error ?? '削除に失敗しました。');
+        }
+      }
     );
   };
 
   const handleSaveName = async () => {
     const res = await updateMyName(nameInput);
     if (!res.ok) {
-      Alert.alert('エラー', res.error ?? '表示名の更新に失敗しました。');
+      showAlert('エラー', res.error ?? '表示名の更新に失敗しました。');
       return;
     }
     setIsEditingName(false);
@@ -154,7 +143,7 @@ export default function HomeScreen() {
   // 今日の質問ボタンの挙動
   const handleQuizAction = () => {
     if (isSupabaseReady && !hasPair) {
-      Alert.alert('ペア連携が必要です', 'まずは招待コードを発行するか、パートナーのコードを入力してペアを作成してください。');
+      showAlert('ペア連携が必要です', 'まずは招待コードを発行するか、パートナーのコードを入力してペアを作成してください。');
       return;
     }
     if (!isMyCompleted) {
@@ -417,7 +406,7 @@ export default function HomeScreen() {
                       style={styles.secondaryBtn}
                       onPress={async () => {
                         const res = await regenerateInviteCode();
-                        if (!res.ok) Alert.alert('エラー', res.error);
+                        if (!res.ok) showAlert('エラー', res.error);
                       }}
                     >
                       <Ionicons name="key-outline" size={15} color={COLORS.primaryDark} />
@@ -545,6 +534,28 @@ export default function HomeScreen() {
                 <View style={styles.menuItemTextBox}>
                   <Text style={styles.menuItemTitle}>二人の相性レポート</Text>
                   <Text style={styles.menuItemSubtext}>過去の回答からAIが傾向を分析</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setIsMenuOpen(false);
+                  router.push('/settings');
+                }}
+              >
+                <View style={[styles.menuItemIconBox, { backgroundColor: '#FDF3E7' }]}>
+                  <Ionicons name="notifications-outline" size={20} color="#C97A2B" />
+                </View>
+                <View style={styles.menuItemTextBox}>
+                  <Text style={styles.menuItemTitle}>通知・アカウント引き継ぎ</Text>
+                  <Text style={styles.menuItemSubtext}>
+                    {accountAuth.isAnonymous
+                      ? 'リマインダー設定・Google連携（未連携）'
+                      : 'リマインダー設定・Google連携済み'}
+                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>

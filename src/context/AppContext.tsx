@@ -1,17 +1,35 @@
-import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { SwipeDirection, Question, HistoryDayItem } from '../types';
 import {
-  QUESTIONS_BY_ID,
-  QUESTION_POOL_IDS,
   TODAY_QUESTIONS,
+  buildQuestionCatalog,
   evaluateMatch,
 } from '../constants/questions';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { syncExtraQuestions } from '../lib/extraQuestions';
 import {
+  AccountAuthInfo,
+  extractAccountAuthInfo,
+  linkGoogleIdentity,
+  signInWithGoogleAccount,
+} from '../lib/auth';
+import {
+  PushRegistrationResult,
+  cancelDailyReminder,
+  configureNotificationHandler,
+  notifyPartnerAnswered,
+  registerForPushNotificationsAsync,
+  scheduleDailyReminder,
+} from '../lib/notifications';
+import {
+  DEFAULT_DAILY_REMINDER,
+  DailyReminderSettings,
   getHasSeenTutorial,
   setHasSeenTutorialStorage,
   getCachedDisplayName,
   setCachedDisplayName,
+  getCachedExtraQuestions,
+  getDailyReminderSettings,
 } from '../lib/storage';
 
 interface MatchSummary {
@@ -41,6 +59,7 @@ interface AppContextType {
   isSupabaseReady: boolean;
   authError: string | null;
   userId: string | null;
+  accountAuth: AccountAuthInfo;
   pairId: string | null;
   hasPair: boolean;
   isPairConnected: boolean;
@@ -58,12 +77,19 @@ interface AppContextType {
   isTutorialVisible: boolean;
   historyDays: HistoryDayItem[];
   isHistoryLoading: boolean;
+  dailyReminder: DailyReminderSettings;
+  pushStatus: PushRegistrationResult | null;
   submitAnswer: (questionId: string, direction: SwipeDirection) => Promise<void>;
   createPair: (displayName?: string) => Promise<{ ok: boolean; error?: string }>;
   joinPair: (code: string, displayName?: string) => Promise<{ ok: boolean; error?: string }>;
   leavePair: () => Promise<{ ok: boolean; error?: string }>;
   regenerateInviteCode: () => Promise<{ ok: boolean; error?: string }>;
   updateMyName: (name: string) => Promise<{ ok: boolean; error?: string }>;
+  enableDailyReminder: (hour: number, minute: number) => Promise<{ ok: boolean; error?: string }>;
+  disableDailyReminder: () => Promise<void>;
+  registerPushNotifications: () => Promise<PushRegistrationResult>;
+  linkGoogle: () => Promise<{ ok: boolean; cancelled?: boolean; redirecting?: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ ok: boolean; cancelled?: boolean; redirecting?: boolean; error?: string }>;
   refreshState: () => Promise<void>;
   refreshDayStatus: () => Promise<void>;
   fetchHistory: () => Promise<void>;
@@ -71,6 +97,7 @@ interface AppContextType {
   completeTutorial: () => void;
   showTutorial: () => void;
   closeTutorial: () => void;
+  getQuestionsById: () => Record<string, Question>;
   matchSummary: MatchSummary;
 }
 
@@ -116,6 +143,11 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [accountAuth, setAccountAuth] = useState<AccountAuthInfo>({
+    isAnonymous: true,
+    email: null,
+    isGoogleLinked: false,
+  });
   const [pairId, setPairId] = useState<string | null>(null);
   const [hasPair, setHasPair] = useState(false);
   const [isPairConnected, setIsPairConnected] = useState(false);
@@ -141,6 +173,20 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [historyDays, setHistoryDays] = useState<HistoryDayItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [dailyReminder, setDailyReminder] = useState<DailyReminderSettings>(DEFAULT_DAILY_REMINDER);
+  const [pushStatus, setPushStatus] = useState<PushRegistrationResult | null>(null);
+
+  const catalogRef = useRef(buildQuestionCatalog([]));
+
+  const refreshQuestionCatalog = useCallback(
+    async (options?: { force?: boolean; fullRefresh?: boolean }) => {
+      const records = await syncExtraQuestions(options);
+      const nextCatalog = buildQuestionCatalog(records);
+      catalogRef.current = nextCatalog;
+      return nextCatalog;
+    },
+    []
+  );
 
   const loadAnswersForDay = useCallback(
     async (targetPairId: string, quizDate: string, currentUserId: string) => {
@@ -206,7 +252,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       const { data: dailySet, error: dailyErr } = await supabase.rpc('get_or_create_daily_set', {
-        p_question_pool: QUESTION_POOL_IDS,
+        p_question_pool: catalogRef.current.activePoolIds,
       });
 
       if (dailyErr || !dailySet) {
@@ -216,6 +262,11 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const qIds: string[] = dailySet.question_ids ?? [];
       const quizDate: string = dailySet.quiz_date;
       setTodayDate(quizDate);
+
+      // パートナー側で新しい追加配信質問が出題された場合、ローカル辞書に無ければ即時同期して補完
+      if (qIds.some((id) => !catalogRef.current.questionsById[id])) {
+        await refreshQuestionCatalog({ force: true, fullRefresh: true });
+      }
 
       // 過去に出題された質問があれば履歴を取得
       const { data: pastRows } = await supabase.rpc('get_past_question_history', {
@@ -233,9 +284,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
 
+      const questionsById = catalogRef.current.questionsById;
       const hydratedQuestions: Question[] = qIds
         .map((id) => {
-          const base = QUESTIONS_BY_ID[id];
+          const base = questionsById[id];
           if (!base) return null;
           const past = pastMap.get(id);
           if (!past) return base;
@@ -271,20 +323,26 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       await loadAnswersForDay(pairState.pair_id, quizDate, currentUserId);
     },
-    [loadAnswersForDay]
+    [loadAnswersForDay, refreshQuestionCatalog]
   );
 
-  // 初期化（チュートリアル状態復元 + 匿名ログイン + データ取得）
+  // 初期化（チュートリアル状態復元 + キャッシュ読込 + 匿名ログイン + データ取得）
   useEffect(() => {
     let mounted = true;
 
     async function init() {
-      const [seen, cachedName] = await Promise.all([
+      configureNotificationHandler();
+
+      const [seen, cachedName, cachedExtra, savedReminder] = await Promise.all([
         getHasSeenTutorial(),
         getCachedDisplayName(),
+        getCachedExtraQuestions(),
+        getDailyReminderSettings(),
       ]);
 
       if (!mounted) return;
+      catalogRef.current = buildQuestionCatalog(cachedExtra);
+      setDailyReminder(savedReminder);
       setHasSeenTutorial(seen);
       setIsTutorialVisible(!seen);
       if (cachedName) {
@@ -302,28 +360,43 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           data: { session },
         } = await supabase.auth.getSession();
 
-        let activeUserId = session?.user?.id ?? null;
+        let activeUser = session?.user ?? null;
 
-        if (!activeUserId) {
+        if (!activeUser) {
           const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
           if (anonError) {
-            setAuthError('認証に失敗しました。しばらくしてから再起動してください。');
+            console.warn('[Supabase] signInAnonymously error:', anonError);
+            setAuthError(`認証に失敗しました（${anonError.message}）。しばらくしてから再起動してください。`);
             setIsInitialized(true);
             setIsLoading(false);
             return;
           }
-          activeUserId = anonData.user?.id ?? null;
+          activeUser = anonData.user ?? null;
         }
+
+        const activeUserId = activeUser?.id ?? null;
 
         if (!mounted) return;
+        setAuthError(null);
         setUserId(activeUserId);
+        setAccountAuth(extractAccountAuthInfo(activeUser));
 
         if (activeUserId) {
+          // 1日1回だけ追加質問の差分同期を実行（変更が無ければほぼ0バイト）
+          await refreshQuestionCatalog({ force: false });
+          if (!mounted) return;
           await loadPairAndDailyData(activeUserId);
+
+          // 開発ビルド / 本番ビルドの実機なら Expo Push Token をバックグラウンド登録
+          void registerForPushNotificationsAsync().then((res) => {
+            if (mounted) setPushStatus(res);
+          });
         }
-      } catch {
+      } catch (err) {
+        console.warn('[Supabase] init error:', err);
         if (mounted) {
-          setAuthError('サーバーへの接続に失敗しました。');
+          const detail = err instanceof Error ? err.message : String(err);
+          setAuthError(`サーバーへの接続に失敗しました（${detail}）。`);
         }
       } finally {
         if (mounted) {
@@ -335,10 +408,20 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     init();
 
+    const authSubscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return;
+      const nextUser = nextSession?.user ?? null;
+      setAccountAuth(extractAccountAuthInfo(nextUser));
+      if (nextUser?.id) {
+        setUserId(nextUser.id);
+      }
+    });
+
     return () => {
       mounted = false;
+      authSubscription?.data.subscription.unsubscribe();
     };
-  }, [loadPairAndDailyData]);
+  }, [loadPairAndDailyData, refreshQuestionCatalog]);
 
   const refreshState = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -382,10 +465,11 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const submitAnswer = useCallback(
     async (questionId: string, direction: SwipeDirection) => {
-      setMyAnswers((prev) => ({
-        ...prev,
+      const nextMyAnswers: Record<string, SwipeDirection> = {
+        ...myAnswers,
         [questionId]: direction,
-      }));
+      };
+      setMyAnswers(nextMyAnswers);
 
       if (!supabase || !userId || !pairId) return;
 
@@ -399,40 +483,98 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       if (!error || error.code === '23505') {
         await refreshDayStatus();
+        // 今日の全問に回答し終えたタイミングでパートナーへプッシュ通知を送信（サーバー側で重複防止）
+        const completedAll =
+          questions.length > 0 && questions.every((q) => Boolean(nextMyAnswers[q.id]));
+        if (completedAll && isPairConnected) {
+          void notifyPartnerAnswered(todayDate);
+        }
       }
     },
-    [userId, pairId, todayDate, refreshDayStatus]
+    [myAnswers, userId, pairId, todayDate, refreshDayStatus, questions, isPairConnected]
   );
+
+  const ensureAuthenticatedUserId = useCallback(async (): Promise<{
+    uid: string | null;
+    error?: string;
+  }> => {
+    if (!supabase) {
+      return {
+        uid: null,
+        error: 'Supabase が未設定です。.env.local を確認し、npx expo start --clear で再起動してください。',
+      };
+    }
+    if (userId) {
+      return { uid: userId };
+    }
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+        setAuthError(null);
+        return { uid: session.user.id };
+      }
+      const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError || !anonData.user?.id) {
+        const msg = anonError?.message ?? '匿名認証に失敗しました';
+        setAuthError(`認証に失敗しました（${msg}）。`);
+        return { uid: null, error: `認証に失敗しました（${msg}）。` };
+      }
+      setUserId(anonData.user.id);
+      setAuthError(null);
+      return { uid: anonData.user.id };
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setAuthError(`サーバーへの接続に失敗しました（${detail}）。`);
+      return { uid: null, error: `サーバーへの接続に失敗しました（${detail}）。` };
+    }
+  }, [userId]);
 
   const createPair = useCallback(
     async (displayName?: string): Promise<{ ok: boolean; error?: string }> => {
-      if (!supabase || !userId) {
-        return { ok: false, error: 'Supabase が未設定です。' };
+      if (!supabase) {
+        return {
+          ok: false,
+          error: 'Supabase が未設定です。.env.local を確認し、npx expo start --clear で再起動してください。',
+        };
       }
       setIsLoading(true);
       try {
+        const auth = await ensureAuthenticatedUserId();
+        if (!auth.uid) {
+          return { ok: false, error: auth.error ?? '認証が完了していません。' };
+        }
         const { error } = await supabase.rpc('create_pair', {
           p_display_name: displayName ?? myName,
         });
         if (error) {
           return { ok: false, error: formatJoinError(error.message) };
         }
-        await loadPairAndDailyData(userId);
+        await loadPairAndDailyData(auth.uid);
         return { ok: true };
       } finally {
         setIsLoading(false);
       }
     },
-    [userId, myName, loadPairAndDailyData]
+    [ensureAuthenticatedUserId, myName, loadPairAndDailyData]
   );
 
   const joinPair = useCallback(
     async (code: string, displayName?: string): Promise<{ ok: boolean; error?: string }> => {
-      if (!supabase || !userId) {
-        return { ok: false, error: 'Supabase が未設定です。' };
+      if (!supabase) {
+        return {
+          ok: false,
+          error: 'Supabase が未設定です。.env.local を確認し、npx expo start --clear で再起動してください。',
+        };
       }
       setIsLoading(true);
       try {
+        const auth = await ensureAuthenticatedUserId();
+        if (!auth.uid) {
+          return { ok: false, error: auth.error ?? '認証が完了していません。' };
+        }
         const { error } = await supabase.rpc('join_pair', {
           p_invite_code: code,
           p_display_name: displayName ?? myName,
@@ -440,35 +582,43 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (error) {
           return { ok: false, error: formatJoinError(error.message) };
         }
-        await loadPairAndDailyData(userId);
+        await loadPairAndDailyData(auth.uid);
         return { ok: true };
       } finally {
         setIsLoading(false);
       }
     },
-    [userId, myName, loadPairAndDailyData]
+    [ensureAuthenticatedUserId, myName, loadPairAndDailyData]
   );
 
   const leavePair = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
-    if (!supabase || !userId) {
+    if (!supabase) {
       return { ok: false, error: 'Supabase が未設定です。' };
     }
     setIsLoading(true);
     try {
+      const auth = await ensureAuthenticatedUserId();
+      if (!auth.uid) {
+        return { ok: false, error: auth.error ?? '認証が完了していません。' };
+      }
       const { error } = await supabase.rpc('leave_pair');
       if (error) {
         return { ok: false, error: 'ペアの解除に失敗しました。' };
       }
-      await loadPairAndDailyData(userId);
+      await loadPairAndDailyData(auth.uid);
       return { ok: true };
     } finally {
       setIsLoading(false);
     }
-  }, [userId, loadPairAndDailyData]);
+  }, [ensureAuthenticatedUserId, loadPairAndDailyData]);
 
   const regenerateInviteCode = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
-    if (!supabase || !userId) {
+    if (!supabase) {
       return { ok: false, error: 'Supabase が未設定です。' };
+    }
+    const auth = await ensureAuthenticatedUserId();
+    if (!auth.uid) {
+      return { ok: false, error: auth.error ?? '認証が完了していません。' };
     }
     const { data, error } = await supabase.rpc('regenerate_invite_code');
     if (error || !data) {
@@ -476,7 +626,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     setPairCode(data.invite_code);
     return { ok: true };
-  }, [userId]);
+  }, [ensureAuthenticatedUserId]);
 
   const updateMyName = useCallback(
     async (name: string): Promise<{ ok: boolean; error?: string }> => {
@@ -517,11 +667,20 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return;
       }
 
+      const missingAnyQuestion = data.some((day: any) => {
+        const rawAnswers: any[] = Array.isArray(day.answers) ? day.answers : [];
+        return rawAnswers.some((a) => !catalogRef.current.questionsById[a.question_id]);
+      });
+      if (missingAnyQuestion) {
+        await refreshQuestionCatalog({ force: true, fullRefresh: true });
+      }
+
+      const questionsById = catalogRef.current.questionsById;
       const mapped: HistoryDayItem[] = data.map((day: any) => {
         const rawAnswers: any[] = Array.isArray(day.answers) ? day.answers : [];
         const items = rawAnswers
           .map((a) => {
-            const q = QUESTIONS_BY_ID[a.question_id];
+            const q = questionsById[a.question_id];
             if (!q) return null;
             const myAns = a.my_answer as SwipeDirection | undefined;
             const partnerAns = a.partner_answer as SwipeDirection | undefined;
@@ -544,7 +703,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [userId, hasPair]);
+  }, [userId, hasPair, refreshQuestionCatalog]);
 
   const deleteAccount = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!supabase || !userId) {
@@ -567,11 +726,85 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // 新しい匿名セッションを作成
       const { data: anonData } = await supabase.auth.signInAnonymously();
       setUserId(anonData.user?.id ?? null);
+      setAccountAuth(extractAccountAuthInfo(anonData.user));
       return { ok: true };
     } finally {
       setIsLoading(false);
     }
   }, [userId]);
+
+  const enableDailyReminder = useCallback(
+    async (hour: number, minute: number): Promise<{ ok: boolean; error?: string }> => {
+      const res = await scheduleDailyReminder(hour, minute);
+      if (res.ok && res.settings) {
+        setDailyReminder(res.settings);
+        return { ok: true };
+      }
+      return { ok: false, error: res.error };
+    },
+    []
+  );
+
+  const disableDailyReminder = useCallback(async () => {
+    const next = await cancelDailyReminder();
+    setDailyReminder(next);
+  }, []);
+
+  const registerPushNotifications = useCallback(async (): Promise<PushRegistrationResult> => {
+    const res = await registerForPushNotificationsAsync();
+    setPushStatus(res);
+    return res;
+  }, []);
+
+  const linkGoogle = useCallback(async () => {
+    if (!supabase) {
+      return { ok: false, error: 'Supabase が未設定です。' };
+    }
+    setIsLoading(true);
+    try {
+      const auth = await ensureAuthenticatedUserId();
+      if (!auth.uid) {
+        return { ok: false, error: auth.error ?? '認証が完了していません。' };
+      }
+      const res = await linkGoogleIdentity();
+      if (res.ok && !res.redirecting) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+          setAccountAuth(extractAccountAuthInfo(userData.user));
+          setUserId(userData.user.id);
+          await loadPairAndDailyData(userData.user.id);
+        }
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [ensureAuthenticatedUserId, loadPairAndDailyData]);
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) {
+      return { ok: false, error: 'Supabase が未設定です。' };
+    }
+    setIsLoading(true);
+    try {
+      const res = await signInWithGoogleAccount();
+      if (res.ok && !res.redirecting) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+          setAccountAuth(extractAccountAuthInfo(userData.user));
+          setUserId(userData.user.id);
+          setHistoryDays([]);
+          await loadPairAndDailyData(userData.user.id);
+          void registerForPushNotificationsAsync().then((pushRes) => {
+            setPushStatus(pushRes);
+          });
+        }
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadPairAndDailyData]);
 
   const completeTutorial = useCallback(() => {
     setHasSeenTutorial(true);
@@ -586,6 +819,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const closeTutorial = useCallback(() => {
     setIsTutorialVisible(false);
   }, []);
+
+  const getQuestionsById = useCallback(() => catalogRef.current.questionsById, []);
 
   const isMyCompleted = useMemo(() => {
     if (dayStatus.isMyCompleted) return true;
@@ -627,6 +862,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isSupabaseReady: isSupabaseConfigured,
         authError,
         userId,
+        accountAuth,
         pairId,
         hasPair,
         isPairConnected,
@@ -644,12 +880,19 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isTutorialVisible,
         historyDays,
         isHistoryLoading,
+        dailyReminder,
+        pushStatus,
         submitAnswer,
         createPair,
         joinPair,
         leavePair,
         regenerateInviteCode,
         updateMyName,
+        enableDailyReminder,
+        disableDailyReminder,
+        registerPushNotifications,
+        linkGoogle,
+        signInWithGoogle,
         refreshState,
         refreshDayStatus,
         fetchHistory,
@@ -657,6 +900,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         completeTutorial,
         showTutorial,
         closeTutorial,
+        getQuestionsById,
         matchSummary,
       }}
     >

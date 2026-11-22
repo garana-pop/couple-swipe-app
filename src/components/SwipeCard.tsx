@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Question, SwipeDirection } from '../types';
 import { COLORS, SHADOWS } from '../constants/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: WINDOW_WIDTH } = Dimensions.get('window');
+const SCREEN_WIDTH = Math.min(WINDOW_WIDTH, 430);
 
 // カードと左右スロットの寸法バランス（左右に十分な呼吸スペースを確保）
 const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.56, 224);
@@ -520,6 +521,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     paddingVertical: 10,
+    userSelect: 'none',
   },
 
   // ----------------------------------------------------

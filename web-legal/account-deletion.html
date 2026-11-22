@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>アカウント・データ削除のご案内 | ふたりスワイプ</title>
+  <style>
+    :root { --bg: #FAF6F1; --card: #FFFFFF; --text: #3A322C; --muted: #6E635B; --primary: #D97559; --danger: #B84A39; --border: #EADFD4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif; background: var(--bg); color: var(--text); line-height: 1.75; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px; margin-bottom: 18px; }
+    h1 { font-size: 23px; margin: 0 0 8px; }
+    h2 { font-size: 16px; margin: 22px 0 8px; padding-left: 10px; border-left: 4px solid var(--primary); }
+    p, li { font-size: 14px; }
+    ul, ol { padding-left: 20px; }
+    .back { display: inline-block; margin-bottom: 16px; font-size: 13px; color: #B8563A; text-decoration: none; }
+    .box { background: #FAF5EF; border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 12px; }
+    button { border: none; border-radius: 12px; padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-google { background: var(--primary); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-secondary { background: #EFE6DC; color: var(--text); margin-left: 8px; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    #status { margin-top: 12px; font-size: 13px; font-weight: 700; }
+    .ok { color: #3B6347; }
+    .err { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./index.html">← トップへ戻る</a>
+    <div class="card">
+      <h1>アカウントおよびデータの削除（退会）</h1>
+      <p>アプリ「ふたりスワイプ」（<code>com.garanapop.coupleswipeapp</code>）のアカウントおよび関連データは、以下の方法でいつでも完全に削除できます。</p>
+
+      <h2>削除されるデータと保持期間</h2>
+      <ul>
+        <li><strong>即時削除されるデータ</strong>：アカウント認証情報、プロフィール（表示名・通知トークン）、あなたのすべての回答データ、ペア所属情報、およびペアの最後のメンバーであった場合はペア本体・出題セット・AI相性レポートもすべて即時削除されます。</li>
+        <li><strong>サブスクリプション解約について</strong>：Google Play で有料プランを契約中の場合、アカウント削除とは別に <strong>Google Play ストア ＞ お支払いと定期購入 ＞ 定期購入</strong> から自動更新を停止してください。</li>
+      </ul>
+
+      <h2>方法1：アプリ内から削除する（推奨・匿名アカウントにも対応）</h2>
+      <ol>
+        <li>「ふたりスワイプ」アプリを開きます。</li>
+        <li>ホーム画面右上の <strong>メニュー（≡）</strong> をタップします。</li>
+        <li><strong>「アカウント削除」</strong> を選択し、確認ダイアログで「削除する」をタップすると即時削除されます。</li>
+      </ol>
+
+      <h2>方法2：Web から即時削除する（Google 連携済みアカウント向け）</h2>
+      <p>アプリをアンインストール済みの場合でも、Google アカウント連携を行っていた場合は、以下からログインして即時削除できます。</p>
+      <div class="box">
+        <div id="signed-out-view">
+          <button id="btn-login" class="btn-google" type="button">Google でログインして削除手続きへ進む</button>
+        </div>
+        <div id="signed-in-view" style="display:none;">
+          <p id="user-info" style="margin-top:0;"></p>
+          <button id="btn-delete" class="btn-danger" type="button">アカウントとデータを完全削除する</button>
+          <button id="btn-logout" class="btn-secondary" type="button">ログアウト</button>
+        </div>
+        <div id="status"></div>
+      </div>
+
+      <h2>方法3：Google 未連携のままアプリを削除した場合</h2>
+      <p>匿名アカウントは個人を特定できる情報（メールアドレス等）を一切保持していません。最終利用から <strong>180日経過すると自動的に完全削除</strong> されます。180日を待たずに削除を希望される場合やご不明点がある場合は、Google Play ストア記載のデベロッパー連絡先までお問い合わせください。</p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://zfnbyxntyxgmoebvvifu.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_ZJC-JNxuIha9NsSLhw5IGA_Vo_2_td9';
+
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { detectSessionInUrl: true, persistSession: true }
+    });
+
+    const signedOutView = document.getElementById('signed-out-view');
+    const signedInView = document.getElementById('signed-in-view');
+    const userInfo = document.getElementById('user-info');
+    const statusEl = document.getElementById('status');
+    const btnLogin = document.getElementById('btn-login');
+    const btnDelete = document.getElementById('btn-delete');
+    const btnLogout = document.getElementById('btn-logout');
+
+    function setStatus(msg, isError) {
+      statusEl.textContent = msg;
+      statusEl.className = isError ? 'err' : 'ok';
+    }
+
+    async function renderSession() {
+      const { data: { session } } = await client.auth.getSession();
+      if (session && session.user) {
+        signedOutView.style.display = 'none';
+        signedInView.style.display = 'block';
+        userInfo.textContent = `ログイン中: ${session.user.email || session.user.id}`;
+      } else {
+        signedOutView.style.display = 'block';
+        signedInView.style.display = 'none';
+      }
+    }
+
+    btnLogin.addEventListener('click', async () => {
+      setStatus('Google ログイン画面へ移動します...', false);
+      const { error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) setStatus('ログインの開始に失敗しました: ' + error.message, true);
+    });
+
+    btnLogout.addEventListener('click', async () => {
+      await client.auth.signOut();
+      setStatus('ログアウトしました。', false);
+      await renderSession();
+    });
+
+    btnDelete.addEventListener('click', async () => {
+      if (!window.confirm('本当にアカウントとすべてのデータを完全削除しますか？この操作は取り消せません。')) {
+        return;
+      }
+      btnDelete.disabled = true;
+      setStatus('削除処理を実行しています...', false);
+      const { error } = await client.rpc('delete_my_account');
+      if (error) {
+        btnDelete.disabled = false;
+        setStatus('削除に失敗しました: ' + error.message, true);
+        return;
+      }
+      await client.auth.signOut();
+      setStatus('アカウントおよび関連データをすべて削除しました。ご利用ありがとうございました。', false);
+      await renderSession();
+    });
+
+    client.auth.onAuthStateChange(() => { void renderSession(); });
+    void renderSession();
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+name: Supabase Weekly Encrypted Backup
+
+on:
+  schedule:
+    # 毎週月曜 04:00 JST (日曜 19:00 UTC) に public スキーマを暗号化バックアップ
+    - cron: '0 19 * * 0'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        id: check
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::notice::SUPABASE_DB_URL または BACKUP_PASSPHRASE が未設定のためスキップしました。docs/OPERATIONS.md を参照して Repository Secrets を設定してください。"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install PostgreSQL 17 client
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-common gpg
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump and encrypt public schema
+        if: steps.check.outputs.configured == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+          OUT_FILE="couple-swipe-public-${TIMESTAMP}.sql.gz.gpg"
+
+          pg_dump "$SUPABASE_DB_URL" \
+            --schema=public \
+            --no-owner \
+            --no-privileges \
+            --format=plain \
+            | gzip -9 \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 \
+                  --passphrase "$BACKUP_PASSPHRASE" \
+                  --output "$OUT_FILE"
+
+          ls -lh "$OUT_FILE"
+          echo "artifact_file=${OUT_FILE}" >> "$GITHUB_OUTPUT"
+        id: dump
+
+      - name: Upload encrypted backup artifact (30-day retention)
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ github.run_id }}
+          path: ${{ steps.dump.outputs.artifact_file }}
+          retention-days: 30

@@ -24,6 +24,9 @@ create table if not exists public.pairs (
   created_at timestamptz not null default now()
 );
 
+create index if not exists idx_pairs_last_active_at
+  on public.pairs (last_active_at);
+
 -- ペアとユーザーの対応（user_id UNIQUE 制約で 1ユーザー1ペアに制限）
 create table if not exists public.pair_members (
   pair_id uuid not null references public.pairs(id) on delete cascade,
@@ -70,6 +73,9 @@ create index if not exists idx_answers_pair_date
 create index if not exists idx_answers_pair_question_date
   on public.answers (pair_id, question_id, quiz_date desc);
 
+create index if not exists idx_answers_user_id
+  on public.answers (user_id);
+
 -- ============================================================================
 -- 2. ヘルパー関数（RLS・日付・公開判定）
 -- ============================================================================
@@ -102,7 +108,7 @@ as $$
     select 1
     from public.pair_members pm
     where pm.pair_id = p_pair_id
-      and pm.user_id = auth.uid()
+      and pm.user_id = (select auth.uid())
   );
 $$;
 
@@ -119,6 +125,10 @@ declare
   v_member_count int;
   v_completed_members int;
 begin
+  if not public.is_pair_member(p_pair_id) then
+    return false;
+  end if;
+
   select coalesce(array_length(ds.question_ids, 1), 0)
     into v_total
   from public.daily_sets ds
@@ -195,12 +205,12 @@ create policy "profiles_select_self_or_partner"
   on public.profiles for select
   to authenticated
   using (
-    id = auth.uid()
+    id = (select auth.uid())
     or exists (
       select 1
       from public.pair_members pm_me
       join public.pair_members pm_partner on pm_me.pair_id = pm_partner.pair_id
-      where pm_me.user_id = auth.uid()
+      where pm_me.user_id = (select auth.uid())
         and pm_partner.user_id = profiles.id
     )
   );
@@ -208,13 +218,13 @@ create policy "profiles_select_self_or_partner"
 create policy "profiles_insert_self"
   on public.profiles for insert
   to authenticated
-  with check (id = auth.uid());
+  with check (id = (select auth.uid()));
 
 create policy "profiles_update_self"
   on public.profiles for update
   to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
+  using (id = (select auth.uid()))
+  with check (id = (select auth.uid()));
 
 -- pairs: 所属メンバーのみ参照可能（作成・更新・削除は RPC 経由）
 create policy "pairs_select_member"
@@ -242,7 +252,7 @@ create policy "answers_select_self_or_revealed"
   on public.answers for select
   to authenticated
   using (
-    user_id = auth.uid()
+    user_id = (select auth.uid())
     or (
       public.is_pair_member(pair_id)
       and public.is_revealed(pair_id, quiz_date)
@@ -253,7 +263,7 @@ create policy "answers_insert_own_today"
   on public.answers for insert
   to authenticated
   with check (
-    user_id = auth.uid()
+    user_id = (select auth.uid())
     and public.is_pair_member(pair_id)
     and quiz_date = public.today_in_pair_tz(pair_id)
     and exists (
@@ -936,3 +946,79 @@ $$;
 revoke all on function public.cleanup_inactive_pairs(int) from public;
 revoke all on function public.cleanup_inactive_pairs(int) from anon;
 revoke all on function public.cleanup_inactive_pairs(int) from authenticated;
+
+-- ============================================================================
+-- 5. 最小権限（テーブル・関数のアクセス制御）
+-- ============================================================================
+
+-- 未認証（anon）からはテーブル・RPC ともに直接アクセス不可
+revoke all on table
+  public.profiles,
+  public.pairs,
+  public.pair_members,
+  public.pair_join_attempts,
+  public.daily_sets,
+  public.answers
+  from public, anon;
+
+-- 認証済み（匿名サインイン含む）へ必要最小限のテーブル権限のみ付与
+revoke all on table
+  public.profiles,
+  public.pairs,
+  public.pair_members,
+  public.pair_join_attempts,
+  public.daily_sets,
+  public.answers
+  from authenticated;
+
+grant select, insert, update on table public.profiles to authenticated;
+grant select on table public.pairs to authenticated;
+grant select on table public.pair_members to authenticated;
+grant select on table public.daily_sets to authenticated;
+grant select, insert on table public.answers to authenticated;
+
+-- 内部専用ヘルパーはクライアントから直接呼び出し不可
+revoke all on function public.generate_invite_code() from public, anon, authenticated;
+
+-- RLS ヘルパー・アプリ用 RPC は認証済みロールのみ実行可能
+revoke all on function public.today_in_pair_tz(uuid) from public, anon;
+grant execute on function public.today_in_pair_tz(uuid) to authenticated;
+
+revoke all on function public.is_pair_member(uuid) from public, anon;
+grant execute on function public.is_pair_member(uuid) to authenticated;
+
+revoke all on function public.is_revealed(uuid, date) from public, anon;
+grant execute on function public.is_revealed(uuid, date) to authenticated;
+
+revoke all on function public.upsert_profile(text) from public, anon;
+grant execute on function public.upsert_profile(text) to authenticated;
+
+revoke all on function public.create_pair(text) from public, anon;
+grant execute on function public.create_pair(text) to authenticated;
+
+revoke all on function public.regenerate_invite_code() from public, anon;
+grant execute on function public.regenerate_invite_code() to authenticated;
+
+revoke all on function public.join_pair(text, text) from public, anon;
+grant execute on function public.join_pair(text, text) to authenticated;
+
+revoke all on function public.leave_pair() from public, anon;
+grant execute on function public.leave_pair() to authenticated;
+
+revoke all on function public.get_pair_state() from public, anon;
+grant execute on function public.get_pair_state() to authenticated;
+
+revoke all on function public.get_or_create_daily_set(text[]) from public, anon;
+grant execute on function public.get_or_create_daily_set(text[]) to authenticated;
+
+revoke all on function public.get_day_status(date) from public, anon;
+grant execute on function public.get_day_status(date) to authenticated;
+
+revoke all on function public.get_past_question_history(text[], date) from public, anon;
+grant execute on function public.get_past_question_history(text[], date) to authenticated;
+
+revoke all on function public.get_pair_history(int, int) from public, anon;
+grant execute on function public.get_pair_history(int, int) to authenticated;
+
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;

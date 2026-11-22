@@ -1,0 +1,45 @@
+name: Supabase Keepalive (Prevent 7-day Free Tier Pause)
+
+on:
+  schedule:
+    # 5日ごとに UTC 03:00 (JST 12:00) に実行して無料枠の7日間非アクティブ一時停止を防ぐ
+    - cron: '0 3 */5 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        id: check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::notice::SUPABASE_URL または SUPABASE_PUBLISHABLE_KEY が未設定のためスキップしました。docs/OPERATIONS.md を参照して Repository Secrets を設定してください。"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ping Supabase Auth & REST health endpoints
+        if: steps.check.outputs.configured == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          # Auth health check (egress 極小・認証不要)
+          auth_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            "${SUPABASE_URL%/}/auth/v1/health")
+          echo "Auth health HTTP status: ${auth_code}"
+          test "$auth_code" -eq 200
+
+          # REST root ping (PostgREST 稼働維持)
+          rest_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            "${SUPABASE_URL%/}/rest/v1/")
+          echo "REST ping HTTP status: ${rest_code}"
+          test "$rest_code" -eq 200 -o "$rest_code" -eq 401

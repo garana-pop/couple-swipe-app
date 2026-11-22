@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "540123998356",
+    "project_id": "coupleswipeapp",
+    "storage_bucket": "coupleswipeapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:540123998356:android:fd2cc90d94d0585f122c81",
+        "android_client_info": {
+          "package_name": "com.garanapop.coupleswipeapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALSAq5xv9kkN4Jdq36_MgqMsuxd478NJk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
