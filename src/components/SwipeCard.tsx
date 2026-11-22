@@ -21,6 +21,8 @@ const SIDE_SLOT_WIDTH = Math.max((SCREEN_WIDTH - CARD_WIDTH) / 2 - 12, 60);
 
 const VERTICAL_OVERLAP_MIN = 12;
 const HORIZONTAL_OVERLAP_MIN = 20;
+const OFFSCREEN_MARGIN_X = 35;
+const OFFSCREEN_MARGIN_Y = 20;
 
 function getOverlappingDirection(
   cardRect: LayoutRectangle,
@@ -81,6 +83,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
 
   const [slotLayouts, setSlotLayouts] = useState<Partial<Record<SwipeDirection, LayoutRectangle>>>({});
   const [cardRestLayout, setCardRestLayout] = useState<LayoutRectangle | null>(null);
+  const [stageLayout, setStageLayout] = useState<LayoutRectangle | null>(null);
 
   // カードが答えのエリア（スロット）に重なっているかを判定
   const getOverlapForGesture = useCallback(
@@ -98,6 +101,29 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
       );
     },
     [cardRestLayout, slotLayouts]
+  );
+
+  // カードが画面外までスワイプされたかを判定
+  const getOffscreenSwipeDirection = useCallback(
+    (dx: number, dy: number): SwipeDirection | null => {
+      if (!cardRestLayout || !stageLayout) return null;
+
+      const cardLeft = cardRestLayout.x + dx;
+      const cardRight = cardLeft + cardRestLayout.width;
+      const cardTop = cardRestLayout.y + dy;
+      const cardBottom = cardTop + cardRestLayout.height;
+
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        if (cardLeft < -OFFSCREEN_MARGIN_X) return 'LEFT';
+        if (cardRight > stageLayout.width + OFFSCREEN_MARGIN_X) return 'RIGHT';
+      } else {
+        if (cardTop < -OFFSCREEN_MARGIN_Y) return 'UP';
+        if (cardBottom > stageLayout.height + OFFSCREEN_MARGIN_Y) return 'DOWN';
+      }
+
+      return null;
+    },
+    [cardRestLayout, stageLayout]
   );
 
   // スワイプアウトのアニメーション
@@ -152,12 +178,12 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         onPanResponderRelease: (_, gesture) => {
           if (isAnimating) return;
 
-          const dir = getOverlapForGesture(gesture.dx, gesture.dy);
+          const dir = getOffscreenSwipeDirection(gesture.dx, gesture.dy);
 
           if (dir) {
             animateSwipeOut(dir);
           } else {
-            // 重なっていない場合はスプリングで戻る
+            // 画面外までスワイプされていない場合は初期位置に戻る
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
               friction: 6,
@@ -168,7 +194,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           }
         },
       }),
-    [animateSwipeOut, getOverlapForGesture, isAnimating, pan]
+    [animateSwipeOut, getOffscreenSwipeDirection, getOverlapForGesture, isAnimating, pan]
   );
 
   // カードの回転計算
@@ -191,7 +217,12 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
     : COLORS.card;
 
   return (
-    <View style={styles.stageContainer}>
+    <View
+      style={styles.stageContainer}
+      onLayout={(e) => {
+        setStageLayout(e.nativeEvent.layout);
+      }}
+    >
       {/* ========================================================
           4方向の立体スロット（奥行きと厚みのあるトレイデザイン）
           ======================================================== */}
