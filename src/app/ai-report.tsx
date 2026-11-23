@@ -12,8 +12,10 @@ import { router } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { showAlert } from '../lib/alert';
+import { LEGAL_URLS, openExternalLink } from '../lib/links';
 import {
   BillingOfferingPrices,
+  fetchPairAiReportHistory,
   fetchPairEntitlement,
   generateServerAiReport,
   initializeBilling,
@@ -58,9 +60,16 @@ function formatDateTime(iso: string): string {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export default function AiReportScreen() {
   const {
     userId,
+    pairId,
     isSupabaseReady,
     isPairConnected,
     partnerName,
@@ -71,10 +80,11 @@ export default function AiReportScreen() {
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [loadingEntitlement, setLoadingEntitlement] = useState(true);
   const [entitlement, setEntitlement] = useState<PairEntitlement | null>(null);
-  const [reportRecord, setReportRecord] = useState<PairAiReportRecord | null>(null);
+  const [reportHistory, setReportHistory] = useState<PairAiReportRecord[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [offering, setOffering] = useState<BillingOfferingPrices>({
     isStoreReady: false,
-    yearlyPriceLabel: '¥3,600 / 年',
+    yearlyPriceLabel: '¥3,000 / 年',
     monthlyPriceLabel: '¥500 / 月',
   });
   const [generating, setGenerating] = useState(false);
@@ -87,12 +97,29 @@ export default function AiReportScreen() {
     ]);
     if (ent) {
       setEntitlement(ent);
-      setReportRecord(ent.latestReport);
+      if (ent.isPremium && pairId) {
+        const hist = await fetchPairAiReportHistory(pairId, 20);
+        if (hist.length > 0) {
+          setReportHistory(hist);
+          setSelectedReportId((prev) =>
+            prev && hist.some((r) => r.id === prev) ? prev : hist[0].id
+          );
+        } else if (ent.latestReport) {
+          setReportHistory([ent.latestReport]);
+          setSelectedReportId(ent.latestReport.id);
+        } else {
+          setReportHistory([]);
+          setSelectedReportId(null);
+        }
+      } else {
+        setReportHistory(ent.latestReport ? [ent.latestReport] : []);
+        setSelectedReportId(ent.latestReport?.id ?? null);
+      }
     }
     if (offer) {
       setOffering(offer);
     }
-  }, [isSupabaseReady, userId]);
+  }, [isSupabaseReady, userId, pairId]);
 
   useEffect(() => {
     let active = true;
@@ -109,8 +136,18 @@ export default function AiReportScreen() {
   }, [refreshEntitlementAndBilling]);
 
   const isPremium = Boolean(entitlement?.isPremium);
-  const displayReport: AiReportData = isPremium && reportRecord ? reportRecord.report : SAMPLE_REPORT;
-  const isShowingSample = !isPremium || !reportRecord;
+  const latestReportRecord = reportHistory[0] ?? entitlement?.latestReport ?? null;
+  const activeReportRecord =
+    reportHistory.find((r) => r.id === selectedReportId) ?? latestReportRecord;
+  const isViewingOlderReport = Boolean(
+    isPremium &&
+      activeReportRecord &&
+      latestReportRecord &&
+      activeReportRecord.id !== latestReportRecord.id
+  );
+  const displayReport: AiReportData =
+    isPremium && activeReportRecord ? activeReportRecord.report : SAMPLE_REPORT;
+  const isShowingSample = !isPremium || !activeReportRecord;
 
   const handleGenerateReport = async (forceRefresh: boolean) => {
     if (!isSupabaseReady) {
@@ -125,7 +162,12 @@ export default function AiReportScreen() {
         return;
       }
       if (res.reportRecord) {
-        setReportRecord(res.reportRecord);
+        const nextRec = res.reportRecord;
+        setReportHistory((prev) => {
+          const withoutDup = prev.filter((item) => item.id !== nextRec.id);
+          return [nextRec, ...withoutDup];
+        });
+        setSelectedReportId(nextRec.id);
       }
       if (res.cached) {
         showAlert(
@@ -224,7 +266,7 @@ export default function AiReportScreen() {
           <View style={styles.cardHeader}>
             <Ionicons name="sparkles" size={18} color="#4A7C59" />
             <Text style={styles.cardTitle}>
-              {reportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
+              {latestReportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
             </Text>
           </View>
           <Text style={styles.premiumMetaText}>
@@ -234,8 +276,8 @@ export default function AiReportScreen() {
               ? ` ＋ 過去未回答日の相手回答 ${entitlement?.pastPartnerOnlyDaysCount}日`
               : ''}
             ）
-            {reportRecord
-              ? `\n最終更新: ${formatDateTime(reportRecord.createdAt)}（${reportRecord.analyzedAnswers}問を分析）`
+            {latestReportRecord
+              ? `\n最終更新: ${formatDateTime(latestReportRecord.createdAt)}（${latestReportRecord.analyzedAnswers}問を分析）`
               : ''}
             {(entitlement?.pastUnansweredDaysCount ?? 0) > 0
               ? `\n※ 過去の未回答お題が ${entitlement?.pastUnansweredDaysCount}日分 あります。「過去の回答との比較」から後から回答して相手の結果を見られます。`
@@ -260,7 +302,7 @@ export default function AiReportScreen() {
             style={styles.generateBtn}
             activeOpacity={0.85}
             disabled={generating || !isPairConnected}
-            onPress={() => void handleGenerateReport(Boolean(reportRecord))}
+            onPress={() => void handleGenerateReport(Boolean(latestReportRecord))}
           >
             {generating ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -268,7 +310,7 @@ export default function AiReportScreen() {
               <>
                 <Ionicons name="sparkles-outline" size={17} color="#FFFFFF" />
                 <Text style={styles.generateBtnText}>
-                  {reportRecord ? '最新データでレポートを更新する' : 'AI相性レポートを生成する'}
+                  {latestReportRecord ? '最新データでレポートを更新する' : 'AI相性レポートを生成する'}
                 </Text>
               </>
             )}
@@ -284,6 +326,102 @@ export default function AiReportScreen() {
               : ''}
             ）から AI が専用レポートを生成し、過去の未回答の質問にも後から回答して相手の結果を見られるようになります。
           </Text>
+        </View>
+      )}
+
+      {/* 有料ペア向け：過去のAI診断アーカイブ（横並びで見返し＆比較） */}
+      {isPremium && reportHistory.length > 0 && (
+        <View style={styles.archiveSection}>
+          <View style={styles.archiveHeader}>
+            <View style={styles.archiveTitleRow}>
+              <Ionicons name="albums-outline" size={16} color={COLORS.primaryDark} />
+              <Text style={styles.archiveTitle}>
+                AI診断アーカイブ（全 {reportHistory.length}件）
+              </Text>
+            </View>
+            {isViewingOlderReport && latestReportRecord && (
+              <TouchableOpacity
+                style={styles.backLatestBtn}
+                onPress={() => setSelectedReportId(latestReportRecord.id)}
+              >
+                <Text style={styles.backLatestBtnText}>最新へ戻す</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.archiveScrollContent}
+          >
+            {reportHistory.map((item, idx) => {
+              const isSelected = activeReportRecord?.id === item.id;
+              const prevItem = reportHistory[idx + 1];
+              const delta = prevItem
+                ? item.report.overallScore - prevItem.report.overallScore
+                : null;
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.archiveCard,
+                    SHADOWS.cardSmall,
+                    isSelected && styles.archiveCardActive,
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedReportId(item.id)}
+                >
+                  <View style={styles.archiveCardTop}>
+                    <Text style={[styles.archiveDate, isSelected && styles.archiveDateActive]}>
+                      {formatShortDate(item.createdAt)}
+                    </Text>
+                    {idx === 0 && (
+                      <View style={styles.latestChip}>
+                        <Text style={styles.latestChipText}>最新</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.archiveScoreRow}>
+                    <Text style={[styles.archiveScore, isSelected && styles.archiveScoreActive]}>
+                      {item.report.overallScore}
+                      <Text style={styles.archiveScoreUnit}>点</Text>
+                    </Text>
+                    {delta !== null && (
+                      <Text
+                        style={[
+                          styles.archiveDelta,
+                          {
+                            color:
+                              delta > 0 ? '#4A7C59' : delta < 0 ? '#C85338' : COLORS.textMuted,
+                          },
+                        ]}
+                      >
+                        {delta > 0 ? `▲+${delta}` : delta < 0 ? `▼${delta}` : '±0'}
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text style={styles.archiveMeta}>
+                    {item.analyzedDays}日・{item.analyzedAnswers}問
+                  </Text>
+                  <Text style={styles.archiveTags} numberOfLines={1}>
+                    {item.report.myType.tag} × {item.report.partnerType.tag}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {isViewingOlderReport && activeReportRecord && (
+            <View style={styles.olderViewingBanner}>
+              <Ionicons name="time-outline" size={14} color={COLORS.primaryDark} />
+              <Text style={styles.olderViewingText}>
+                {formatDateTime(activeReportRecord.createdAt)} に生成した過去レポートを表示中です
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -387,8 +525,8 @@ export default function AiReportScreen() {
             <View style={styles.perkRow}>
               <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
               <Text style={styles.perkText}>
-                <Text style={styles.perkBold}>未回答日も含めた深層AI相性診断</Text>
-                ：双方の回答＋過去未回答日の相手回答をもとに、性格傾向やすれ違い予防策をAIが分析
+                <Text style={styles.perkBold}>未回答日も含めた深層AI相性診断＆過去アーカイブ</Text>
+                ：性格傾向やすれ違い予防策をAIが分析し、過去の診断レポートも並べて見返せます
               </Text>
             </View>
             <View style={styles.perkRow}>
@@ -409,11 +547,11 @@ export default function AiReportScreen() {
               onPress={() => setSelectedPlan('yearly')}
             >
               <View style={styles.planBestBadge}>
-                <Text style={styles.planBestText}>人気No.1（40% OFF）</Text>
+                <Text style={styles.planBestText}>50% OFF</Text>
               </View>
               <Text style={styles.planName}>年額プラン</Text>
               <Text style={styles.planPrice}>{offering.yearlyPriceLabel}</Text>
-              <Text style={styles.planSubPrice}>(2人分・ペア共有)</Text>
+              <Text style={styles.planSubPrice}>(月250円・2人共有)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -458,8 +596,70 @@ export default function AiReportScreen() {
           </TouchableOpacity>
 
           <Text style={styles.subNotes}>
-            いつでも Google Play から解約可能・ペア共有対応
+            定期購入は自動更新されます。次回更新の24時間前までに Google Play の定期購入管理からいつでも解約できます。
           </Text>
+
+          <View style={styles.legalLinksRow}>
+            <TouchableOpacity
+              onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
+            >
+              <Text style={styles.legalLinkText}>プライバシーポリシー</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>•</Text>
+            <TouchableOpacity
+              onPress={() =>
+                void openExternalLink(
+                  LEGAL_URLS.googlePlaySubscriptions,
+                  'Google Play 定期購入管理'
+                )
+              }
+            >
+              <Text style={styles.legalLinkText}>解約・サブスク管理</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>•</Text>
+            <TouchableOpacity
+              onPress={() =>
+                void openExternalLink(LEGAL_URLS.accountDeletion, '退会・データ削除案内')
+              }
+            >
+              <Text style={styles.legalLinkText}>退会案内</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* 課金済みユーザー向け：プライバシーポリシー・解約管理リンク */}
+      {isPremium && (
+        <View style={styles.premiumLegalFooter}>
+          <Text style={styles.subNotes}>
+            プランの確認・解約は Google Play の定期購入管理からいつでも行えます。
+          </Text>
+          <View style={styles.legalLinksRow}>
+            <TouchableOpacity
+              onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
+            >
+              <Text style={styles.legalLinkText}>プライバシーポリシー</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>•</Text>
+            <TouchableOpacity
+              onPress={() =>
+                void openExternalLink(
+                  LEGAL_URLS.googlePlaySubscriptions,
+                  'Google Play 定期購入管理'
+                )
+              }
+            >
+              <Text style={styles.legalLinkText}>解約・サブスク管理</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>•</Text>
+            <TouchableOpacity
+              onPress={() =>
+                void openExternalLink(LEGAL_URLS.accountDeletion, '退会・データ削除案内')
+              }
+            >
+              <Text style={styles.legalLinkText}>退会案内</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -913,5 +1113,151 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
     textAlign: 'center',
+    lineHeight: 16,
+  },
+  legalLinksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  legalLinkText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+    textDecorationLine: 'underline',
+  },
+  legalDot: {
+    fontSize: 11,
+    color: COLORS.textLight,
+  },
+  premiumLegalFooter: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  archiveSection: {
+    marginBottom: 16,
+  },
+  archiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  archiveTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  archiveTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  backLatestBtn: {
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  backLatestBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primaryDark,
+  },
+  archiveScrollContent: {
+    gap: 10,
+    paddingVertical: 2,
+    paddingRight: 6,
+  },
+  archiveCard: {
+    width: 158,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  archiveCardActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#FDF4EF',
+  },
+  archiveCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  archiveDate: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  archiveDateActive: {
+    color: COLORS.primaryDark,
+  },
+  latestChip: {
+    backgroundColor: '#4A7C59',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  latestChipText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  archiveScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 3,
+  },
+  archiveScore: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: COLORS.text,
+  },
+  archiveScoreActive: {
+    color: COLORS.primaryDark,
+  },
+  archiveScoreUnit: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  archiveDelta: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  archiveMeta: {
+    fontSize: 10.5,
+    color: COLORS.textMuted,
+    marginBottom: 4,
+  },
+  archiveTags: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  olderViewingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  olderViewingText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
   },
 });

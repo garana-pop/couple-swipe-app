@@ -44,6 +44,7 @@ export default function HomeScreen() {
     isMyCompleted,
     isPartnerCompleted,
     matchSummary,
+    pairStats,
     isTutorialVisible,
     completeTutorial,
     showTutorial,
@@ -222,7 +223,7 @@ export default function HomeScreen() {
 
       <Stack.Screen
         options={{
-          title: 'ふたりスワイプ',
+          title: 'Kotaeai',
           headerRight: () => (
             <TouchableOpacity
               onPress={() => setIsMenuOpen(true)}
@@ -322,6 +323,42 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+
+              {/* 連続回答ストリーク＆通算統計バー */}
+              <TouchableOpacity
+                style={styles.streakStatsRow}
+                activeOpacity={0.75}
+                onPress={() => router.push('/history')}
+              >
+                <View style={styles.streakPill}>
+                  <Ionicons
+                    name={pairStats.currentStreak > 0 ? 'flame' : 'flame-outline'}
+                    size={14}
+                    color={pairStats.currentStreak > 0 ? '#D97559' : COLORS.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.streakPillText,
+                      pairStats.currentStreak > 0 && styles.streakPillTextActive,
+                    ]}
+                  >
+                    連続 {pairStats.currentStreak}日
+                  </Text>
+                </View>
+
+                <View style={styles.streakMetaGroup}>
+                  <Text style={styles.streakMetaText}>完了 {pairStats.totalRevealedDays}日</Text>
+                  {pairStats.overallMatchRate !== null ? (
+                    <>
+                      <Text style={styles.streakMetaDot}>•</Text>
+                      <Text style={styles.streakMetaText}>
+                        一致率 {pairStats.overallMatchRate}%
+                      </Text>
+                    </>
+                  ) : null}
+                  <Ionicons name="chevron-forward" size={13} color={COLORS.textLight} />
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* 今日の質問メインアクションカード（連携済み時は最上部に配置） */}
@@ -629,7 +666,7 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.drawerFooter}>
-              <Text style={styles.drawerVersionText}>ふたりスワイプ v1.0.0</Text>
+              <Text style={styles.drawerVersionText}>Kotaeai v1.0.0</Text>
             </View>
           </View>
         </View>
@@ -760,6 +797,47 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+  },
+  streakStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  streakPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FDF3EC',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  streakPillText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  streakPillTextActive: {
+    color: COLORS.primaryDark,
+    fontWeight: '800',
+  },
+  streakMetaGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  streakMetaText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  streakMetaDot: {
+    fontSize: 11,
+    color: COLORS.textLight,
   },
   noticeBanner: {
     flexDirection: 'row',

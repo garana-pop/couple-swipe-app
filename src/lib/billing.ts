@@ -99,7 +99,7 @@ function getNativePurchasesModule(): {
 export async function initializeBilling(userId: string): Promise<BillingOfferingPrices> {
   const fallback: BillingOfferingPrices = {
     isStoreReady: false,
-    yearlyPriceLabel: '¥3,600 / 年',
+    yearlyPriceLabel: '¥3,000 / 年',
     monthlyPriceLabel: '¥500 / 月',
   };
 
@@ -251,6 +251,39 @@ export async function fetchPairEntitlement(): Promise<PairEntitlement | null> {
     analyzableDaysCount: Number(d.analyzable_days_count ?? d.revealed_days_count ?? 0),
     latestReport: parseReportRecord(d.latest_report),
   };
+}
+
+/**
+ * 有料ペア向けに過去の AI 相性レポート履歴を新しい順に一覧取得する（RLS で有料ペアメンバーのみ許可）
+ */
+export async function fetchPairAiReportHistory(
+  pairId: string,
+  limit = 20
+): Promise<PairAiReportRecord[]> {
+  if (!supabase || !pairId) return [];
+  const { data, error } = await supabase
+    .from('pair_ai_reports')
+    .select('id, analyzed_days, analyzed_answers, model_used, created_at, report_json')
+    .eq('pair_id', pairId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .map((row) =>
+      parseReportRecord({
+        id: row.id,
+        analyzed_days: row.analyzed_days,
+        analyzed_answers: row.analyzed_answers,
+        model_used: row.model_used,
+        created_at: row.created_at,
+        report: row.report_json,
+      })
+    )
+    .filter((item): item is PairAiReportRecord => item !== null);
 }
 
 function formatAiReportError(code: string): string {

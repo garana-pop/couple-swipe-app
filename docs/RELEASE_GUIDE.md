@@ -38,7 +38,7 @@ npx eas-cli@latest env:create --name EXPO_PUBLIC_REVENUECAT_ANDROID_KEY --value 
 
 ## 2. AI 相性レポート用 Gemini API キーの設定（Supabase Edge Function Secret）
 
-AI 相性レポート生成（Edge Function: `generate-ai-report`）は **サーバー側で課金確認を通過した有料ペアに対してのみ** Gemini API を呼び出します（デフォルトモデル: `gemini-2.5-flash`）。
+AI 相性レポート生成（Edge Function: `generate-ai-report`）は **サーバー側で課金確認を通過した有料ペアに対してのみ** Gemini API を呼び出します（デフォルトモデル: `gemini-flash-lite-latest`、`404/503` 時は `gemini-flash-latest` 等へ自動フェイルオーバー、`thinkingBudget: 512`・1ペア1日3回上限付き）。
 
 1. [Google AI Studio](https://aistudio.google.com/apikey) で `GEMINI_API_KEY` を取得
 2. Supabase ダッシュボードの [Edge Functions > Secrets](https://supabase.com/dashboard/project/zfnbyxntyxgmoebvvifu/functions/secrets) に以下を登録：
@@ -50,7 +50,7 @@ AI 相性レポート生成（Edge Function: `generate-ai-report`）は **サー
 ## 3. RevenueCat（無料枠）＋ Google Play Billing 連携手順
 
 1. **Google Play Console で定期購入商品を作成**
-   - 定期購入 ID 例: `couple_swipe_yearly`（年額 ¥3,600）、`couple_swipe_monthly`（月額 ¥500）
+   - 定期購入 ID 例: `couple_swipe_yearly`（年額 ¥3,000・50% OFF）、`couple_swipe_monthly`（月額 ¥500）
 2. **RevenueCat（https://www.revenuecat.com/）で無料プロジェクト作成**
    - Google Play アプリ（`com.garanapop.coupleswipeapp`）を登録し、サービスアカウントを接続
    - Entitlement `premium` を作成し、Offering `default` に `$rc_annual`（年額）と `$rc_monthly`（月額）を紐づけ

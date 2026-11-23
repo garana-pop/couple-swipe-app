@@ -52,6 +52,7 @@ export default function QuizScreen() {
   const [pastMyAnswers, setPastMyAnswers] = useState<Record<string, SwipeDirection>>({});
   const [loadingPast, setLoadingPast] = useState(isPastQuiz);
   const [pastLoadError, setPastLoadError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const submittingRef = useRef(false);
 
   // 途中まで回答済みの場合、最初の未回答質問から再開（当日モード用初期値）
@@ -124,7 +125,15 @@ export default function QuizScreen() {
 
     try {
       if (!isPastQuiz) {
-        await submitAnswer(currentQuestion.id, direction);
+        const res = await submitAnswer(currentQuestion.id, direction);
+        if (!res.ok) {
+          setRetryNonce((n) => n + 1);
+          showAlert(
+            '通信エラー',
+            res.error ?? '回答の保存に失敗しました。通信環境をご確認のうえもう一度お試しください。'
+          );
+          return;
+        }
 
         if (currentIndex + 1 < total) {
           setCurrentIndex((prev) => prev + 1);
@@ -144,6 +153,7 @@ export default function QuizScreen() {
 
       const res = await submitPastAnswer(targetDate, currentQuestion.id, direction, isFinalQuestion);
       if (!res.ok) {
+        setRetryNonce((n) => n + 1);
         showAlert('回答できませんでした', res.error ?? '過去の質問の保存に失敗しました。');
         if (res.error?.includes('プレミアム')) {
           router.replace('/ai-report');
@@ -241,7 +251,7 @@ export default function QuizScreen() {
         <View style={styles.cardArea}>
           {currentQuestion && (
             <SwipeCard
-              key={`${targetDate}-${currentQuestion.id}`}
+              key={`${targetDate}-${currentQuestion.id}-${retryNonce}`}
               question={currentQuestion}
               onSwipe={handleSwipeAnswer}
             />

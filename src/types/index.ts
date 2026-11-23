@@ -111,3 +111,19 @@ export interface PairEntitlement {
   analyzableDaysCount: number;
   latestReport: PairAiReportRecord | null;
 }
+
+export interface CategoryMatchStat {
+  category: string;
+  matched: number;
+  total: number;
+  percentage: number;
+}
+
+export interface PairStats {
+  currentStreak: number;
+  isTodayIncludedInStreak: boolean;
+  totalRevealedDays: number;
+  overallMatchRate: number | null;
+  totalBothAnsweredQuestions: number;
+  categoryStats: CategoryMatchStat[];
+}

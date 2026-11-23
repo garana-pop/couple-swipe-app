@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { showAlert, showConfirm } from '../lib/alert';
+import { LEGAL_URLS, openExternalLink } from '../lib/links';
 import { sendTestLocalNotification } from '../lib/notifications';
 
 const TIME_PRESETS: { label: string; hour: number; minute: number }[] = [
@@ -395,6 +396,66 @@ export default function SettingsScreen() {
         )}
       </View>
 
+      {/* ================================================================
+          規約・プライバシーポリシー・解約案内
+         ================================================================ */}
+      <View style={[styles.card, SHADOWS.card]}>
+        <View style={styles.cardHeaderLeft}>
+          <View style={[styles.iconBox, { backgroundColor: '#F5EFE8' }]}>
+            <Ionicons name="document-text-outline" size={20} color={COLORS.primaryDark} />
+          </View>
+          <View style={styles.cardHeaderTexts}>
+            <Text style={styles.cardTitle}>プライバシー・解約案内</Text>
+            <Text style={styles.cardSubtitle}>定期購入の管理・各種ポリシー</Text>
+          </View>
+        </View>
+
+        <View style={styles.legalLinksList}>
+          <TouchableOpacity
+            style={styles.legalRow}
+            activeOpacity={0.75}
+            onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
+          >
+            <View style={styles.legalRowLeft}>
+              <Ionicons name="shield-outline" size={17} color={COLORS.primaryDark} />
+              <Text style={styles.legalRowText}>プライバシーポリシー</Text>
+            </View>
+            <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.legalRow}
+            activeOpacity={0.75}
+            onPress={() =>
+              void openExternalLink(
+                LEGAL_URLS.googlePlaySubscriptions,
+                'Google Play 定期購入管理'
+              )
+            }
+          >
+            <View style={styles.legalRowLeft}>
+              <Ionicons name="card-outline" size={17} color={COLORS.primaryDark} />
+              <Text style={styles.legalRowText}>サブスクリプションの解約・管理（Google Play）</Text>
+            </View>
+            <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.legalRow, styles.legalRowLast]}
+            activeOpacity={0.75}
+            onPress={() =>
+              void openExternalLink(LEGAL_URLS.accountDeletion, '退会・アカウント削除案内')
+            }
+          >
+            <View style={styles.legalRowLeft}>
+              <Ionicons name="person-remove-outline" size={17} color={COLORS.primaryDark} />
+              <Text style={styles.legalRowText}>退会・アカウント削除のご案内</Text>
+            </View>
+            <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <TouchableOpacity
         style={styles.backButton}
         activeOpacity={0.8}
@@ -641,6 +702,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.primaryDark,
+  },
+  legalLinksList: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  legalRowLast: {
+    borderBottomWidth: 0,
+  },
+  legalRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    flex: 1,
+  },
+  legalRowText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
   },
   backButton: {
     flexDirection: 'row',

@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { SwipeDirection, Question, HistoryDayItem, DayQuizData } from '../types';
+import {
+  SwipeDirection,
+  Question,
+  HistoryDayItem,
+  DayQuizData,
+  CategoryMatchStat,
+  PairStats,
+} from '../types';
 import {
   TODAY_QUESTIONS,
   buildQuestionCatalog,
@@ -77,9 +84,10 @@ interface AppContextType {
   isTutorialVisible: boolean;
   historyDays: HistoryDayItem[];
   isHistoryLoading: boolean;
+  pairStats: PairStats;
   dailyReminder: DailyReminderSettings;
   pushStatus: PushRegistrationResult | null;
-  submitAnswer: (questionId: string, direction: SwipeDirection) => Promise<void>;
+  submitAnswer: (questionId: string, direction: SwipeDirection) => Promise<{ ok: boolean; error?: string }>;
   loadDayQuizData: (quizDate: string) => Promise<DayQuizData | null>;
   submitPastAnswer: (
     quizDate: string,
@@ -130,6 +138,13 @@ function formatJoinError(message: string): string {
     return 'すでに別のペアに参加しています。先にペアを解除してください。';
   }
   return '連携処理に失敗しました。通信環境をご確認のうえ再度お試しください。';
+}
+
+function shiftIsoDate(dateStr: string, deltaDays: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
 }
 
 function formatPastDateLabel(pastDateStr: string, currentDateStr: string): { badge: string; label: string } {
@@ -329,6 +344,56 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       await loadAnswersForDay(pairState.pair_id, quizDate, currentUserId);
+
+      // 履歴も初回ロード時に同期し、ホームのストリーク・通算一致率を即時表示する
+      const { data: histData, error: histErr } = await supabase.rpc('get_pair_history', {
+        p_limit: 60,
+        p_offset: 0,
+      });
+      if (!histErr && Array.isArray(histData)) {
+        const missingHistQuestion = histData.some((day: any) => {
+          const rawAnswers: any[] = Array.isArray(day.answers) ? day.answers : [];
+          return rawAnswers.some((a) => !catalogRef.current.questionsById[a.question_id]);
+        });
+        if (missingHistQuestion) {
+          await refreshQuestionCatalog({ force: true, fullRefresh: true });
+        }
+        const dict = catalogRef.current.questionsById;
+        const mappedHist: HistoryDayItem[] = histData.map((day: any) => {
+          const rawAnswers: any[] = Array.isArray(day.answers) ? day.answers : [];
+          const items = rawAnswers
+            .map((a) => {
+              const q = dict[a.question_id];
+              if (!q) return null;
+              const myAns = a.my_answer as SwipeDirection | undefined;
+              const partnerAns = a.partner_answer as SwipeDirection | undefined;
+              return {
+                question: q,
+                myAnswer: myAns,
+                partnerAnswer: partnerAns,
+                isMatched: evaluateMatch(q, myAns, partnerAns),
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null);
+          return {
+            quizDate: day.quiz_date,
+            totalQuestions: Number(
+              day.total_questions ??
+                (Array.isArray(day.question_ids) ? day.question_ids.length : items.length)
+            ),
+            myAnsweredCount: Number(day.my_answered_count ?? 0),
+            partnerAnsweredCount: Number(day.partner_answered_count ?? 0),
+            isMyCompleted: Boolean(day.is_my_completed ?? day.is_revealed),
+            isPartnerCompleted: Boolean(day.is_partner_completed ?? day.is_revealed),
+            isRevealed: day.is_revealed !== false,
+            isPremiumUnlocked: Boolean(day.is_premium_unlocked),
+            canAnswerPastDay: Boolean(day.can_answer_past_day),
+            isLockedPastDay: Boolean(day.is_locked_past_day),
+            items,
+          };
+        });
+        setHistoryDays(mappedHist);
+      }
     },
     [loadAnswersForDay, refreshQuestionCatalog]
   );
@@ -471,24 +536,38 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [userId, todayDate, isPairConnected, questions.length, pairId, loadPairAndDailyData, loadAnswersForDay]);
 
   const submitAnswer = useCallback(
-    async (questionId: string, direction: SwipeDirection) => {
+    async (
+      questionId: string,
+      direction: SwipeDirection
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const prevMyAnswers = myAnswers;
       const nextMyAnswers: Record<string, SwipeDirection> = {
-        ...myAnswers,
+        ...prevMyAnswers,
         [questionId]: direction,
       };
       setMyAnswers(nextMyAnswers);
 
-      if (!supabase || !userId || !pairId) return;
+      if (!supabase || !userId || !pairId) {
+        return { ok: true };
+      }
 
-      const { error } = await supabase.from('answers').insert({
-        pair_id: pairId,
-        quiz_date: todayDate,
-        question_id: questionId,
-        user_id: userId,
-        direction,
-      });
+      try {
+        const { error } = await supabase.from('answers').insert({
+          pair_id: pairId,
+          quiz_date: todayDate,
+          question_id: questionId,
+          user_id: userId,
+          direction,
+        });
 
-      if (!error || error.code === '23505') {
+        if (error && error.code !== '23505') {
+          setMyAnswers(prevMyAnswers);
+          return {
+            ok: false,
+            error: '回答の保存に失敗しました。通信環境をご確認のうえ、もう一度お試しください。',
+          };
+        }
+
         await refreshDayStatus();
         // 今日の全問に回答し終えたタイミングでパートナーへプッシュ通知を送信（サーバー側で重複防止）
         const completedAll =
@@ -496,6 +575,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (completedAll && isPairConnected) {
           void notifyPartnerAnswered(todayDate);
         }
+        return { ok: true };
+      } catch {
+        setMyAnswers(prevMyAnswers);
+        return {
+          ok: false,
+          error: '通信エラーのため回答を保存できませんでした。接続を確認してもう一度お試しください。',
+        };
       }
     },
     [myAnswers, userId, pairId, todayDate, refreshDayStatus, questions, isPairConnected]
@@ -808,7 +894,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsHistoryLoading(true);
     try {
       const { data, error } = await supabase.rpc('get_pair_history', {
-        p_limit: 30,
+        p_limit: 60,
         p_offset: 0,
       });
       if (error || !Array.isArray(data)) {
@@ -1013,6 +1099,72 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [questions, myAnswers, partnerAnswers]);
 
+  const pairStats = useMemo<PairStats>(() => {
+    const revealedDates = new Set<string>();
+    const categoryAcc = new Map<string, { matched: number; total: number }>();
+    let totalMatched = 0;
+    let totalBoth = 0;
+
+    for (const day of historyDays) {
+      if (day.isRevealed) {
+        revealedDates.add(day.quizDate);
+      }
+      for (const item of day.items) {
+        if (!item.myAnswer || !item.partnerAnswer) continue;
+        totalBoth++;
+        if (item.isMatched) totalMatched++;
+        const cat = item.question.category || 'その他';
+        const prev = categoryAcc.get(cat) ?? { matched: 0, total: 0 };
+        categoryAcc.set(cat, {
+          matched: prev.matched + (item.isMatched ? 1 : 0),
+          total: prev.total + 1,
+        });
+      }
+    }
+
+    // 今日の双方回答が完了済みだがまだ historyDays に未反映の場合も即時合算
+    if (isMyCompleted && isPartnerCompleted && !revealedDates.has(todayDate) && matchSummary.details.length > 0) {
+      revealedDates.add(todayDate);
+      for (const item of matchSummary.details) {
+        if (!item.myAnswer || !item.partnerAnswer) continue;
+        totalBoth++;
+        if (item.isMatched) totalMatched++;
+        const cat = item.question.category || 'その他';
+        const prev = categoryAcc.get(cat) ?? { matched: 0, total: 0 };
+        categoryAcc.set(cat, {
+          matched: prev.matched + (item.isMatched ? 1 : 0),
+          total: prev.total + 1,
+        });
+      }
+    }
+
+    const isTodayIncludedInStreak = revealedDates.has(todayDate);
+    let cursor = isTodayIncludedInStreak ? todayDate : shiftIsoDate(todayDate, -1);
+    let currentStreak = 0;
+    while (revealedDates.has(cursor)) {
+      currentStreak++;
+      cursor = shiftIsoDate(cursor, -1);
+    }
+
+    const categoryStats: CategoryMatchStat[] = [...categoryAcc.entries()]
+      .map(([category, stat]) => ({
+        category,
+        matched: stat.matched,
+        total: stat.total,
+        percentage: stat.total > 0 ? Math.round((stat.matched / stat.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.percentage - a.percentage || b.total - a.total);
+
+    return {
+      currentStreak,
+      isTodayIncludedInStreak,
+      totalRevealedDays: revealedDates.size,
+      overallMatchRate: totalBoth > 0 ? Math.round((totalMatched / totalBoth) * 100) : null,
+      totalBothAnsweredQuestions: totalBoth,
+      categoryStats,
+    };
+  }, [historyDays, todayDate, isMyCompleted, isPartnerCompleted, matchSummary.details]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1039,6 +1191,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isTutorialVisible,
         historyDays,
         isHistoryLoading,
+        pairStats,
         dailyReminder,
         pushStatus,
         submitAnswer,

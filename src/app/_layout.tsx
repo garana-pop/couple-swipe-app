@@ -51,7 +51,7 @@ export default function RootLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'ふたりスワイプ',
+          title: 'Kotaeai',
           headerShown: true,
         }}
       />

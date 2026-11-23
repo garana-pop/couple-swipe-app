@@ -28,6 +28,7 @@ export default function HistoryScreen() {
     myName,
     historyDays,
     isHistoryLoading,
+    pairStats,
     fetchHistory,
     isSupabaseReady,
     hasPair,
@@ -48,6 +49,81 @@ export default function HistoryScreen() {
         <Text style={styles.headerDesc}>
           過去に出題された質問と、二人の回答の記録を一覧で確認できます。
         </Text>
+      </View>
+
+      {/* 連続回答ストリーク ＆ カテゴリ別一致率カード */}
+      <View style={[styles.card, SHADOWS.cardSmall, styles.statsCard]}>
+        <View style={styles.statsKpiRow}>
+          <View style={styles.kpiItem}>
+            <View style={styles.kpiValueRow}>
+              <Ionicons
+                name={pairStats.currentStreak > 0 ? 'flame' : 'flame-outline'}
+                size={16}
+                color={pairStats.currentStreak > 0 ? '#D97559' : COLORS.textMuted}
+              />
+              <Text style={styles.kpiValue}>{pairStats.currentStreak}日</Text>
+            </View>
+            <Text style={styles.kpiLabel}>連続ストリーク</Text>
+          </View>
+
+          <View style={styles.kpiDivider} />
+
+          <View style={styles.kpiItem}>
+            <Text style={styles.kpiValue}>{pairStats.totalRevealedDays}日</Text>
+            <Text style={styles.kpiLabel}>双方完了日数</Text>
+          </View>
+
+          <View style={styles.kpiDivider} />
+
+          <View style={styles.kpiItem}>
+            <Text style={styles.kpiValue}>
+              {pairStats.overallMatchRate !== null ? `${pairStats.overallMatchRate}%` : '--'}
+            </Text>
+            <Text style={styles.kpiLabel}>通算一致率</Text>
+          </View>
+        </View>
+
+        {pairStats.categoryStats.length > 0 ? (
+          <View style={styles.categoryStatsSection}>
+            <Text style={styles.categoryStatsHeading}>
+              カテゴリ別一致率（双方回答 {pairStats.totalBothAnsweredQuestions}問）
+            </Text>
+            <View style={styles.categoryBarsList}>
+              {pairStats.categoryStats.map((stat) => {
+                const barColor =
+                  stat.percentage >= 75
+                    ? '#4A7C59'
+                    : stat.percentage >= 50
+                      ? COLORS.primary
+                      : '#C97A2B';
+                return (
+                  <View key={stat.category} style={styles.categoryBarItem}>
+                    <View style={styles.categoryBarHeader}>
+                      <Text style={styles.categoryBarName} numberOfLines={1}>
+                        {stat.category}
+                      </Text>
+                      <Text style={[styles.categoryBarValue, { color: barColor }]}>
+                        {stat.percentage}%（{stat.matched}/{stat.total}）
+                      </Text>
+                    </View>
+                    <View style={styles.categoryBarTrack}>
+                      <View
+                        style={[
+                          styles.categoryBarFill,
+                          { width: `${stat.percentage}%`, backgroundColor: barColor },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.categoryEmptyHint}>
+            二人とも回答を完了すると、カテゴリ別の一致率グラフが表示されます。
+          </Text>
+        )}
       </View>
 
       {/* 今日の再出題比較セクション */}
@@ -342,6 +418,95 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textMuted,
     lineHeight: 18,
+  },
+  statsCard: {
+    marginBottom: 18,
+    paddingVertical: 15,
+  },
+  statsKpiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  kpiItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  kpiValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  kpiValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.text,
+  },
+  kpiLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  kpiDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: COLORS.border,
+  },
+  categoryStatsSection: {
+    marginTop: 14,
+    paddingTop: 13,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  categoryStatsHeading: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: COLORS.primaryDark,
+    marginBottom: 10,
+  },
+  categoryBarsList: {
+    gap: 9,
+  },
+  categoryBarItem: {
+    gap: 4,
+  },
+  categoryBarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categoryBarName: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  categoryBarValue: {
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  categoryBarTrack: {
+    height: 7,
+    backgroundColor: COLORS.surface,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  categoryBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  categoryEmptyHint: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    fontSize: 11.5,
+    color: COLORS.textMuted,
+    textAlign: 'center',
   },
   sectionLabel: {
     fontSize: 13,
