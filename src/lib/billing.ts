@@ -2,7 +2,10 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import type {
   AiReportData,
+  BreakupCausePoint,
+  BreakupReflectionData,
   PairAiReportRecord,
+  PairBreakupReflectionRecord,
   PairEntitlement,
   Question,
 } from '../types';
@@ -343,8 +346,15 @@ export async function syncAndFetchPairEntitlement(
 function parseReportRecord(raw: unknown): PairAiReportRecord | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  const report = r.report as Partial<AiReportData> | undefined;
-  if (!report || typeof report !== 'object' || typeof report.chemistrySummary !== 'string') {
+  const report = r.report as
+    | (Omit<Partial<AiReportData>, 'reportType'> & { reportType?: string })
+    | undefined;
+  if (
+    !report ||
+    typeof report !== 'object' ||
+    report.reportType === 'breakup_reflection' ||
+    typeof report.chemistrySummary !== 'string'
+  ) {
     return null;
   }
   return {
@@ -354,6 +364,7 @@ function parseReportRecord(raw: unknown): PairAiReportRecord | null {
     modelUsed: String(r.model_used ?? ''),
     createdAt: String(r.created_at ?? ''),
     report: {
+      reportType: 'compatibility',
       overallScore: typeof report.overallScore === 'number' ? report.overallScore : 80,
       myType: {
         tag: report.myType?.tag ?? 'バランスタイプ',
@@ -366,6 +377,47 @@ function parseReportRecord(raw: unknown): PairAiReportRecord | null {
       chemistrySummary: report.chemistrySummary,
       riskPoints: Array.isArray(report.riskPoints) ? report.riskPoints : [],
       nextActionTip: report.nextActionTip ?? '',
+    },
+  };
+}
+
+function parseBreakupReflectionRecord(raw: unknown): PairBreakupReflectionRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const report = r.report as Partial<BreakupReflectionData> | undefined;
+  if (
+    !report ||
+    typeof report !== 'object' ||
+    report.reportType !== 'breakup_reflection' ||
+    typeof report.warmMessage !== 'string'
+  ) {
+    return null;
+  }
+  const rawCauses: unknown[] = Array.isArray(report.rootCauses) ? report.rootCauses : [];
+  const rootCauses: BreakupCausePoint[] = rawCauses
+    .filter((c): c is Partial<BreakupCausePoint> => Boolean(c && typeof c === 'object'))
+    .map((c) => ({
+      title: typeof c.title === 'string' ? c.title : '価値観やペースの違い',
+      background: typeof c.background === 'string' ? c.background : '',
+      takeaway: typeof c.takeaway === 'string' ? c.takeaway : '',
+    }))
+    .filter((c) => Boolean(c.background || c.takeaway));
+
+  return {
+    id: String(r.id ?? ''),
+    analyzedDays: Number(r.analyzed_days ?? 0),
+    analyzedAnswers: Number(r.analyzed_answers ?? 0),
+    modelUsed: String(r.model_used ?? ''),
+    createdAt: String(r.created_at ?? ''),
+    report: {
+      reportType: 'breakup_reflection',
+      isSoloRemaining: Boolean(report.isSoloRemaining),
+      hasPartnerAnswers: report.hasPartnerAnswers !== false,
+      warmMessage: report.warmMessage,
+      goodMemoriesSummary: report.goodMemoriesSummary ?? '',
+      rootCauses,
+      myStrengthForNextLove: report.myStrengthForNextLove ?? '',
+      gentleNextStep: report.gentleNextStep ?? '',
     },
   };
 }
@@ -398,13 +450,18 @@ export async function fetchPairEntitlement(): Promise<PairEntitlement | null> {
 }
 
 /**
- * 有料ペア向けに過去の AI 相性レポート履歴を新しい順に一覧取得する（RLS で有料ペアメンバーのみ許可）
+ * 有料ペア向けに過去の AI レポート（通常相性診断 ＆ 別れ・関係性の振り返り診断）を1クエリで取得する
  */
-export async function fetchPairAiReportHistory(
+export async function fetchPairAllAiReports(
   pairId: string,
-  limit = 20
-): Promise<PairAiReportRecord[]> {
-  if (!supabase || !pairId) return [];
+  limit = 30
+): Promise<{
+  compatibilityReports: PairAiReportRecord[];
+  reflectionReports: PairBreakupReflectionRecord[];
+}> {
+  if (!supabase || !pairId) {
+    return { compatibilityReports: [], reflectionReports: [] };
+  }
   const { data, error } = await supabase
     .from('pair_ai_reports')
     .select('id, analyzed_days, analyzed_answers, model_used, created_at, report_json')
@@ -413,32 +470,56 @@ export async function fetchPairAiReportHistory(
     .limit(limit);
 
   if (error || !Array.isArray(data)) {
-    return [];
+    return { compatibilityReports: [], reflectionReports: [] };
   }
 
-  return data
-    .map((row) =>
-      parseReportRecord({
-        id: row.id,
-        analyzed_days: row.analyzed_days,
-        analyzed_answers: row.analyzed_answers,
-        model_used: row.model_used,
-        created_at: row.created_at,
-        report: row.report_json,
-      })
-    )
-    .filter((item): item is PairAiReportRecord => item !== null);
+  const compatibilityReports: PairAiReportRecord[] = [];
+  const reflectionReports: PairBreakupReflectionRecord[] = [];
+
+  for (const row of data) {
+    const wrapped = {
+      id: row.id,
+      analyzed_days: row.analyzed_days,
+      analyzed_answers: row.analyzed_answers,
+      model_used: row.model_used,
+      created_at: row.created_at,
+      report: row.report_json,
+    };
+    const reflection = parseBreakupReflectionRecord(wrapped);
+    if (reflection) {
+      reflectionReports.push(reflection);
+      continue;
+    }
+    const compat = parseReportRecord(wrapped);
+    if (compat) {
+      compatibilityReports.push(compat);
+    }
+  }
+
+  return { compatibilityReports, reflectionReports };
+}
+
+/**
+ * 有料ペア向けに過去の AI 相性レポート履歴を新しい順に一覧取得する（RLS で有料ペアメンバーのみ許可）
+ */
+export async function fetchPairAiReportHistory(
+  pairId: string,
+  limit = 20
+): Promise<PairAiReportRecord[]> {
+  const { compatibilityReports } = await fetchPairAllAiReports(pairId, limit);
+  return compatibilityReports;
 }
 
 function formatAiReportError(code: string): string {
   switch (code) {
     case 'PREMIUM_REQUIRED':
-      return 'AI 相性レポートの生成には「ふたりプレミアムプラン」への加入が必要です（パートナーの加入でも利用できます）。';
+      return 'AI 診断レポートの生成には「ふたりプレミアムプラン」への加入が必要です（パートナーの加入でも利用できます）。';
     case 'NOT_IN_PAIR':
+      return 'ペアの回答履歴が見つかりませんでした。ペアを作成または参加してからお試しください。';
     case 'PARTNER_NOT_CONNECTED':
-      return 'パートナーとのペア連携完了後に AI 相性レポートを作成できます。';
+      return 'パートナーとのペア連携完了後に通常の AI 相性レポートを作成できます（相手がペア解除済みの場合は、画面下部の「すれ違い・別れの原因 AI 振り返り診断」をご利用いただけます）。';
     case 'NOT_ENOUGH_DATA':
-      return '分析できる回答データがまだありません。今日の3問に答えるか、過去の回答データが揃うとお試しいただけます。';
+      return '分析できる回答データがまだありません。回答履歴が1日分以上溜まるとお試しいただけます。';
     case 'DAILY_LIMIT_EXCEEDED':
       return '本日の AI 診断レポート生成回数の上限（1日3回）に達しました。明日になってから再度お試しください。';
     case 'AI_OVERLOADED':
@@ -446,8 +527,42 @@ function formatAiReportError(code: string): string {
     case 'AI_PROVIDER_NOT_CONFIGURED':
       return '現在 AI 診断機能をメンテナンス中です。しばらくしてからお試しください。';
     default:
-      return 'AI 相性レポートの生成に失敗しました。しばらくしてからもう一度お試しください。';
+      return 'AI レポートの生成に失敗しました。しばらくしてからもう一度お試しください。';
   }
+}
+
+function buildQuestionCatalogPayload(
+  questionsById: Record<string, Question>
+): Record<
+  string,
+  { category: string; title: string; choices: Record<string, string>; matchRule?: string }
+> {
+  const questionCatalog: Record<
+    string,
+    { category: string; title: string; choices: Record<string, string>; matchRule?: string }
+  > = {};
+  for (const [id, q] of Object.entries(questionsById)) {
+    questionCatalog[id] = {
+      category: q.category,
+      title: q.title,
+      choices: q.choices,
+      matchRule: q.matchRule,
+    };
+  }
+  return questionCatalog;
+}
+
+async function extractEdgeFunctionErrorCode(error: unknown): Promise<string> {
+  try {
+    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    if (ctx && typeof ctx.json === 'function') {
+      const errBody = await ctx.json();
+      if (errBody?.error) return errBody.error;
+    }
+  } catch {
+    // ignore
+  }
+  return error instanceof Error ? error.message : '';
 }
 
 /**
@@ -466,36 +581,14 @@ export async function generateServerAiReport(
     return { ok: false, error: 'サーバーに接続されていません。' };
   }
 
-  const questionCatalog: Record<
-    string,
-    { category: string; title: string; choices: Record<string, string>; matchRule?: string }
-  > = {};
-  for (const [id, q] of Object.entries(questionsById)) {
-    questionCatalog[id] = {
-      category: q.category,
-      title: q.title,
-      choices: q.choices,
-      matchRule: q.matchRule,
-    };
-  }
-
+  const questionCatalog = buildQuestionCatalogPayload(questionsById);
   const { data, error } = await supabase.functions.invoke('generate-ai-report', {
-    body: { forceRefresh, questionCatalog },
+    body: { mode: 'compatibility', forceRefresh, questionCatalog },
   });
 
   if (error) {
-    // Edge Function が 400 / 402 / 503 の JSON エラーを返した場合、本文からエラーコードを抽出
-    let errCode = '';
-    try {
-      const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
-      if (ctx && typeof ctx.json === 'function') {
-        const errBody = await ctx.json();
-        errCode = errBody?.error ?? '';
-      }
-    } catch {
-      // ignore
-    }
-    return { ok: false, error: formatAiReportError(errCode || error.message) };
+    const errCode = await extractEdgeFunctionErrorCode(error);
+    return { ok: false, error: formatAiReportError(errCode) };
   }
 
   const payload = data as {
@@ -517,5 +610,54 @@ export async function generateServerAiReport(
     ok: true,
     cached: Boolean(payload?.cached),
     reportRecord: parsed,
+  };
+}
+
+/**
+ * 別れ・関係性の振り返り AI 診断を生成・取得する
+ * （相手がすでにペアを解除して1人だけ残っている状態でも、残存回答履歴から優しく分析可能）
+ */
+export async function generateServerBreakupReflection(
+  questionsById: Record<string, Question>,
+  forceRefresh = false
+): Promise<{
+  ok: boolean;
+  cached?: boolean;
+  reflectionRecord?: PairBreakupReflectionRecord;
+  error?: string;
+}> {
+  if (!supabase) {
+    return { ok: false, error: 'サーバーに接続されていません。' };
+  }
+
+  const questionCatalog = buildQuestionCatalogPayload(questionsById);
+  const { data, error } = await supabase.functions.invoke('generate-ai-report', {
+    body: { mode: 'breakup_reflection', forceRefresh, questionCatalog },
+  });
+
+  if (error) {
+    const errCode = await extractEdgeFunctionErrorCode(error);
+    return { ok: false, error: formatAiReportError(errCode) };
+  }
+
+  const payload = data as {
+    cached?: boolean;
+    error?: string;
+    reportRecord?: unknown;
+  } | null;
+
+  if (payload?.error) {
+    return { ok: false, error: formatAiReportError(payload.error) };
+  }
+
+  const parsed = parseBreakupReflectionRecord(payload?.reportRecord);
+  if (!parsed) {
+    return { ok: false, error: '振り返りレポートの読み込みに失敗しました。' };
+  }
+
+  return {
+    ok: true,
+    cached: Boolean(payload?.cached),
+    reflectionRecord: parsed,
   };
 }

@@ -79,6 +79,7 @@ export interface AiReportRiskPoint {
 }
 
 export interface AiReportData {
+  reportType?: 'compatibility';
   overallScore: number;
   myType: { tag: string; desc: string };
   partnerType: { tag: string; desc: string };
@@ -94,6 +95,32 @@ export interface PairAiReportRecord {
   modelUsed: string;
   createdAt: string;
   report: AiReportData;
+}
+
+export interface BreakupCausePoint {
+  title: string;
+  background: string;
+  takeaway: string;
+}
+
+export interface BreakupReflectionData {
+  reportType: 'breakup_reflection';
+  isSoloRemaining?: boolean;
+  hasPartnerAnswers?: boolean;
+  warmMessage: string;
+  goodMemoriesSummary: string;
+  rootCauses: BreakupCausePoint[];
+  myStrengthForNextLove: string;
+  gentleNextStep: string;
+}
+
+export interface PairBreakupReflectionRecord {
+  id: string;
+  analyzedDays: number;
+  analyzedAnswers: number;
+  modelUsed: string;
+  createdAt: string;
+  report: BreakupReflectionData;
 }
 
 export interface PairEntitlement {

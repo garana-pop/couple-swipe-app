@@ -34,6 +34,7 @@ Android パッケージ名: `com.garanapop.coupleswipeapp`
   - `GEMINI_API_KEY` 登録・実動作検証完了
   - `gemini-flash-lite-latest`（404/503 自動フェイルオーバー）＋ `thinkingBudget: 512` ＋ `maxOutputTokens: 2048` ＋ 1ペア1日3回上限のコスト安全策実装済み
   - 回答日時（時間帯5区分・当日／追っかけ割合・回答テンポ）の集計サマリーを診断へ反映（細かい時刻非言及・肯定表現ガード付き）
+  - **すれ違い・別れの原因 AI 振り返り診断**（`mode: 'breakup_reflection'`・AI相性レポート画面最下部の控えめ導線＋ペア解除確認モーダル導線・相手解除後の1人残存ペアでも残存履歴から優しく分析可能）
 - [x] **課金ペア向け過去日機能（本番 DB マイグレーション＆E2E 検証済み）**
   - 過去未回答日の相手回答の閲覧＆AI診断反映（[20261123000002_premium_past_partner_answers.sql](./supabase/migrations/20261123000002_premium_past_partner_answers.sql)）
   - 過去未回答お題への追っかけ回答＆ネタバレ防止（回答完了で相手の答えと一致率を即公開：[20261123000003_premium_answer_past_days.sql](./supabase/migrations/20261123000003_premium_answer_past_days.sql)）

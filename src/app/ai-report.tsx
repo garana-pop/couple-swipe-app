@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,22 +8,50 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { showAlert } from '../lib/alert';
 import { LEGAL_URLS, openExternalLink } from '../lib/links';
 import {
   BillingOfferingPrices,
-  fetchPairAiReportHistory,
+  fetchPairAllAiReports,
   fetchPairEntitlement,
   generateServerAiReport,
+  generateServerBreakupReflection,
   initializeBilling,
   purchaseSubscriptionPlan,
   restoreSubscriptionPurchases,
   syncAndFetchPairEntitlement,
 } from '../lib/billing';
-import type { AiReportData, PairAiReportRecord, PairEntitlement } from '../types';
+import type {
+  AiReportData,
+  BreakupReflectionData,
+  PairAiReportRecord,
+  PairBreakupReflectionRecord,
+  PairEntitlement,
+} from '../types';
+
+const SAMPLE_REFLECTION: BreakupReflectionData = {
+  reportType: 'breakup_reflection',
+  warmMessage:
+    'ここまでお互いと向き合いながら日々の質問に答えてきた時間は、とても誠実で大切な記録です。どちらが悪いわけでもないので、まずはご自身を優しく労ってあげてくださいね。',
+  goodMemoriesSummary:
+    '休日の過ごし方や人への思いやりに関する回答では重なる部分も多く、お互いを大切にしたい気持ちはしっかり通じ合っていました。',
+  rootCauses: [
+    {
+      title: '安心できる連絡・距離感のペース差',
+      background:
+        'こまめに気持ちを確かめ合いたいペースと、自分の時間で整えてから向き合いたいペースに少しずつ違いがあったようです。',
+      takeaway:
+        '次の恋では「忙しいときは一言だけ送るね」など、お互いが安心できるリズムを早い段階で軽く共有しておくと心地よく続けられます。',
+    },
+  ],
+  myStrengthForNextLove:
+    '相手との違いを丁寧に受け止めようとする誠実さと、話し合いを大切にする温かさがあなたの素敵な強みです。',
+  gentleNextStep:
+    '今は無理に答えを急がず、深呼吸して自分のペースを取り戻してください。この経験はきっと、もっと穏やかで安心できるご縁につながっていきます。',
+};
 
 function formatPlanName(productId: string | null | undefined): string {
   const raw = (productId ?? '').toLowerCase();
@@ -75,9 +103,11 @@ function formatShortDate(iso: string): string {
 }
 
 export default function AiReportScreen() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const {
     userId,
     pairId,
+    hasPair,
     isSupabaseReady,
     isPairConnected,
     partnerName,
@@ -86,11 +116,20 @@ export default function AiReportScreen() {
     fetchHistory,
   } = useApp();
 
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
+  const reflectionSectionYRef = useRef<number>(0);
+  const subCardYRef = useRef<number>(0);
+  const didAutoScrollReflectionRef = useRef(false);
+
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [loadingEntitlement, setLoadingEntitlement] = useState(true);
   const [entitlement, setEntitlement] = useState<PairEntitlement | null>(null);
   const [reportHistory, setReportHistory] = useState<PairAiReportRecord[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [reflectionHistory, setReflectionHistory] = useState<PairBreakupReflectionRecord[]>([]);
+  const [reflectionExpandedOverride, setReflectionExpandedOverride] = useState<boolean | null>(null);
+  const isReflectionOpen = reflectionExpandedOverride ?? mode === 'reflection';
+  const [generatingReflection, setGeneratingReflection] = useState(false);
   const [offering, setOffering] = useState<BillingOfferingPrices>({
     isStoreReady: false,
     yearlyPriceLabel: '¥3,000 / 年',
@@ -101,16 +140,43 @@ export default function AiReportScreen() {
   const [generating, setGenerating] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
 
+  useEffect(() => {
+    if (
+      mode === 'reflection' &&
+      !loadingEntitlement &&
+      isReflectionOpen &&
+      !didAutoScrollReflectionRef.current
+    ) {
+      didAutoScrollReflectionRef.current = true;
+      setTimeout(() => {
+        if (reflectionSectionYRef.current > 0) {
+          scrollViewRef.current?.scrollTo({
+            y: Math.max(0, reflectionSectionYRef.current - 16),
+            animated: true,
+          });
+        } else {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }
+      }, 220);
+    }
+  }, [mode, loadingEntitlement, isReflectionOpen]);
+
   const applyEntitlement = useCallback(
     async (ent: PairEntitlement | null) => {
       if (!ent) return;
       setEntitlement(ent);
       if (ent.isPremium && pairId) {
-        const hist = await fetchPairAiReportHistory(pairId, 20);
-        if (hist.length > 0) {
-          setReportHistory(hist);
+        const { compatibilityReports, reflectionReports } = await fetchPairAllAiReports(
+          pairId,
+          30
+        );
+        setReflectionHistory(reflectionReports);
+        if (compatibilityReports.length > 0) {
+          setReportHistory(compatibilityReports);
           setSelectedReportId((prev) =>
-            prev && hist.some((r) => r.id === prev) ? prev : hist[0].id
+            prev && compatibilityReports.some((r) => r.id === prev)
+              ? prev
+              : compatibilityReports[0].id
           );
         } else if (ent.latestReport) {
           setReportHistory([ent.latestReport]);
@@ -120,6 +186,7 @@ export default function AiReportScreen() {
           setSelectedReportId(null);
         }
       } else {
+        setReflectionHistory([]);
         setReportHistory(ent.latestReport ? [ent.latestReport] : []);
         setSelectedReportId(ent.latestReport?.id ?? null);
       }
@@ -165,6 +232,47 @@ export default function AiReportScreen() {
   const displayReport: AiReportData =
     isPremium && activeReportRecord ? activeReportRecord.report : SAMPLE_REPORT;
   const isShowingSample = !isPremium || !activeReportRecord;
+
+  const latestReflectionRecord = reflectionHistory[0] ?? null;
+
+  const handleGenerateReflection = async (forceRefresh: boolean) => {
+    if (!isSupabaseReady) {
+      showAlert('未接続', 'サーバーに接続してからお試しください。');
+      return;
+    }
+    if (!hasPair) {
+      showAlert('回答履歴がありません', 'ペアの回答履歴がある状態で振り返り診断をご利用いただけます。');
+      return;
+    }
+    setGeneratingReflection(true);
+    try {
+      const res = await generateServerBreakupReflection(getQuestionsById(), forceRefresh);
+      if (!res.ok) {
+        showAlert('振り返り診断エラー', res.error ?? '振り返りレポートの作成に失敗しました。');
+        return;
+      }
+      if (res.reflectionRecord) {
+        const nextRec = res.reflectionRecord;
+        setReflectionHistory((prev) => {
+          const withoutDup = prev.filter((item) => item.id !== nextRec.id);
+          return [nextRec, ...withoutDup];
+        });
+      }
+      if (res.cached) {
+        showAlert(
+          '最新の振り返りを表示中',
+          '前回から新しい回答が増えていないため、最新の振り返りレポートを表示しています。'
+        );
+      } else {
+        showAlert(
+          '振り返りレポートが完成しました',
+          'これまでの回答履歴から、優しく寄り添う振り返りレポートをまとめました。'
+        );
+      }
+    } finally {
+      setGeneratingReflection(false);
+    }
+  };
 
   const handleGenerateReport = async (forceRefresh: boolean) => {
     if (!isSupabaseReady) {
@@ -272,7 +380,11 @@ export default function AiReportScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      ref={scrollViewRef}
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+    >
       {/* プレミアムバナー */}
       <View style={styles.heroBanner}>
         <View style={styles.badgeRow}>
@@ -568,7 +680,12 @@ export default function AiReportScreen() {
 
       {/* サブスクリプション購入カード（未加入時のみ表示） */}
       {!isPremium && (
-        <View style={[styles.card, SHADOWS.card, styles.subCard]}>
+        <View
+          style={[styles.card, SHADOWS.card, styles.subCard]}
+          onLayout={(e) => {
+            subCardYRef.current = e.nativeEvent.layout.y;
+          }}
+        >
           <View style={styles.subHeader}>
             <Ionicons name="diamond" size={22} color="#C97A2B" />
             <Text style={styles.subTitle}>ふたりプレミアムプラン</Text>
@@ -737,6 +854,171 @@ export default function AiReportScreen() {
           </View>
         </View>
       )}
+
+      {/* 画面最下部の控えめな導線：すれ違い・別れの原因 AI 振り返り診断 */}
+      <View
+        style={styles.reflectionOuter}
+        onLayout={(e) => {
+          reflectionSectionYRef.current = e.nativeEvent.layout.y;
+        }}
+      >
+        <TouchableOpacity
+          style={styles.reflectionToggleBtn}
+          activeOpacity={0.75}
+          onPress={() => setReflectionExpandedOverride(!isReflectionOpen)}
+        >
+          <Ionicons name="heart-half-outline" size={15} color="#7C6A77" />
+          <Text style={styles.reflectionToggleText}>
+            そっと振り返りたいとき：すれ違い・別れの原因を AI で振り返る
+          </Text>
+          <Ionicons
+            name={isReflectionOpen ? 'chevron-up' : 'chevron-down'}
+            size={15}
+            color="#9C8D97"
+          />
+        </TouchableOpacity>
+
+        {isReflectionOpen && (
+          <View style={[styles.card, SHADOWS.cardSmall, styles.reflectionCard]}>
+            <View style={styles.reflectionHeader}>
+              <View style={styles.reflectionTitleRow}>
+                <Ionicons name="leaf-outline" size={17} color="#6F5A6B" />
+                <Text style={styles.reflectionTitle}>すれ違い・別れの原因 AI 振り返り</Text>
+              </View>
+              {latestReflectionRecord && isPremium ? (
+                <Text style={styles.reflectionMeta}>
+                  {formatDateTime(latestReflectionRecord.createdAt)}（
+                  {latestReflectionRecord.analyzedDays}日・{latestReflectionRecord.analyzedAnswers}
+                  問を分析）
+                </Text>
+              ) : (
+                <Text style={styles.reflectionSubtitle}>
+                  誰も責めずに、これまでの記録から次につながる優しい気づきを整理します
+                </Text>
+              )}
+            </View>
+
+            <Text style={styles.reflectionLead}>
+              関係を見つめ直したいときや、お別れの気持ちを整理したいときのための静かな振り返り診断です。
+              {!isPairConnected && hasPair
+                ? '\n※ お相手がすでにペアを解除して1人だけ残っている状態でも、残っている回答履歴からそのまま診断できます。'
+                : '\n※ ペア解除の前でも、お相手がすでに解除した後でも、残っている回答履歴から振り返ることができます。'}
+            </Text>
+
+            {isPremium ? (
+              <TouchableOpacity
+                style={[styles.reflectionActionBtn, !hasPair && styles.reflectionActionBtnDisabled]}
+                activeOpacity={0.85}
+                disabled={generatingReflection || !hasPair}
+                onPress={() =>
+                  void handleGenerateReflection(Boolean(latestReflectionRecord))
+                }
+              >
+                {generatingReflection ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="sparkles-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.reflectionActionBtnText}>
+                      {latestReflectionRecord
+                        ? '最新データで振り返りを更新する'
+                        : '回答履歴から優しく振り返る（AI診断）'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.reflectionPremiumNotice}>
+                <Text style={styles.reflectionPremiumNoticeText}>
+                  以下はサンプル表示です。「ふたりプレミアムプラン」に加入すると、実際の回答履歴からあなたに寄り添う振り返りレポートを作成できます。
+                </Text>
+                <TouchableOpacity
+                  style={styles.reflectionScrollToSubBtn}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    scrollViewRef.current?.scrollTo({
+                      y: Math.max(0, subCardYRef.current - 16),
+                      animated: true,
+                    });
+                  }}
+                >
+                  <Text style={styles.reflectionScrollToSubText}>プレミアムプランを確認する</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* 振り返りレポート本体（有料＆生成済みなら実データ、それ以外は優しいサンプル） */}
+            {(() => {
+              const reflection =
+                isPremium && latestReflectionRecord
+                  ? latestReflectionRecord.report
+                  : SAMPLE_REFLECTION;
+              const isReflectionSample = !isPremium || !latestReflectionRecord;
+
+              return (
+                <View style={styles.reflectionBody}>
+                  {isReflectionSample && (
+                    <View style={styles.reflectionSampleTag}>
+                      <Text style={styles.reflectionSampleTagText}>サンプルプレビュー</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.warmMessageBox}>
+                    <View style={styles.warmMessageHeader}>
+                      <Ionicons name="heart-outline" size={15} color="#8E5D6D" />
+                      <Text style={styles.warmMessageLabel}>まず、ここまで向き合ってきたあなたへ</Text>
+                    </View>
+                    <Text style={styles.warmMessageText}>{reflection.warmMessage}</Text>
+                  </View>
+
+                  {reflection.goodMemoriesSummary ? (
+                    <View style={styles.goodMemoriesBox}>
+                      <Text style={styles.goodMemoriesLabel}>大切にできていたこと・素敵だった点</Text>
+                      <Text style={styles.goodMemoriesText}>{reflection.goodMemoriesSummary}</Text>
+                    </View>
+                  ) : null}
+
+                  {reflection.rootCauses.length > 0 && (
+                    <View style={styles.causesList}>
+                      <Text style={styles.causesHeading}>
+                        すれ違いが生まれた背景と、次の恋への気づき
+                      </Text>
+                      {reflection.rootCauses.map((cause, idx) => (
+                        <View key={`${cause.title}-${idx}`} style={styles.causeItem}>
+                          <Text style={styles.causeTitle}>
+                            {idx + 1}. {cause.title}
+                          </Text>
+                          <Text style={styles.causeBackground}>{cause.background}</Text>
+                          {cause.takeaway ? (
+                            <View style={styles.takeawayBox}>
+                              <Text style={styles.takeawayLabel}>これからに活かせる優しいヒント</Text>
+                              <Text style={styles.takeawayText}>{cause.takeaway}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {reflection.myStrengthForNextLove ? (
+                    <View style={styles.strengthBox}>
+                      <Text style={styles.strengthLabel}>回答から見えるあなたの素敵な強み</Text>
+                      <Text style={styles.strengthText}>{reflection.myStrengthForNextLove}</Text>
+                    </View>
+                  ) : null}
+
+                  {reflection.gentleNextStep ? (
+                    <View style={styles.gentleStepBox}>
+                      <Ionicons name="sunny-outline" size={15} color="#7A5D4F" />
+                      <Text style={styles.gentleStepText}>{reflection.gentleNextStep}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })()}
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -1353,5 +1635,245 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: COLORS.primaryDark,
+  },
+  reflectionOuter: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#E7DDD3',
+  },
+  reflectionToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#F8F4F2',
+    borderWidth: 1,
+    borderColor: '#E7DEE2',
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  reflectionToggleText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#756470',
+  },
+  reflectionCard: {
+    marginTop: 12,
+    backgroundColor: '#FAF7F9',
+    borderColor: '#E6DCE2',
+    marginBottom: 4,
+  },
+  reflectionHeader: {
+    marginBottom: 8,
+  },
+  reflectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 4,
+  },
+  reflectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#4F3E4B',
+  },
+  reflectionSubtitle: {
+    fontSize: 11.5,
+    color: '#7E6E7A',
+    lineHeight: 16,
+  },
+  reflectionMeta: {
+    fontSize: 11,
+    color: '#7E6E7A',
+  },
+  reflectionLead: {
+    fontSize: 12,
+    color: '#6C5D68',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  reflectionActionBtn: {
+    backgroundColor: '#7A6174',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 14,
+    marginBottom: 16,
+  },
+  reflectionActionBtnDisabled: {
+    opacity: 0.5,
+  },
+  reflectionActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  reflectionPremiumNotice: {
+    backgroundColor: '#F3ECF1',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2D4DF',
+    marginBottom: 14,
+    gap: 10,
+  },
+  reflectionPremiumNoticeText: {
+    fontSize: 11.5,
+    color: '#645260',
+    lineHeight: 17,
+  },
+  reflectionScrollToSubBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D6C3D1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  reflectionScrollToSubText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B5265',
+  },
+  reflectionBody: {
+    gap: 12,
+  },
+  reflectionSampleTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EFE6ED',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  reflectionSampleTagText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#725D6D',
+  },
+  warmMessageBox: {
+    backgroundColor: '#FFF9FA',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#EFDDE3',
+  },
+  warmMessageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  warmMessageLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#8E5D6D',
+  },
+  warmMessageText: {
+    fontSize: 12.5,
+    color: '#4C3D44',
+    lineHeight: 19,
+  },
+  goodMemoriesBox: {
+    backgroundColor: '#F3F8F5',
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#D2E4D9',
+  },
+  goodMemoriesLabel: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#466F53',
+    marginBottom: 5,
+  },
+  goodMemoriesText: {
+    fontSize: 12,
+    color: '#3B5844',
+    lineHeight: 18,
+  },
+  causesList: {
+    gap: 10,
+  },
+  causesHeading: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#574653',
+    marginBottom: 2,
+  },
+  causeItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#EAE0E6',
+  },
+  causeTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#463742',
+    marginBottom: 5,
+  },
+  causeBackground: {
+    fontSize: 12,
+    color: '#6A5B66',
+    lineHeight: 18,
+    marginBottom: 9,
+  },
+  takeawayBox: {
+    backgroundColor: '#F8F4F7',
+    borderRadius: 10,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#9E7B94',
+  },
+  takeawayLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6E5467',
+    marginBottom: 3,
+  },
+  takeawayText: {
+    fontSize: 11.5,
+    color: '#483944',
+    lineHeight: 17,
+  },
+  strengthBox: {
+    backgroundColor: '#FDF8F2',
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#EFE0CE',
+  },
+  strengthLabel: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#8D6136',
+    marginBottom: 5,
+  },
+  strengthText: {
+    fontSize: 12,
+    color: '#5A4532',
+    lineHeight: 18,
+  },
+  gentleStepBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#F7EFE8',
+    borderRadius: 12,
+    padding: 12,
+  },
+  gentleStepText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#5B463B',
+    lineHeight: 18,
   },
 });

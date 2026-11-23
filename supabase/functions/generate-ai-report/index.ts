@@ -454,13 +454,18 @@ Deno.serve(async (req: Request) => {
   const uid = user.id;
 
   let forceRefresh = false;
+  let reportMode: "compatibility" | "breakup_reflection" = "compatibility";
   let clientCatalog: Record<string, QuestionMeta> = {};
   try {
     const body = (await req.json()) as {
       forceRefresh?: unknown;
+      mode?: unknown;
       questionCatalog?: unknown;
     };
     forceRefresh = Boolean(body?.forceRefresh);
+    if (body?.mode === "breakup_reflection") {
+      reportMode = "breakup_reflection";
+    }
     if (body?.questionCatalog && typeof body.questionCatalog === "object") {
       clientCatalog = body.questionCatalog as Record<string, QuestionMeta>;
     }
@@ -486,8 +491,9 @@ Deno.serve(async (req: Request) => {
     .eq("pair_id", pairId);
 
   const memberIds = (members ?? []).map((m) => m.user_id as string);
-  const partnerId = memberIds.find((id) => id !== uid);
-  if (!partnerId) {
+  const connectedPartnerId = memberIds.find((id) => id !== uid) ?? null;
+  const isSoloRemaining = !connectedPartnerId;
+  if (reportMode === "compatibility" && !connectedPartnerId) {
     return jsonResponse({ error: "PARTNER_NOT_CONNECTED" }, 400);
   }
 
@@ -540,7 +546,20 @@ Deno.serve(async (req: Request) => {
   const { data: allAnswers } = await admin
     .from("answers")
     .select("quiz_date, question_id, user_id, direction, created_at")
-    .eq("pair_id", pairId);
+    .eq("pair_id", pairId)
+    .order("created_at", { ascending: false });
+
+  // 相手がすでにペア解除して 1 人だけ残っている場合も、過去の回答履歴から相手 ID を補完
+  let formerPartnerId: string | null = null;
+  if (!connectedPartnerId) {
+    for (const row of allAnswers ?? []) {
+      if (row.user_id && row.user_id !== uid) {
+        formerPartnerId = row.user_id as string;
+        break;
+      }
+    }
+  }
+  const effectivePartnerId = connectedPartnerId ?? formerPartnerId;
 
   const answerMap = new Map<string, Map<string, { direction: string; createdAtMs: number }>>();
   for (const row of allAnswers ?? []) {
@@ -583,6 +602,7 @@ Deno.serve(async (req: Request) => {
   const analyzableEntries: QAEntry[] = [];
   let revealedDaysCount = 0;
   let pastPartialDaysCount = 0;
+  const allowPartialToday = reportMode === "breakup_reflection" && isSoloRemaining;
 
   for (const ds of dailySets ?? []) {
     const quizDate = ds.quiz_date as string;
@@ -590,6 +610,7 @@ Deno.serve(async (req: Request) => {
     if (qIds.length === 0) continue;
 
     const isPastDay = quizDate < todayDate;
+    const allowPartialThisDay = isPastDay || allowPartialToday;
     const bothDayEntries: QAEntry[] = [];
     const partialDayEntries: QAEntry[] = [];
     let allBothCompleted = true;
@@ -597,7 +618,7 @@ Deno.serve(async (req: Request) => {
     for (const qId of qIds) {
       const m = answerMap.get(`${quizDate}:${qId}`);
       const myRec = m?.get(uid) ?? null;
-      const partnerRec = m?.get(partnerId) ?? null;
+      const partnerRec = effectivePartnerId ? (m?.get(effectivePartnerId) ?? null) : null;
       const myDir = myRec?.direction ?? null;
       const partnerDir = partnerRec?.direction ?? null;
       const latestAnswerMs = Math.max(myRec?.createdAtMs ?? 0, partnerRec?.createdAtMs ?? 0);
@@ -619,7 +640,7 @@ Deno.serve(async (req: Request) => {
         partialDayEntries.push(entry);
       } else {
         allBothCompleted = false;
-        if (isPastDay && (myDir || partnerDir)) {
+        if (allowPartialThisDay && (myDir || partnerDir)) {
           partialDayEntries.push({
             date: quizDate,
             category: meta?.category ?? "その他",
@@ -638,7 +659,7 @@ Deno.serve(async (req: Request) => {
     if (allBothCompleted && bothDayEntries.length === qIds.length) {
       revealedDaysCount++;
       analyzableEntries.push(...bothDayEntries);
-    } else if (isPastDay && partialDayEntries.length > 0) {
+    } else if (allowPartialThisDay && partialDayEntries.length > 0) {
       pastPartialDaysCount++;
       analyzableEntries.push(...partialDayEntries);
     }
@@ -654,15 +675,21 @@ Deno.serve(async (req: Request) => {
     0
   );
 
-  // 5. キャッシュチェック（24時間以内＆回答に変化がなければ再課金せずキャッシュ返却）
+  // 5. キャッシュチェック（同一モードで24時間以内＆回答に変化がなければ再課金せずキャッシュ返却）
   //    ※ 過去日に追っかけ回答が追加された場合も latestAnalyzedAnswerMs > reportCreatedMs で即キャッシュ無効化
-  const { data: latestReport } = await admin
+  const { data: recentModeReports } = await admin
     .from("pair_ai_reports")
     .select("id, analyzed_days, analyzed_answers, model_used, created_at, report_json")
     .eq("pair_id", pairId)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(15);
+
+  const latestReport = (recentModeReports ?? []).find((r) => {
+    const rType = (r.report_json as { reportType?: string } | null)?.reportType;
+    return reportMode === "breakup_reflection"
+      ? rType === "breakup_reflection"
+      : rType !== "breakup_reflection";
+  });
 
   if (latestReport) {
     const reportCreatedMs = Date.parse(latestReport.created_at as string);
@@ -714,28 +741,34 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // 6. Gemini API による AI 相性レポート生成
+  // 6. Gemini API による AI レポート生成（相性診断 / 別れ・関係性の優しい振り返り診断）
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
   if (!geminiApiKey) {
     return jsonResponse({ error: "AI_PROVIDER_NOT_CONFIGURED" }, 503);
   }
 
+  const profileIds = effectivePartnerId ? [uid, effectivePartnerId] : [uid];
   const { data: profiles } = await admin
     .from("profiles")
     .select("id, display_name")
-    .in("id", [uid, partnerId]);
+    .in("id", profileIds);
 
   const myName =
     (profiles ?? []).find((p) => p.id === uid)?.display_name?.trim() || "あなた";
   const partnerName =
-    (profiles ?? []).find((p) => p.id === partnerId)?.display_name?.trim() || "パートナー";
+    (effectivePartnerId
+      ? (profiles ?? []).find((p) => p.id === effectivePartnerId)?.display_name?.trim()
+      : "") || (isSoloRemaining ? "お相手" : "パートナー");
 
+  const hasPartnerAnswers = analyzableEntries.some((e) => Boolean(e.partnerChoice));
   const bothAnsweredEntries = analyzableEntries.filter((e) => e.matched !== null);
   const matchedTotal = bothAnsweredEntries.filter((e) => e.matched === true).length;
   const matchRateText =
     bothAnsweredEntries.length > 0
       ? `双方回答済み${bothAnsweredEntries.length}問の一致率${Math.round((matchedTotal / bothAnsweredEntries.length) * 100)}%`
-      : "双方回答済みの設問はまだなく、過去日の片方回答データから傾向を分析";
+      : hasPartnerAnswers
+        ? "双方回答済みの設問はまだなく、過去日の片方回答データから傾向を分析"
+        : `${myName}の回答履歴のみが残っている状態`;
 
   const summaryLines = analyzableEntries
     .slice(0, 80)
@@ -770,10 +803,53 @@ Deno.serve(async (req: Request) => {
   );
   const rhythmInstruction =
     totalAnalyzedDays >= 5
-      ? "質問への回答内容（自己申告）を主軸にしつつ、上記の回答リズム・活動時間帯の違いや回答ペースも二人の生活リズムやすれ違い予防アドバイスへ自然に織り込んでください。"
+      ? "質問への回答内容（自己申告）を主軸にしつつ、上記の回答リズム・活動時間帯の違いや回答ペースも二人の生活リズムやすれ違いの背景へ自然に織り込んでください。"
       : `まだ回答日数が少ない（${totalAnalyzedDays}日分）ため、上記の回答リズム・時間帯傾向は参考程度にとどめて断定せず、質問への回答内容を主軸に分析してください。`;
 
-  const prompt = `あなたはカップル専門の優しく的確な関係性アナリストです。
+  let prompt: string;
+  if (reportMode === "breakup_reflection") {
+    const situationNote = hasPartnerAnswers
+      ? isSoloRemaining
+        ? `${partnerName}はすでにペアを解除していますが、残っている二人分の回答履歴（計${totalAnalyzedDays}日分・計${analyzableEntries.length}問・${matchRateText}）をもとに分析します。`
+        : `「${myName}」と「${partnerName}」のこれまでの回答履歴（計${totalAnalyzedDays}日分・計${analyzableEntries.length}問・${matchRateText}）をもとに分析します。`
+      : `${partnerName}の回答データは残っていないため、${myName}自身の回答履歴（計${totalAnalyzedDays}日分・計${analyzableEntries.length}問）のみから分析します。データに無い${partnerName}の回答を推測・創作せず、${myName}自身の価値観・大切にしていた想い・恋愛で無理をしやすいポイントを中心に優しく整理してください。`;
+
+    prompt = `あなたは恋愛・パートナーシップに寄り添う、とても温かく優しい心理カウンセラーです。
+いま「${myName}」は、${partnerName}との関係を見つめ直し、すれ違いや別れの原因を静かに振り返ろうとしています。
+${situationNote}
+
+この実データだけに基づき、${myName}の心にそっと寄り添いながら、誰も責めずに「すれ違いの根本背景」と「次の恋愛やこれからの自分に活かせる優しい気づき」を日本語の JSON のみで返してください。
+
+【厳守するトーン＆ルール】
+※ 何よりもまず、これまで向き合ってきた${myName}の気持ちを労い、温かく寄り添う言葉づかい（敬語・やわらかい口調）にしてください。
+※ ${myName}も${partnerName}も絶対に責めないでください。「悪い」「欠点」「失敗」「ダメ」などの否定語は使わず、「どちらも悪くなく、安心できるかたちやペースが少しずつ違っていた」という中立で思いやりのある視点で整理してください。
+※ すれ違いだけでなく、回答の一致や丁寧な向き合い方から見える「二人が大切にできていた素敵だった点（または${myName}の誠実さ）」も必ず温かく認めてください。
+※ ${rhythmInstruction}
+※ 細かい時刻（例：「23時42分」など分単位）には触れず、「朝型・夜型」「マイペース派」など自然な表現にし、後日回答や未回答も決して責めないでください。
+
+【回答リズム・行動傾向（集計サマリー）】
+${behaviorRhythmSummary}
+
+【回答履歴（日付付き）】
+${summaryLines}
+
+【出力JSONスキーマ（キー名厳守）】
+{
+  "warmMessage": "まず心にそっと寄り添い労う温かいメッセージ（95文字以内）",
+  "goodMemoriesSummary": "二人が大切にできていた共通点・素敵だった点（85文字以内）",
+  "rootCauses": [
+    {
+      "title": "すれ違いの背景テーマ（18文字以内・責めない表現）",
+      "background": "回答データから見える価値観や心地よいペースの違い（75文字以内・中立で優しく）",
+      "takeaway": "次の恋愛やこれからの自分に活かせる優しい気づき（80文字以内）"
+    }
+  ],
+  "myStrengthForNextLove": "回答から見える${myName}の恋愛における素敵な強み・魅力（75文字以内）",
+  "gentleNextStep": "自分のペースで前を向くための優しいエール（80文字以内）"
+}
+※ rootCauses は 2〜3件にしてください。`;
+  } else {
+    prompt = `あなたはカップル専門の優しく的確な関係性アナリストです。
 以下は「${myName}」と「${partnerName}」が回答したスワイプ診断の履歴（計${totalAnalyzedDays}日分：双方完了${revealedDaysCount}日＋未回答を含む過去日${pastPartialDaysCount}日・計${analyzableEntries.length}問・${matchRateText}）です。
 この実データだけに基づき、二人の相性・性格傾向・将来のすれ違い予防アドバイスを日本語の JSON のみで返してください。
 ※「過去日・未回答」と付いた設問の回答も、その本人の性格傾向・価値観の分析およびすれ違い予測にしっかり反映してください。
@@ -803,6 +879,7 @@ ${summaryLines}
   "nextActionTip": "二人の仲をさらに深めるおすすめのアクション（70文字以内）"
 }
 ※ riskPoints は 2〜3件にしてください。`;
+  }
 
   const requestedModel = Deno.env.get("GEMINI_MODEL") || DEFAULT_GEMINI_MODEL;
   const geminiResult = await invokeGeminiWithFallback(geminiApiKey, requestedModel, prompt);
@@ -833,7 +910,15 @@ ${summaryLines}
     return jsonResponse({ error: "AI_INVALID_JSON" }, 502);
   }
 
-  // 7. DB に保存してペア双方で共有
+  if (reportMode === "breakup_reflection") {
+    parsedReport.reportType = "breakup_reflection";
+    parsedReport.isSoloRemaining = isSoloRemaining;
+    parsedReport.hasPartnerAnswers = hasPartnerAnswers;
+  } else {
+    parsedReport.reportType = "compatibility";
+  }
+
+  // 7. DB に保存してペアで共有（1人残ったペアでも後から閲覧可能）
   const { data: saved, error: saveError } = await admin
     .from("pair_ai_reports")
     .insert({

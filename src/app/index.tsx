@@ -63,6 +63,8 @@ export default function HomeScreen() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [leavingPair, setLeavingPair] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleCopyCode = async () => {
@@ -102,18 +104,26 @@ export default function HomeScreen() {
   };
 
   const handleLeavePair = () => {
-    showConfirm(
-      'ペアを解除しますか？',
-      '解除すると、このペアから抜けます。誤って二人とも招待コードを作ってしまった場合のリカバリにも使えます。',
-      '解除する',
-      async () => {
-        setIsMenuOpen(false);
-        const res = await leavePair();
-        if (!res.ok) {
-          showAlert('エラー', res.error ?? 'ペア解除に失敗しました。');
-        }
+    setIsMenuOpen(false);
+    setIsLeaveModalOpen(true);
+  };
+
+  const handleConfirmLeavePair = async () => {
+    setLeavingPair(true);
+    try {
+      const res = await leavePair();
+      setIsLeaveModalOpen(false);
+      if (!res.ok) {
+        showAlert('エラー', res.error ?? 'ペア解除に失敗しました。');
       }
-    );
+    } finally {
+      setLeavingPair(false);
+    }
+  };
+
+  const handleOpenReflectionBeforeLeave = () => {
+    setIsLeaveModalOpen(false);
+    router.push({ pathname: '/ai-report', params: { mode: 'reflection' } });
   };
 
   const handleDeleteAccount = () => {
@@ -674,6 +684,73 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ペア解除確認モーダル（解除前の優しいAI振り返り導線付き） */}
+      <Modal
+        visible={isLeaveModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!leavingPair) setIsLeaveModalOpen(false);
+        }}
+      >
+        <View style={styles.confirmOverlay}>
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => {
+              if (!leavingPair) setIsLeaveModalOpen(false);
+            }}
+          />
+          <View style={[styles.confirmDialog, SHADOWS.cardFloating]}>
+            <View style={styles.confirmIconCircle}>
+              <Ionicons name="unlink-outline" size={22} color="#B84A39" />
+            </View>
+            <Text style={styles.confirmTitle}>ペアを解除しますか？</Text>
+            <Text style={styles.confirmMessage}>
+              解除すると、このペアから抜けます。お互いが解除すると、これまでの回答履歴も削除されます。
+              {'\n\n'}
+              関係の見直しやお別れの整理をしたいときは、解除する前に二人の回答履歴からすれ違い・別れの原因を AI で優しく振り返ることもできます。
+            </Text>
+
+            <TouchableOpacity
+              style={styles.reflectionGuideBtn}
+              activeOpacity={0.85}
+              disabled={leavingPair}
+              onPress={handleOpenReflectionBeforeLeave}
+            >
+              <Ionicons name="heart-half-outline" size={16} color="#6F5A6B" />
+              <Text style={styles.reflectionGuideBtnText}>
+                解除前に、二人の回答履歴からすれ違い・別れの原因を AI で振り返る
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color="#6F5A6B" />
+            </TouchableOpacity>
+
+            <View style={styles.confirmActionsRow}>
+              <TouchableOpacity
+                style={styles.confirmCancelBtn}
+                activeOpacity={0.8}
+                disabled={leavingPair}
+                onPress={() => setIsLeaveModalOpen(false)}
+              >
+                <Text style={styles.confirmCancelBtnText}>キャンセル</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmDangerBtn}
+                activeOpacity={0.85}
+                disabled={leavingPair}
+                onPress={() => void handleConfirmLeavePair()}
+              >
+                {leavingPair ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmDangerBtnText}>このまま解除する</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1181,5 +1258,95 @@ const styles = StyleSheet.create({
   drawerVersionText: {
     fontSize: 11,
     color: COLORS.textLight,
+  },
+  confirmOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 22,
+  },
+  confirmDialog: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    zIndex: 1,
+  },
+  confirmIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FDF1EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  confirmMessage: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  reflectionGuideBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F7F3F6',
+    borderWidth: 1,
+    borderColor: '#E5DCE2',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    marginBottom: 16,
+  },
+  reflectionGuideBtnText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#5E4B5B',
+    lineHeight: 17,
+  },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  confirmCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  confirmDangerBtn: {
+    flex: 1,
+    backgroundColor: '#B84A39',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDangerBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });
