@@ -8,7 +8,10 @@ const CORS_HEADERS = {
 };
 
 const CACHE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 同データでの24時間以内の連続再生成を防止
+const DAILY_GENERATION_LIMIT = 3; // コスト安全策: 1ペアあたり1日最大3回まで
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_THINKING_BUDGET = 512;
+const GEMINI_MAX_OUTPUT_TOKENS = 2048;
 
 interface QuestionMeta {
   category?: string;
@@ -233,14 +236,18 @@ Deno.serve(async (req: Request) => {
 
   const { data: allAnswers } = await admin
     .from("answers")
-    .select("quiz_date, question_id, user_id, direction")
+    .select("quiz_date, question_id, user_id, direction, created_at")
     .eq("pair_id", pairId);
 
-  const answerMap = new Map<string, Map<string, string>>();
+  const answerMap = new Map<string, Map<string, { direction: string; createdAtMs: number }>>();
   for (const row of allAnswers ?? []) {
     const dayKey = `${row.quiz_date}:${row.question_id}`;
     if (!answerMap.has(dayKey)) answerMap.set(dayKey, new Map());
-    answerMap.get(dayKey)!.set(row.user_id as string, row.direction as string);
+    const parsedMs = row.created_at ? Date.parse(row.created_at as string) : 0;
+    answerMap.get(dayKey)!.set(row.user_id as string, {
+      direction: row.direction as string,
+      createdAtMs: Number.isNaN(parsedMs) ? 0 : parsedMs,
+    });
   }
 
   // extra_questions をサーバー側辞書として補完
@@ -265,6 +272,7 @@ Deno.serve(async (req: Request) => {
     myChoice: string | null;
     partnerChoice: string | null;
     matched: boolean | null;
+    latestAnswerMs: number;
   }
 
   const analyzableEntries: QAEntry[] = [];
@@ -283,8 +291,11 @@ Deno.serve(async (req: Request) => {
 
     for (const qId of qIds) {
       const m = answerMap.get(`${quizDate}:${qId}`);
-      const myDir = m?.get(uid) ?? null;
-      const partnerDir = m?.get(partnerId) ?? null;
+      const myRec = m?.get(uid) ?? null;
+      const partnerRec = m?.get(partnerId) ?? null;
+      const myDir = myRec?.direction ?? null;
+      const partnerDir = partnerRec?.direction ?? null;
+      const latestAnswerMs = Math.max(myRec?.createdAtMs ?? 0, partnerRec?.createdAtMs ?? 0);
       const meta = mergedCatalog[qId];
 
       if (myDir && partnerDir) {
@@ -295,6 +306,7 @@ Deno.serve(async (req: Request) => {
           myChoice: meta?.choices?.[myDir] ?? myDir,
           partnerChoice: meta?.choices?.[partnerDir] ?? partnerDir,
           matched: evaluateMatch(meta?.matchRule, myDir, partnerDir),
+          latestAnswerMs,
         };
         bothDayEntries.push(entry);
         partialDayEntries.push(entry);
@@ -308,6 +320,7 @@ Deno.serve(async (req: Request) => {
             myChoice: myDir ? (meta?.choices?.[myDir] ?? myDir) : null,
             partnerChoice: partnerDir ? (meta?.choices?.[partnerDir] ?? partnerDir) : null,
             matched: null,
+            latestAnswerMs,
           });
         }
       }
@@ -327,7 +340,13 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "NOT_ENOUGH_DATA" }, 400);
   }
 
-  // 5. キャッシュチェック（24時間以内＆回答数に変化がなければ再課金せずキャッシュ返却）
+  const latestAnalyzedAnswerMs = analyzableEntries.reduce(
+    (maxMs, e) => Math.max(maxMs, e.latestAnswerMs),
+    0
+  );
+
+  // 5. キャッシュチェック（24時間以内＆回答に変化がなければ再課金せずキャッシュ返却）
+  //    ※ 過去日に追っかけ回答が追加された場合も latestAnalyzedAnswerMs > reportCreatedMs で即キャッシュ無効化
   const { data: latestReport } = await admin
     .from("pair_ai_reports")
     .select("id, analyzed_days, analyzed_answers, model_used, created_at, report_json")
@@ -337,8 +356,10 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
 
   if (latestReport) {
-    const ageMs = nowMs - Date.parse(latestReport.created_at as string);
-    const sameVolume = latestReport.analyzed_answers === analyzableEntries.length;
+    const reportCreatedMs = Date.parse(latestReport.created_at as string);
+    const ageMs = nowMs - reportCreatedMs;
+    const hasNewerAnswer = latestAnalyzedAnswerMs > reportCreatedMs;
+    const sameVolume = latestReport.analyzed_answers === analyzableEntries.length && !hasNewerAnswer;
     if ((!forceRefresh && sameVolume) || (sameVolume && ageMs < CACHE_COOLDOWN_MS)) {
       return jsonResponse({
         cached: true,
@@ -352,6 +373,36 @@ Deno.serve(async (req: Request) => {
         },
       });
     }
+  }
+
+  // 5.5. 日次生成回数制限（1ペアあたりペア基準タイムゾーンで1日3回まで）
+  const { data: recentReports } = await admin
+    .from("pair_ai_reports")
+    .select("created_at")
+    .eq("pair_id", pairId)
+    .gte("created_at", new Date(nowMs - 48 * 60 * 60 * 1000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: pairTz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayGeneratedCount = (recentReports ?? []).filter((r) => {
+    const d = new Date(r.created_at as string);
+    return !Number.isNaN(d.getTime()) && dateFormatter.format(d) === todayDate;
+  }).length;
+
+  if (todayGeneratedCount >= DAILY_GENERATION_LIMIT) {
+    return jsonResponse(
+      {
+        error: "DAILY_LIMIT_EXCEEDED",
+        limit: DAILY_GENERATION_LIMIT,
+      },
+      429
+    );
   }
 
   // 6. Gemini API による AI 相性レポート生成
@@ -418,15 +469,22 @@ ${summaryLines}
 
   const model = Deno.env.get("GEMINI_MODEL") || DEFAULT_GEMINI_MODEL;
   const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey,
+      },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.6,
+          maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
+          thinkingConfig: {
+            thinkingBudget: GEMINI_THINKING_BUDGET,
+          },
         },
       }),
     }

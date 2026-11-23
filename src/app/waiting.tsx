@@ -175,7 +175,7 @@ export default function WaitingScreen() {
           <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
         </View>
         <Text style={styles.premiumHintText}>
-          当日の回答はお互い完了するまで秘密ですが、プレミアムプランでは自分が未回答だった過去日の相手の回答を履歴から閲覧でき、AI相性診断にも反映されます。
+          当日の回答はお互い完了するまで秘密ですが、プレミアムプランでは自分が未回答だった過去日の質問に後から回答でき、回答後に相手の答えと一致率を見られます（AI相性診断にも反映）。
         </Text>
       </TouchableOpacity>
 

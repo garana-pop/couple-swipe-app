@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { SwipeDirection, Question, HistoryDayItem } from '../types';
+import { SwipeDirection, Question, HistoryDayItem, DayQuizData } from '../types';
 import {
   TODAY_QUESTIONS,
   buildQuestionCatalog,
@@ -80,6 +80,13 @@ interface AppContextType {
   dailyReminder: DailyReminderSettings;
   pushStatus: PushRegistrationResult | null;
   submitAnswer: (questionId: string, direction: SwipeDirection) => Promise<void>;
+  loadDayQuizData: (quizDate: string) => Promise<DayQuizData | null>;
+  submitPastAnswer: (
+    quizDate: string,
+    questionId: string,
+    direction: SwipeDirection,
+    isFinalQuestion?: boolean
+  ) => Promise<{ ok: boolean; error?: string }>;
   createPair: (displayName?: string) => Promise<{ ok: boolean; error?: string }>;
   joinPair: (code: string, displayName?: string) => Promise<{ ok: boolean; error?: string }>;
   leavePair: () => Promise<{ ok: boolean; error?: string }>;
@@ -494,6 +501,147 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [myAnswers, userId, pairId, todayDate, refreshDayStatus, questions, isPairConnected]
   );
 
+  const loadDayQuizData = useCallback(
+    async (quizDate: string): Promise<DayQuizData | null> => {
+      if (!supabase || !userId || !pairId) return null;
+
+      const { data: setRow, error: setErr } = await supabase
+        .from('daily_sets')
+        .select('question_ids')
+        .eq('pair_id', pairId)
+        .eq('quiz_date', quizDate)
+        .maybeSingle();
+
+      if (setErr || !setRow || !Array.isArray(setRow.question_ids) || setRow.question_ids.length === 0) {
+        return null;
+      }
+
+      const qIds = setRow.question_ids as string[];
+      if (qIds.some((id) => !catalogRef.current.questionsById[id])) {
+        await refreshQuestionCatalog({ force: true, fullRefresh: true });
+      }
+
+      const [pastRes, statusRes, answersRes] = await Promise.all([
+        supabase.rpc('get_past_question_history', {
+          p_question_ids: qIds,
+          p_before_date: quizDate,
+        }),
+        supabase.rpc('get_day_status', {
+          p_quiz_date: quizDate,
+        }),
+        supabase
+          .from('answers')
+          .select('question_id, user_id, direction')
+          .eq('pair_id', pairId)
+          .eq('quiz_date', quizDate),
+      ]);
+
+      const pastMap = new Map<
+        string,
+        { quiz_date: string; my_answer: SwipeDirection | null; partner_answer: SwipeDirection | null }
+      >();
+      if (Array.isArray(pastRes.data)) {
+        for (const r of pastRes.data) {
+          pastMap.set(r.question_id, r);
+        }
+      }
+
+      const questionsById = catalogRef.current.questionsById;
+      const hydratedQuestions: Question[] = qIds
+        .map((id) => {
+          const base = questionsById[id];
+          if (!base) return null;
+          const past = pastMap.get(id);
+          if (!past) return base;
+          const formatted = formatPastDateLabel(past.quiz_date, quizDate);
+          return {
+            ...base,
+            repeatBadge: formatted.badge,
+            pastHistory: {
+              date: formatted.label,
+              myAnswer: past.my_answer ?? undefined,
+              partnerAnswer: past.partner_answer ?? undefined,
+            },
+          } as Question;
+        })
+        .filter((q): q is Question => q !== null);
+
+      const mine: Record<string, SwipeDirection> = {};
+      const partner: Record<string, SwipeDirection> = {};
+      if (Array.isArray(answersRes.data)) {
+        for (const row of answersRes.data) {
+          if (row.user_id === userId) {
+            mine[row.question_id] = row.direction as SwipeDirection;
+          } else {
+            partner[row.question_id] = row.direction as SwipeDirection;
+          }
+        }
+      }
+
+      const status = statusRes.data;
+      const totalQuestions = Number(status?.total_questions ?? hydratedQuestions.length);
+      const myAnsweredCount = Number(status?.my_answered_count ?? Object.keys(mine).length);
+      const partnerAnsweredCount = Number(status?.partner_answered_count ?? Object.keys(partner).length);
+
+      return {
+        quizDate,
+        questions: hydratedQuestions,
+        myAnswers: mine,
+        partnerAnswers: partner,
+        totalQuestions,
+        myAnsweredCount,
+        partnerAnsweredCount,
+        isMyCompleted: Boolean(status?.is_my_completed ?? (totalQuestions > 0 && myAnsweredCount >= totalQuestions)),
+        isPartnerCompleted: Boolean(
+          status?.is_partner_completed ?? (totalQuestions > 0 && partnerAnsweredCount >= totalQuestions)
+        ),
+        isRevealed: Boolean(status?.is_revealed),
+      };
+    },
+    [userId, pairId, refreshQuestionCatalog]
+  );
+
+  const submitPastAnswer = useCallback(
+    async (
+      quizDate: string,
+      questionId: string,
+      direction: SwipeDirection,
+      isFinalQuestion = false
+    ): Promise<{ ok: boolean; error?: string }> => {
+      if (!supabase || !userId || !pairId) {
+        return { ok: false, error: 'サーバーに接続されていません。' };
+      }
+
+      const { error } = await supabase.from('answers').insert({
+        pair_id: pairId,
+        quiz_date: quizDate,
+        question_id: questionId,
+        user_id: userId,
+        direction,
+      });
+
+      if (error && error.code !== '23505') {
+        if (error.code === '42501') {
+          return {
+            ok: false,
+            error: '過去の質問への回答には「ふたりプレミアムプラン」への加入が必要です。',
+          };
+        }
+        return {
+          ok: false,
+          error: '回答の保存に失敗しました。通信環境をご確認のうえ再度お試しください。',
+        };
+      }
+
+      if (isFinalQuestion && isPairConnected) {
+        void notifyPartnerAnswered(quizDate);
+      }
+
+      return { ok: true };
+    },
+    [userId, pairId, isPairConnected]
+  );
+
   const ensureAuthenticatedUserId = useCallback(async (): Promise<{
     uid: string | null;
     error?: string;
@@ -695,10 +843,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         return {
           quizDate: day.quiz_date,
+          totalQuestions: Number(
+            day.total_questions ?? (Array.isArray(day.question_ids) ? day.question_ids.length : items.length)
+          ),
+          myAnsweredCount: Number(day.my_answered_count ?? 0),
+          partnerAnsweredCount: Number(day.partner_answered_count ?? 0),
+          isMyCompleted: Boolean(day.is_my_completed ?? day.is_revealed),
+          isPartnerCompleted: Boolean(day.is_partner_completed ?? day.is_revealed),
           isRevealed: day.is_revealed !== false,
           isPremiumUnlocked: Boolean(day.is_premium_unlocked),
+          canAnswerPastDay: Boolean(day.can_answer_past_day),
           isLockedPastDay: Boolean(day.is_locked_past_day),
-          partnerAnsweredCount: Number(day.partner_answered_count ?? 0),
           items,
         };
       });
@@ -887,6 +1042,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         dailyReminder,
         pushStatus,
         submitAnswer,
+        loadDayQuizData,
+        submitPastAnswer,
         createPair,
         joinPair,
         leavePair,

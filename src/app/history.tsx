@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
@@ -33,11 +33,13 @@ export default function HistoryScreen() {
     hasPair,
   } = useApp();
 
-  useEffect(() => {
-    if (isSupabaseReady && hasPair) {
-      void fetchHistory();
-    }
-  }, [isSupabaseReady, hasPair, fetchHistory]);
+  useFocusEffect(
+    useCallback(() => {
+      if (isSupabaseReady && hasPair) {
+        void fetchHistory();
+      }
+    }, [isSupabaseReady, hasPair, fetchHistory])
+  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -137,12 +139,12 @@ export default function HistoryScreen() {
         <View style={styles.premiumGuideHeader}>
           <View style={styles.premiumGuideTitleRow}>
             <Ionicons name="diamond" size={14} color="#9E6B24" />
-            <Text style={styles.premiumGuideTitle}>未回答の過去日もプレミアムで閲覧OK</Text>
+            <Text style={styles.premiumGuideTitle}>過去の未回答お題もプレミアムで回答＆閲覧OK</Text>
           </View>
           <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
         </View>
         <Text style={styles.premiumGuideText}>
-          プレミアムプランに加入すると、自分が未回答だった過去日の相手の回答も見られるようになり、その回答を含めたAI相性診断も利用できます（※今日の回答は双方完了まで非公開）。
+          プレミアムプランに加入すると、自分が未回答だった過去日の質問に後から回答でき、回答すると相手の答えと一致率が見られます（AI相性診断にも自動反映・当日は双方完了まで秘密）。
         </Text>
       </TouchableOpacity>
 
@@ -156,12 +158,13 @@ export default function HistoryScreen() {
           <Ionicons name="calendar-outline" size={28} color={COLORS.textLight} />
           <Text style={styles.emptyTitle}>表示できる履歴はまだありません</Text>
           <Text style={styles.emptySub}>
-            二人とも回答を完了した日の記録がここに蓄積されます。自分が未回答だった過去日の相手回答は、プレミアムプランで閲覧・AI診断に反映できます。
+            二人とも回答を完了した日の記録がここに蓄積されます。未回答の過去日がある場合は、プレミアムプランで後から回答して相手の結果を見られます。
           </Text>
         </View>
       ) : (
         <View style={styles.list}>
           {historyDays.map((day) => {
+            // 1. 無料ペアの未回答過去日（ロックカード）
             if (day.isLockedPastDay) {
               return (
                 <View key={day.quizDate} style={[styles.card, SHADOWS.cardSmall, styles.lockedPastCard]}>
@@ -174,8 +177,9 @@ export default function HistoryScreen() {
                   </View>
 
                   <Text style={styles.lockedDescText}>
-                    あなたは未回答ですが、{partnerName}さんが {day.partnerAnsweredCount}問 回答しています。
-                    プレミアムプランでは過去の未回答日の相手回答も閲覧でき、AI相性診断にも反映されます。
+                    {day.partnerAnsweredCount > 0
+                      ? `あなたは未回答ですが、${partnerName}さんが ${day.partnerAnsweredCount}問 回答しています。プレミアムプランに加入すると、この日の質問に後から回答して相手の結果や一致率を見ることができ、AI相性診断にも反映されます。`
+                      : `この日のお題（全${day.totalQuestions}問）は未回答です。プレミアムプランに加入すると、過去の質問に後から回答できるようになります。`}
                   </Text>
 
                   <TouchableOpacity
@@ -185,13 +189,55 @@ export default function HistoryScreen() {
                   >
                     <Ionicons name="diamond-outline" size={14} color="#FFFFFF" />
                     <Text style={styles.unlockCtaBtnText}>
-                      プレミアムで過去の回答を見る ＆ AI診断に含める
+                      プレミアムで過去の質問に回答 ＆ 結果を見る
                     </Text>
                   </TouchableOpacity>
                 </View>
               );
             }
 
+            // 2. プレミアムペアの未回答過去日（ネタバレ防止：最初は相手の答えを伏せて回答ボタンを表示）
+            if (day.canAnswerPastDay) {
+              const remaining = Math.max(1, day.totalQuestions - day.myAnsweredCount);
+              return (
+                <View key={day.quizDate} style={[styles.card, SHADOWS.cardSmall, styles.answerablePastCard]}>
+                  <View style={styles.dayHeader}>
+                    <Text style={styles.dayDate}>{formatDateHeading(day.quizDate)}</Text>
+                    <View style={styles.premiumUnlockedBadge}>
+                      <Ionicons name="diamond" size={11} color="#8C5A1B" />
+                      <Text style={styles.premiumUnlockedBadgeText}>
+                        未回答あり（残り{remaining}問）
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.spoilerShieldBox}>
+                    <Ionicons name="eye-off-outline" size={15} color="#8C5A1B" />
+                    <Text style={styles.spoilerShieldText}>
+                      {day.partnerAnsweredCount > 0
+                        ? `${partnerName}さんは ${day.partnerAnsweredCount}問 回答済みです（ネタバレ防止のため伏せています）。この日の質問に回答すると、${partnerName}さんの回答と一致率が見られます！`
+                        : `この日のお題はまだ未回答です。プレミアム特典として今から回答できます（${partnerName}さんも回答すると一致率が表示されます）。`}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.answerPastBtn}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      router.push({ pathname: '/quiz', params: { date: day.quizDate } })
+                    }
+                  >
+                    <Ionicons name="play-circle" size={17} color="#FFFFFF" />
+                    <Text style={styles.answerPastBtnText}>
+                      この日の質問に回答する（残り{remaining}問）
+                    </Text>
+                    <Ionicons name="chevron-forward" size={15} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            // 3. 回答完了済みの日（双方完了 or 自分完了・相手未完了）
             const bothAnsweredItems = day.items.filter((i) => i.myAnswer && i.partnerAnswer);
             const matchedCount = bothAnsweredItems.filter((i) => i.isMatched).length;
             const totalBoth = bothAnsweredItems.length;
@@ -201,16 +247,20 @@ export default function HistoryScreen() {
               <View key={day.quizDate} style={[styles.card, SHADOWS.cardSmall]}>
                 <View style={styles.dayHeader}>
                   <Text style={styles.dayDate}>{formatDateHeading(day.quizDate)}</Text>
-                  {day.isPremiumUnlocked ? (
-                    <View style={styles.premiumUnlockedBadge}>
-                      <Ionicons name="diamond" size={11} color="#8C5A1B" />
-                      <Text style={styles.premiumUnlockedBadgeText}>プレミアム解放（未回答の日）</Text>
-                    </View>
-                  ) : (
+                  {day.isRevealed ? (
                     <View style={styles.dayRateBadge}>
                       <Text style={styles.dayRateText}>
                         一致率 {rate}% ({matchedCount}/{totalBoth})
                       </Text>
+                    </View>
+                  ) : day.isPremiumUnlocked ? (
+                    <View style={styles.premiumUnlockedBadge}>
+                      <Ionicons name="diamond" size={11} color="#8C5A1B" />
+                      <Text style={styles.premiumUnlockedBadgeText}>プレミアム解放（相手途中回答）</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.partnerWaitingBadge}>
+                      <Text style={styles.partnerWaitingBadgeText}>パートナー未回答</Text>
                     </View>
                   )}
                 </View>
@@ -566,6 +616,51 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: '#8C5A1B',
+  },
+  answerablePastCard: {
+    backgroundColor: '#FFFDF8',
+    borderColor: '#EBD3AA',
+  },
+  spoilerShieldBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FAF3E6',
+    borderRadius: 12,
+    padding: 11,
+    marginBottom: 12,
+  },
+  spoilerShieldText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#7A5B32',
+    lineHeight: 18,
+  },
+  answerPastBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+  },
+  answerPastBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  partnerWaitingBadge: {
+    backgroundColor: '#EFF5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  partnerWaitingBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4D779E',
   },
   backButton: {
     flexDirection: 'row',

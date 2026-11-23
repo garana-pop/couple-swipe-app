@@ -1,32 +1,108 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
-import { SwipeDirection } from '../types';
+import { evaluateMatch } from '../constants/questions';
+import { DayQuizData, SwipeDirection } from '../types';
+
+function formatShortDate(dateStr: string): string {
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return `${Number(parts[1])}月${Number(parts[2])}日`;
+}
 
 export default function ResultScreen() {
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const rawDate = Array.isArray(dateParam) ? dateParam[0] : dateParam;
+
   const {
+    todayDate,
     isPartnerCompleted,
     isMyCompleted,
     partnerName,
     myName,
     matchSummary,
+    loadDayQuizData,
   } = useApp();
 
-  // 双方完了していない場合はロック画面へ
+  const isPastResult = Boolean(
+    rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && rawDate !== todayDate
+  );
+  const targetDate = isPastResult ? rawDate! : todayDate;
+
+  const [pastData, setPastData] = useState<DayQuizData | null>(null);
+  const [loadingPast, setLoadingPast] = useState(isPastResult);
+
+  // 当日モード: 双方完了していない場合はロック画面へ
   useEffect(() => {
+    if (isPastResult) return;
     if (!isMyCompleted || !isPartnerCompleted) {
       router.replace('/waiting');
     }
-  }, [isMyCompleted, isPartnerCompleted]);
+  }, [isPastResult, isMyCompleted, isPartnerCompleted]);
+
+  // 過去日モード: 完了した過去日の結果（双方回答・一致率）を取得
+  useEffect(() => {
+    if (!isPastResult) return;
+
+    let active = true;
+    void (async () => {
+      try {
+        const loaded = await loadDayQuizData(targetDate);
+        if (active) {
+          setPastData(loaded);
+        }
+      } finally {
+        if (active) {
+          setLoadingPast(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isPastResult, targetDate, loadDayQuizData]);
+
+  const effectiveSummary = useMemo(() => {
+    if (!isPastResult) return matchSummary;
+    if (!pastData) {
+      return { total: 0, matchedCount: 0, percentage: 0, details: [] };
+    }
+
+    const details = pastData.questions.map((q) => {
+      const my = pastData.myAnswers[q.id];
+      const partner = pastData.partnerAnswers[q.id];
+      const isMatched = evaluateMatch(q, my, partner);
+      return {
+        question: q,
+        myAnswer: my,
+        partnerAnswer: partner,
+        isMatched,
+      };
+    });
+
+    const bothAnswered = details.filter((d) => d.myAnswer && d.partnerAnswer);
+    const matchedCount = bothAnswered.filter((d) => d.isMatched).length;
+    const total = bothAnswered.length;
+    const percentage = total > 0 ? Math.round((matchedCount / total) * 100) : 0;
+
+    return {
+      total,
+      matchedCount,
+      percentage,
+      details,
+    };
+  }, [isPastResult, matchSummary, pastData]);
 
   // 方向の日本語ラベルと色を取得
   const getDirectionBadge = (dir?: SwipeDirection) => {
@@ -43,17 +119,40 @@ export default function ResultScreen() {
     }
   };
 
+  if (isPastResult && loadingPast) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Stack.Screen options={{ title: `${formatShortDate(targetDate)}の診断結果` }} />
+        <ActivityIndicator color={COLORS.primary} size="large" />
+        <Text style={styles.loadingText}>結果を読み込んでいます...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* 一致率メインサークル（コメント文は削除してシンプルに） */}
+      <Stack.Screen
+        options={{
+          title: isPastResult ? `${formatShortDate(targetDate)}の診断結果` : '診断結果',
+        }}
+      />
+
+      {/* 一致率メインサークル */}
       <View style={[styles.rateCard, SHADOWS.card]}>
-        <Text style={styles.rateSubtitle}>今日の一致率</Text>
+        <Text style={styles.rateSubtitle}>
+          {isPastResult ? `${formatShortDate(targetDate)}の一致率` : '今日の一致率'}
+        </Text>
         <View style={styles.percentageCircle}>
-          <Text style={styles.percentageText}>{matchSummary.percentage}%</Text>
+          <Text style={styles.percentageText}>{effectiveSummary.percentage}%</Text>
           <Text style={styles.matchedFractionText}>
-            {matchSummary.matchedCount} / {matchSummary.total} 問一致
+            {effectiveSummary.matchedCount} / {effectiveSummary.total} 問一致
           </Text>
         </View>
+        {isPastResult && effectiveSummary.total < effectiveSummary.details.length ? (
+          <Text style={styles.partialNoteText}>
+            ※ 双方回答済みの {effectiveSummary.total} 問から算出しています
+          </Text>
+        ) : null}
       </View>
 
       {/* 質問ごとの回答対比一覧 */}
@@ -63,10 +162,11 @@ export default function ResultScreen() {
       </View>
 
       <View style={styles.questionsList}>
-        {matchSummary.details.map((item, index) => {
+        {effectiveSummary.details.map((item, index) => {
           const myBadge = getDirectionBadge(item.myAnswer);
           const partnerBadge = getDirectionBadge(item.partnerAnswer);
           const history = item.question.pastHistory;
+          const hasBoth = Boolean(item.myAnswer && item.partnerAnswer);
 
           return (
             <View key={item.question.id} style={[styles.detailCard, SHADOWS.cardSmall]}>
@@ -78,16 +178,24 @@ export default function ResultScreen() {
                 <View
                   style={[
                     styles.matchBadge,
-                    item.isMatched ? styles.matchBadgeMatched : styles.matchBadgeDiff,
+                    !hasBoth
+                      ? styles.matchBadgeSingle
+                      : item.isMatched
+                        ? styles.matchBadgeMatched
+                        : styles.matchBadgeDiff,
                   ]}
                 >
                   <Text
                     style={[
                       styles.matchBadgeText,
-                      item.isMatched ? styles.matchTextMatched : styles.matchTextDiff,
+                      !hasBoth
+                        ? styles.matchTextSingle
+                        : item.isMatched
+                          ? styles.matchTextMatched
+                          : styles.matchTextDiff,
                     ]}
                   >
-                    {item.isMatched ? '一致' : '不一致'}
+                    {!hasBoth ? '片方回答' : item.isMatched ? '一致' : '不一致'}
                   </Text>
                 </View>
               </View>
@@ -154,7 +262,7 @@ export default function ResultScreen() {
                     <View style={styles.historyAnswerRow}>
                       <Text style={styles.historyLabel}>今回：</Text>
                       <Text style={[styles.historyAnswerText, styles.historyAnswerTextCurrent]}>
-                        あなた「{item.myAnswer ? item.question.choices[item.myAnswer] : ''}」 / {partnerName}「{item.partnerAnswer ? item.question.choices[item.partnerAnswer] : ''}」
+                        あなた「{item.myAnswer ? item.question.choices[item.myAnswer] : '未回答'}」 / {partnerName}「{item.partnerAnswer ? item.question.choices[item.partnerAnswer] : '未回答'}」
                       </Text>
                     </View>
                     {history.note && (
@@ -167,6 +275,17 @@ export default function ResultScreen() {
           );
         })}
       </View>
+
+      {isPastResult && (
+        <TouchableOpacity
+          style={styles.historyBackButton}
+          activeOpacity={0.8}
+          onPress={() => router.replace('/history')}
+        >
+          <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
+          <Text style={styles.historyBackButtonText}>過去の回答一覧へ戻る</Text>
+        </TouchableOpacity>
+      )}
 
       {/* ホームに戻るボタン */}
       <TouchableOpacity
@@ -182,6 +301,17 @@ export default function ResultScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -226,6 +356,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
     marginTop: -2,
+  },
+  partialNoteText: {
+    marginTop: 10,
+    fontSize: 11,
+    color: COLORS.textMuted,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -283,6 +418,9 @@ const styles = StyleSheet.create({
   matchBadgeDiff: {
     backgroundColor: '#FEF6EB',
   },
+  matchBadgeSingle: {
+    backgroundColor: COLORS.surface,
+  },
   matchBadgeText: {
     fontSize: 11,
     fontWeight: '800',
@@ -292,6 +430,9 @@ const styles = StyleSheet.create({
   },
   matchTextDiff: {
     color: '#C97A2B',
+  },
+  matchTextSingle: {
+    color: COLORS.textMuted,
   },
   answersCompareBox: {
     backgroundColor: COLORS.surface,
@@ -338,10 +479,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     flex: 1,
   },
-
-  // ----------------------------------------------------
-  // 過去との比較セクション
-  // ----------------------------------------------------
   historyCompareContainer: {
     marginTop: 12,
     paddingTop: 12,
@@ -393,7 +530,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: 'italic',
   },
-
+  historyBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 6,
+    marginBottom: 10,
+  },
+  historyBackButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   homeButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -106,21 +106,21 @@ Deno.serve(async (req: Request) => {
   const partnerId = partnerMember.user_id as string;
 
   // 3. ペア基準タイムゾーンの「今日」を取得し、出題セットを確認
-  let quizDate = requestedDate;
-  if (!quizDate) {
-    const { data: pairRow } = await admin
-      .from("pairs")
-      .select("timezone")
-      .eq("id", pairId)
-      .maybeSingle();
-    const tz = (pairRow?.timezone as string | undefined) || "Asia/Tokyo";
-    quizDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  }
+  const { data: pairRow } = await admin
+    .from("pairs")
+    .select("timezone")
+    .eq("id", pairId)
+    .maybeSingle();
+  const tz = (pairRow?.timezone as string | undefined) || "Asia/Tokyo";
+  const todayDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const quizDate = requestedDate || todayDate;
+  const isPastDay = quizDate < todayDate;
 
   const { data: dailySet } = await admin
     .from("daily_sets")
@@ -193,12 +193,25 @@ Deno.serve(async (req: Request) => {
   }
 
   // 7. Expo Push API へ送信
-  const title = partnerCompleted
-    ? "二人の回答が揃いました！"
-    : `${senderName}さんが回答しました`;
-  const body = partnerCompleted
-    ? `${senderName}さんも今日の質問に答えました。今日の一致率と結果を見てみましょう！`
-    : "あなたも今日の3問に答えて、二人のかみ合わせ結果を開きましょう！";
+  const dateParts = quizDate.split("-");
+  const dateLabel =
+    dateParts.length === 3 ? `${Number(dateParts[1])}月${Number(dateParts[2])}日` : quizDate;
+
+  const title = isPastDay
+    ? partnerCompleted
+      ? "過去のお題の回答が揃いました！"
+      : `${senderName}さんが過去のお題に回答しました`
+    : partnerCompleted
+      ? "二人の回答が揃いました！"
+      : `${senderName}さんが回答しました`;
+
+  const body = isPastDay
+    ? partnerCompleted
+      ? `${senderName}さんが ${dateLabel} の質問に答えました。履歴から一致率と結果を見てみましょう！`
+      : `${senderName}さんが ${dateLabel} の質問に答えました。プレミアムプランならあなたも後から回答して結果を見られます！`
+    : partnerCompleted
+      ? `${senderName}さんも今日の質問に答えました。今日の一致率と結果を見てみましょう！`
+      : "あなたも今日の3問に答えて、二人のかみ合わせ結果を開きましょう！";
 
   const expoHeaders: Record<string, string> = {
     "Content-Type": "application/json",
@@ -219,7 +232,7 @@ Deno.serve(async (req: Request) => {
       title,
       body,
       data: {
-        screen: partnerCompleted ? "result" : "quiz",
+        screen: isPastDay ? "history" : partnerCompleted ? "result" : "quiz",
         quizDate,
         eventType,
       },

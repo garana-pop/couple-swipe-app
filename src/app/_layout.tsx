@@ -19,6 +19,8 @@ export default function RootLayout() {
         router.push('/quiz');
       } else if (screen === 'waiting') {
         router.push('/waiting');
+      } else if (screen === 'history') {
+        router.push('/history');
       } else {
         router.replace('/');
       }

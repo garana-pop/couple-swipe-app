@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { showAlert } from '../lib/alert';
@@ -162,7 +163,7 @@ export default function AiReportScreen() {
       await refreshEntitlementAndBilling();
       showAlert(
         'ご加入ありがとうございます！',
-        `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。AI相性診断と、未回答だった過去日の相手回答の閲覧が解放されています。`
+        `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。AI相性診断と、過去の未回答質問への回答・相手の結果閲覧が解放されています。`
       );
     } finally {
       setPurchasing(false);
@@ -236,8 +237,24 @@ export default function AiReportScreen() {
             {reportRecord
               ? `\n最終更新: ${formatDateTime(reportRecord.createdAt)}（${reportRecord.analyzedAnswers}問を分析）`
               : ''}
-            {'\n'}※ 自分が未回答だった過去日の相手の回答も「過去の回答との比較」から閲覧できます。
+            {(entitlement?.pastUnansweredDaysCount ?? 0) > 0
+              ? `\n※ 過去の未回答お題が ${entitlement?.pastUnansweredDaysCount}日分 あります。「過去の回答との比較」から後から回答して相手の結果を見られます。`
+              : '\n※ 過去の未回答お題は「過去の回答との比較」からいつでも回答できます。'}
           </Text>
+
+          {(entitlement?.pastUnansweredDaysCount ?? 0) > 0 && (
+            <TouchableOpacity
+              style={styles.pastCatchUpBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push('/history')}
+            >
+              <Ionicons name="play-circle-outline" size={16} color="#8C5A1B" />
+              <Text style={styles.pastCatchUpBtnText}>
+                過去の未回答お題（{entitlement?.pastUnansweredDaysCount}日分）に回答する
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.generateBtn}
@@ -265,7 +282,7 @@ export default function AiReportScreen() {
             {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
               ? `＋あなたが未回答の過去日 ${entitlement?.pastPartnerOnlyDaysCount}日分`
               : ''}
-            ）から AI が専用レポートを生成し、未回答の過去日の相手の回答も履歴から閲覧できるようになります。
+            ）から AI が専用レポートを生成し、過去の未回答の質問にも後から回答して相手の結果を見られるようになります。
           </Text>
         </View>
       )}
@@ -363,8 +380,8 @@ export default function AiReportScreen() {
             <View style={styles.perkRow}>
               <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
               <Text style={styles.perkText}>
-                <Text style={styles.perkBold}>未回答の過去日の相手回答を閲覧</Text>
-                ：自分が答え忘れた日でも、過去の相手の回答を履歴で見られます（※当日は双方回答まで秘密）
+                <Text style={styles.perkBold}>過去の未回答質問に回答＆相手の結果を解放</Text>
+                ：答え忘れた過去日の質問に履歴から後から回答でき、回答すると相手の答えと一致率が見られます（※当日は双方回答まで秘密）
               </Text>
             </View>
             <View style={styles.perkRow}>
@@ -521,6 +538,25 @@ const styles = StyleSheet.create({
     color: '#3B6347',
     marginBottom: 12,
     lineHeight: 17,
+  },
+  pastCatchUpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFBF3',
+    borderWidth: 1,
+    borderColor: '#EBD3AA',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  pastCatchUpBtnText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#8C5A1B',
   },
   generateBtn: {
     backgroundColor: '#4A7C59',
