@@ -36,8 +36,8 @@
 ### フェーズ8: 課金・AIレポート・Google Play リリース準備（コード・バックエンド実装完了／外部設定・提出手順は [docs/RELEASE_GUIDE.md](./docs/RELEASE_GUIDE.md) 参照）
 - [x] RevenueCat（無料枠）＋ Google Play Billing を導入し、ペア共有の課金状態管理を実装する（`user_subscriptions`・`is_pair_premium`・`get_pair_entitlement` RPC・Edge Function `revenuecat-webhook` デプロイ済み・[src/lib/billing.ts](./src/lib/billing.ts) 実装済み）
 - [x] AI 相性レポート（[src/app/ai-report.tsx](./src/app/ai-report.tsx)）をサーバー側（Edge Function `generate-ai-report` ＋ `pair_ai_reports` キャッシュ）で課金状態確認後に生成・返却するよう切り替える
-- [x] 退会・アカウント削除の Web 導線・プライバシーポリシーを用意する（[web-legal/](./web-legal/) ＋ GitHub Pages 自動公開 [.github/workflows/deploy-legal-pages.yml](./.github/workflows/deploy-legal-pages.yml)）
-- [x] EAS Build（`npx eas-cli@latest build`）で Android 用 APK / AAB をビルドできるようにする（[eas.json](./eas.json)・`expo-dev-client`・FCM V1 認証鍵登録済み）
-- [ ] **【ユーザー作業】** 外部キー登録（EAS 環境変数・`GEMINI_API_KEY`・RevenueCat Webhook・GitHub Pages 有効化 — [docs/RELEASE_GUIDE.md](./docs/RELEASE_GUIDE.md) 参照）
-- [ ] **【ユーザー作業】** Google Play デベロッパー登録、ストア用アプリアイコン（512×512）・フィーチャーグラフィック（1024×500）・スクリーンショットの準備
-- [ ] **【ユーザー作業】** 個人デベロッパーアカウント要件の **14日間のクローズドテスト** を実施後、本番リリース
+- [x] 退会・アカウント削除の Web 導線・プライバシーポリシーを用意する（[web-legal/](./web-legal/) ＋ GitHub Pages 公開完了）
+- [x] EAS Build（`npx eas-cli@latest build`）で Android 用 APK / AAB をビルドできるようにする（[eas.json](./eas.json)・EAS 環境変数登録・FCM V1 認証鍵登録・Android 実機 APK ビルド＆動作確認完了）
+- [ ] **【ユーザー作業（リリース・課金有効化時）】** 外部キー登録（Supabase Secrets の `GEMINI_API_KEY` / `REVENUECAT_WEBHOOK_AUTH_KEY`、Google OAuth 設定、RevenueCat 商品連携 — [docs/PHASE7_SETUP.md](./docs/PHASE7_SETUP.md)・[docs/RELEASE_GUIDE.md](./docs/RELEASE_GUIDE.md) 参照）
+- [ ] **【ユーザー作業（ストア申請時）】** Google Play デベロッパー登録、ストア用アプリアイコン（512×512）・フィーチャーグラフィック（1024×500）・スクリーンショットの準備
+- [ ] **【ユーザー作業（ストア申請時）】** 個人デベロッパーアカウント要件の **14日間のクローズドテスト** を実施後、本番リリース

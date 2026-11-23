@@ -118,7 +118,7 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ visible, onClose }
         </View>
       ),
       description:
-        '二人の回答が揃うと一致率と回答内容が公開されます。数ヶ月後に同じ質問が再度出題され、二人の関係の変化を比較できます。',
+        '二人の回答が揃うと一致率と回答内容が公開されます。プレミアムプランでは、自分が未回答だった過去日の相手の回答も閲覧でき、それを含めたAI相性診断も利用できます。',
     },
   ];
 

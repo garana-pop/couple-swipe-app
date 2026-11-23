@@ -207,7 +207,23 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "PREMIUM_REQUIRED" }, 402);
   }
 
-  // 4. 公開済みの過去回答を集計（最新60日分・DBの実データのみ使用）
+  // ペア基準タイムゾーンにおける「今日」を算出（今日未完了の相手回答は後出し防止のため除外）
+  const { data: pairRow } = await admin
+    .from("pairs")
+    .select("timezone")
+    .eq("id", pairId)
+    .maybeSingle();
+  const pairTz = (pairRow?.timezone as string | undefined) || "Asia/Tokyo";
+  const todayDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: pairTz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  // 4. 回答履歴を集計（最新60日分・DBの実データのみ使用）
+  //    - 双方全問完了の日（今日含む）
+  //    - プレミアム特典: 昨日以前（quiz_date < todayDate）で片方のみ回答した日のデータも含める
   const { data: dailySets } = await admin
     .from("daily_sets")
     .select("quiz_date, question_ids")
@@ -246,47 +262,68 @@ Deno.serve(async (req: Request) => {
     date: string;
     category: string;
     title: string;
-    myChoice: string;
-    partnerChoice: string;
-    matched: boolean;
+    myChoice: string | null;
+    partnerChoice: string | null;
+    matched: boolean | null;
   }
 
-  const revealedEntries: QAEntry[] = [];
+  const analyzableEntries: QAEntry[] = [];
   let revealedDaysCount = 0;
+  let pastPartialDaysCount = 0;
 
   for (const ds of dailySets ?? []) {
+    const quizDate = ds.quiz_date as string;
     const qIds = Array.isArray(ds.question_ids) ? (ds.question_ids as string[]) : [];
     if (qIds.length === 0) continue;
 
-    const dayEntries: QAEntry[] = [];
-    let allCompleted = true;
+    const isPastDay = quizDate < todayDate;
+    const bothDayEntries: QAEntry[] = [];
+    const partialDayEntries: QAEntry[] = [];
+    let allBothCompleted = true;
 
     for (const qId of qIds) {
-      const m = answerMap.get(`${ds.quiz_date}:${qId}`);
-      const myDir = m?.get(uid);
-      const partnerDir = m?.get(partnerId);
-      if (!myDir || !partnerDir) {
-        allCompleted = false;
-        break;
-      }
+      const m = answerMap.get(`${quizDate}:${qId}`);
+      const myDir = m?.get(uid) ?? null;
+      const partnerDir = m?.get(partnerId) ?? null;
       const meta = mergedCatalog[qId];
-      dayEntries.push({
-        date: ds.quiz_date as string,
-        category: meta?.category ?? "その他",
-        title: meta?.title ?? qId,
-        myChoice: meta?.choices?.[myDir] ?? myDir,
-        partnerChoice: meta?.choices?.[partnerDir] ?? partnerDir,
-        matched: evaluateMatch(meta?.matchRule, myDir, partnerDir),
-      });
+
+      if (myDir && partnerDir) {
+        const entry: QAEntry = {
+          date: quizDate,
+          category: meta?.category ?? "その他",
+          title: meta?.title ?? qId,
+          myChoice: meta?.choices?.[myDir] ?? myDir,
+          partnerChoice: meta?.choices?.[partnerDir] ?? partnerDir,
+          matched: evaluateMatch(meta?.matchRule, myDir, partnerDir),
+        };
+        bothDayEntries.push(entry);
+        partialDayEntries.push(entry);
+      } else {
+        allBothCompleted = false;
+        if (isPastDay && (myDir || partnerDir)) {
+          partialDayEntries.push({
+            date: quizDate,
+            category: meta?.category ?? "その他",
+            title: meta?.title ?? qId,
+            myChoice: myDir ? (meta?.choices?.[myDir] ?? myDir) : null,
+            partnerChoice: partnerDir ? (meta?.choices?.[partnerDir] ?? partnerDir) : null,
+            matched: null,
+          });
+        }
+      }
     }
 
-    if (allCompleted) {
+    if (allBothCompleted && bothDayEntries.length === qIds.length) {
       revealedDaysCount++;
-      revealedEntries.push(...dayEntries);
+      analyzableEntries.push(...bothDayEntries);
+    } else if (isPastDay && partialDayEntries.length > 0) {
+      pastPartialDaysCount++;
+      analyzableEntries.push(...partialDayEntries);
     }
   }
 
-  if (revealedDaysCount === 0 || revealedEntries.length === 0) {
+  const totalAnalyzedDays = revealedDaysCount + pastPartialDaysCount;
+  if (totalAnalyzedDays === 0 || analyzableEntries.length === 0) {
     return jsonResponse({ error: "NOT_ENOUGH_DATA" }, 400);
   }
 
@@ -301,7 +338,7 @@ Deno.serve(async (req: Request) => {
 
   if (latestReport) {
     const ageMs = nowMs - Date.parse(latestReport.created_at as string);
-    const sameVolume = latestReport.analyzed_answers === revealedEntries.length;
+    const sameVolume = latestReport.analyzed_answers === analyzableEntries.length;
     if ((!forceRefresh && sameVolume) || (sameVolume && ageMs < CACHE_COOLDOWN_MS)) {
       return jsonResponse({
         cached: true,
@@ -333,20 +370,30 @@ Deno.serve(async (req: Request) => {
   const partnerName =
     (profiles ?? []).find((p) => p.id === partnerId)?.display_name?.trim() || "パートナー";
 
-  const matchedTotal = revealedEntries.filter((e) => e.matched).length;
-  const matchRate = Math.round((matchedTotal / revealedEntries.length) * 100);
+  const bothAnsweredEntries = analyzableEntries.filter((e) => e.matched !== null);
+  const matchedTotal = bothAnsweredEntries.filter((e) => e.matched === true).length;
+  const matchRateText =
+    bothAnsweredEntries.length > 0
+      ? `双方回答済み${bothAnsweredEntries.length}問の一致率${Math.round((matchedTotal / bothAnsweredEntries.length) * 100)}%`
+      : "双方回答済みの設問はまだなく、過去日の片方回答データから傾向を分析";
 
-  const summaryLines = revealedEntries
-    .slice(0, 60)
-    .map(
-      (e) =>
-        `[${e.category}] ${e.title} -> ${myName}:「${e.myChoice}」 / ${partnerName}:「${e.partnerChoice}」 (${e.matched ? "一致" : "不一致"})`
-    )
+  const summaryLines = analyzableEntries
+    .slice(0, 80)
+    .map((e) => {
+      if (e.myChoice && e.partnerChoice) {
+        return `[${e.category}] ${e.title} -> ${myName}:「${e.myChoice}」 / ${partnerName}:「${e.partnerChoice}」 (${e.matched ? "一致" : "不一致"})`;
+      }
+      if (!e.myChoice && e.partnerChoice) {
+        return `[${e.category}][過去日・${myName}未回答] ${e.title} -> ${myName}:未回答 / ${partnerName}:「${e.partnerChoice}」`;
+      }
+      return `[${e.category}][過去日・${partnerName}未回答] ${e.title} -> ${myName}:「${e.myChoice}」 / ${partnerName}:未回答`;
+    })
     .join("\n");
 
   const prompt = `あなたはカップル専門の優しく的確な関係性アナリストです。
-以下は「${myName}」と「${partnerName}」が回答したスワイプ診断の履歴（計${revealedDaysCount}日分・${revealedEntries.length}問・全体一致率${matchRate}%）です。
+以下は「${myName}」と「${partnerName}」が回答したスワイプ診断の履歴（計${totalAnalyzedDays}日分：双方完了${revealedDaysCount}日＋未回答を含む過去日${pastPartialDaysCount}日・計${analyzableEntries.length}問・${matchRateText}）です。
 この実データだけに基づき、二人の相性・性格傾向・将来のすれ違い予防アドバイスを日本語の JSON のみで返してください。
+※「過去日・未回答」と付いた設問の回答も、その本人の性格傾向・価値観の分析およびすれ違い予測にしっかり反映してください。
 
 【回答履歴】
 ${summaryLines}
@@ -407,8 +454,8 @@ ${summaryLines}
     .insert({
       pair_id: pairId,
       generated_by: uid,
-      analyzed_days: revealedDaysCount,
-      analyzed_answers: revealedEntries.length,
+      analyzed_days: totalAnalyzedDays,
+      analyzed_answers: analyzableEntries.length,
       report_json: parsedReport,
       model_used: model,
     })

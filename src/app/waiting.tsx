@@ -165,6 +165,21 @@ export default function WaitingScreen() {
       )}
 
       <TouchableOpacity
+        style={styles.premiumHintCard}
+        activeOpacity={0.85}
+        onPress={() => router.push('/ai-report')}
+      >
+        <View style={styles.premiumHintHeader}>
+          <Ionicons name="diamond-outline" size={14} color="#8C5A1B" />
+          <Text style={styles.premiumHintTitle}>過去の未回答日について</Text>
+          <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
+        </View>
+        <Text style={styles.premiumHintText}>
+          当日の回答はお互い完了するまで秘密ですが、プレミアムプランでは自分が未回答だった過去日の相手の回答を履歴から閲覧でき、AI相性診断にも反映されます。
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={styles.backHomeBtn}
         onPress={() => router.replace('/')}
       >
@@ -318,6 +333,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.primary,
+  },
+  premiumHintCard: {
+    width: '100%',
+    backgroundColor: '#FFFBF3',
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#EED9B7',
+    marginBottom: 14,
+  },
+  premiumHintHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 5,
+  },
+  premiumHintTitle: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#8C5A1B',
+  },
+  premiumHintText: {
+    fontSize: 11.5,
+    color: '#7A5B32',
+    lineHeight: 17,
   },
   backHomeBtn: {
     paddingVertical: 8,

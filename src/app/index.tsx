@@ -515,7 +515,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.menuItemTextBox}>
                   <Text style={styles.menuItemTitle}>過去の回答との比較</Text>
-                  <Text style={styles.menuItemSubtext}>出題履歴と二人の回答の変化</Text>
+                  <Text style={styles.menuItemSubtext}>出題履歴・未回答過去日の相手回答</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
@@ -532,8 +532,8 @@ export default function HomeScreen() {
                   <Ionicons name="analytics-outline" size={20} color={COLORS.primary} />
                 </View>
                 <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>二人の相性レポート</Text>
-                  <Text style={styles.menuItemSubtext}>過去の回答からAIが傾向を分析</Text>
+                  <Text style={styles.menuItemTitle}>AI相性診断・プレミアム</Text>
+                  <Text style={styles.menuItemSubtext}>AI分析＆未回答過去日の相手回答を解放</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>

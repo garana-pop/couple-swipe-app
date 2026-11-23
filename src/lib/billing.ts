@@ -246,6 +246,8 @@ export async function fetchPairEntitlement(): Promise<PairEntitlement | null> {
     expiresAt: typeof d.expires_at === 'string' ? d.expires_at : null,
     willRenew: Boolean(d.will_renew),
     revealedDaysCount: Number(d.revealed_days_count ?? 0),
+    pastPartnerOnlyDaysCount: Number(d.past_partner_only_days_count ?? 0),
+    analyzableDaysCount: Number(d.analyzable_days_count ?? d.revealed_days_count ?? 0),
     latestReport: parseReportRecord(d.latest_report),
   };
 }
@@ -258,7 +260,7 @@ function formatAiReportError(code: string): string {
     case 'PARTNER_NOT_CONNECTED':
       return 'パートナーとのペア連携完了後に AI 相性レポートを作成できます。';
     case 'NOT_ENOUGH_DATA':
-      return '二人とも回答を完了した日のデータがまだありません。まずは今日の3問に答えてみましょう！';
+      return '分析できる回答データがまだありません。今日の3問に答えるか、過去の回答データが揃うとお試しいただけます。';
     case 'AI_PROVIDER_NOT_CONFIGURED':
       return 'サーバー側の AI API キー（GEMINI_API_KEY）がまだ設定されていません。';
     default:

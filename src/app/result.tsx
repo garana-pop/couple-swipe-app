@@ -148,7 +148,7 @@ export default function ResultScreen() {
                     <View style={styles.historyAnswerRow}>
                       <Text style={styles.historyLabel}>前回：</Text>
                       <Text style={styles.historyAnswerText}>
-                        あなた「{item.question.choices[history.myAnswer]}」 / {partnerName}「{item.question.choices[history.partnerAnswer]}」
+                        あなた「{history.myAnswer ? item.question.choices[history.myAnswer] : '未回答'}」 / {partnerName}「{history.partnerAnswer ? item.question.choices[history.partnerAnswer] : '未回答'}」
                       </Text>
                     </View>
                     <View style={styles.historyAnswerRow}>

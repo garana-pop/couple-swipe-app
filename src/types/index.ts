@@ -10,8 +10,8 @@ export interface QuestionChoice {
 
 export interface QuestionHistoryItem {
   date: string; // 例: '2026-08-21 (90日前)'
-  myAnswer: SwipeDirection;
-  partnerAnswer: SwipeDirection;
+  myAnswer?: SwipeDirection;
+  partnerAnswer?: SwipeDirection;
   note?: string;
 }
 
@@ -46,6 +46,10 @@ export interface HistoryDayAnswer {
 
 export interface HistoryDayItem {
   quizDate: string; // YYYY-MM-DD
+  isRevealed: boolean;
+  isPremiumUnlocked: boolean; // プレミアム特典で解放された過去未回答日
+  isLockedPastDay: boolean; // 無料プランでロック中の過去未回答日（回答内容は非公開）
+  partnerAnsweredCount: number;
   items: HistoryDayAnswer[];
 }
 
@@ -84,5 +88,7 @@ export interface PairEntitlement {
   expiresAt: string | null;
   willRenew: boolean;
   revealedDaysCount: number;
+  pastPartnerOnlyDaysCount: number;
+  analyzableDaysCount: number;
   latestReport: PairAiReportRecord | null;
 }

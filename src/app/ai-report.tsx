@@ -162,7 +162,7 @@ export default function AiReportScreen() {
       await refreshEntitlementAndBilling();
       showAlert(
         'ご加入ありがとうございます！',
-        `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。`
+        `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。AI相性診断と、未回答だった過去日の相手回答の閲覧が解放されています。`
       );
     } finally {
       setPurchasing(false);
@@ -194,7 +194,7 @@ export default function AiReportScreen() {
         </View>
         <Text style={styles.heroTitle}>ふたりの深層AI診断レポート</Text>
         <Text style={styles.heroDesc}>
-          毎日のスワイプ回答履歴をサーバー側AIが分析し、二人の性格傾向・価値観のすれ違い予防策をレポートします。
+          毎日のスワイプ回答履歴（自分が未回答だった過去の日の相手の回答も含む）をAIが分析し、性格傾向や価値観のすれ違い予防策をレポートします。
         </Text>
         <View style={styles.shareBadge}>
           <Ionicons
@@ -227,10 +227,16 @@ export default function AiReportScreen() {
             </Text>
           </View>
           <Text style={styles.premiumMetaText}>
-            公開済みの回答データ：{entitlement?.revealedDaysCount ?? 0}日分
-            {reportRecord
-              ? ` ／ 最終更新: ${formatDateTime(reportRecord.createdAt)}（${reportRecord.analyzedAnswers}問を分析）`
+            分析対象データ：計 {entitlement?.analyzableDaysCount ?? 0}日分（双方回答{' '}
+            {entitlement?.revealedDaysCount ?? 0}日
+            {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
+              ? ` ＋ 過去未回答日の相手回答 ${entitlement?.pastPartnerOnlyDaysCount}日`
               : ''}
+            ）
+            {reportRecord
+              ? `\n最終更新: ${formatDateTime(reportRecord.createdAt)}（${reportRecord.analyzedAnswers}問を分析）`
+              : ''}
+            {'\n'}※ 自分が未回答だった過去日の相手の回答も「過去の回答との比較」から閲覧できます。
           </Text>
 
           <TouchableOpacity
@@ -255,7 +261,11 @@ export default function AiReportScreen() {
         <View style={styles.sampleNoticeBanner}>
           <Ionicons name="eye-outline" size={16} color="#9E6B24" />
           <Text style={styles.sampleNoticeText}>
-            以下はサンプルプレビューです。プレミアムプランに加入（またはパートナーが加入）すると、二人の実データ（現在 {entitlement?.revealedDaysCount ?? 0}日分）から AI が専用レポートを生成します。
+            以下はサンプルプレビューです。プレミアムプランに加入（またはパートナーが加入）すると、二人の実データ（双方回答 {entitlement?.revealedDaysCount ?? 0}日分
+            {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
+              ? `＋あなたが未回答の過去日 ${entitlement?.pastPartnerOnlyDaysCount}日分`
+              : ''}
+            ）から AI が専用レポートを生成し、未回答の過去日の相手の回答も履歴から閲覧できるようになります。
           </Text>
         </View>
       )}
@@ -346,8 +356,32 @@ export default function AiReportScreen() {
             <Text style={styles.subTitle}>ふたりプレミアムプラン</Text>
           </View>
           <Text style={styles.subSubtitle}>
-            1人が加入すれば、2人とも全ての AI 診断レポートを見放題（Google Play Billing / RevenueCat 管理）
+            1人が加入すれば2人とも利用OK！ペア共有でプレミアム機能がすべて解放されます。
           </Text>
+
+          <View style={styles.perksBox}>
+            <View style={styles.perkRow}>
+              <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
+              <Text style={styles.perkText}>
+                <Text style={styles.perkBold}>未回答の過去日の相手回答を閲覧</Text>
+                ：自分が答え忘れた日でも、過去の相手の回答を履歴で見られます（※当日は双方回答まで秘密）
+              </Text>
+            </View>
+            <View style={styles.perkRow}>
+              <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
+              <Text style={styles.perkText}>
+                <Text style={styles.perkBold}>未回答日も含めた深層AI相性診断</Text>
+                ：双方の回答＋過去未回答日の相手回答をもとに、性格傾向やすれ違い予防策をAIが分析
+              </Text>
+            </View>
+            <View style={styles.perkRow}>
+              <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
+              <Text style={styles.perkText}>
+                <Text style={styles.perkBold}>片方の課金で2人とも利用可能</Text>
+                ：どちらかが加入すればパートナーにも自動適用されます
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.planSelector}>
             <TouchableOpacity
@@ -737,8 +771,32 @@ const styles = StyleSheet.create({
   subSubtitle: {
     fontSize: 12,
     color: COLORS.textMuted,
-    marginBottom: 14,
+    marginBottom: 12,
     lineHeight: 17,
+  },
+  perksBox: {
+    backgroundColor: '#FAF6EE',
+    borderRadius: 14,
+    padding: 12,
+    gap: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F0DEC0',
+  },
+  perkRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  perkText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.text,
+    lineHeight: 17,
+  },
+  perkBold: {
+    fontWeight: '800',
+    color: COLORS.text,
   },
   planSelector: {
     flexDirection: 'row',

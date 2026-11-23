@@ -276,7 +276,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       const pastMap = new Map<
         string,
-        { quiz_date: string; my_answer: SwipeDirection; partner_answer: SwipeDirection }
+        { quiz_date: string; my_answer: SwipeDirection | null; partner_answer: SwipeDirection | null }
       >();
       if (Array.isArray(pastRows)) {
         for (const r of pastRows) {
@@ -297,8 +297,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             repeatBadge: formatted.badge,
             pastHistory: {
               date: formatted.label,
-              myAnswer: past.my_answer,
-              partnerAnswer: past.partner_answer,
+              myAnswer: past.my_answer ?? undefined,
+              partnerAnswer: past.partner_answer ?? undefined,
             },
           } as Question;
         })
@@ -695,6 +695,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         return {
           quizDate: day.quiz_date,
+          isRevealed: day.is_revealed !== false,
+          isPremiumUnlocked: Boolean(day.is_premium_unlocked),
+          isLockedPastDay: Boolean(day.is_locked_past_day),
+          partnerAnsweredCount: Number(day.partner_answered_count ?? 0),
           items,
         };
       });

@@ -80,10 +80,11 @@ export default function HistoryScreen() {
                     <Text style={styles.timeBlockLabel}>{history.date} の回答</Text>
                     <View style={styles.answersRow}>
                       <Text style={styles.userAnswerText}>
-                        {myName}: 「{question.choices[history.myAnswer]}」
+                        {myName}: 「{history.myAnswer ? question.choices[history.myAnswer] : '未回答'}」
                       </Text>
                       <Text style={styles.userAnswerText}>
-                        {partnerName}: 「{question.choices[history.partnerAnswer]}」
+                        {partnerName}: 「
+                        {history.partnerAnswer ? question.choices[history.partnerAnswer] : '未回答'}」
                       </Text>
                     </View>
                   </View>
@@ -126,7 +127,25 @@ export default function HistoryScreen() {
       </View>
 
       {/* 過去の履歴タイムライン（Supabase 実データ） */}
-      <Text style={styles.sectionLabel}>過去の公開済みタイムライン</Text>
+      <Text style={styles.sectionLabel}>過去の履歴タイムライン</Text>
+
+      <TouchableOpacity
+        style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
+        activeOpacity={0.85}
+        onPress={() => router.push('/ai-report')}
+      >
+        <View style={styles.premiumGuideHeader}>
+          <View style={styles.premiumGuideTitleRow}>
+            <Ionicons name="diamond" size={14} color="#9E6B24" />
+            <Text style={styles.premiumGuideTitle}>未回答の過去日もプレミアムで閲覧OK</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
+        </View>
+        <Text style={styles.premiumGuideText}>
+          プレミアムプランに加入すると、自分が未回答だった過去日の相手の回答も見られるようになり、その回答を含めたAI相性診断も利用できます（※今日の回答は双方完了まで非公開）。
+        </Text>
+      </TouchableOpacity>
+
       {isHistoryLoading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator color={COLORS.primary} />
@@ -135,56 +154,103 @@ export default function HistoryScreen() {
       ) : historyDays.length === 0 ? (
         <View style={[styles.card, SHADOWS.cardSmall, styles.emptyCard]}>
           <Ionicons name="calendar-outline" size={28} color={COLORS.textLight} />
-          <Text style={styles.emptyTitle}>公開済みの履歴はまだありません</Text>
+          <Text style={styles.emptyTitle}>表示できる履歴はまだありません</Text>
           <Text style={styles.emptySub}>
-            二人とも回答を完了した日の記録がここに蓄積されます。
+            二人とも回答を完了した日の記録がここに蓄積されます。自分が未回答だった過去日の相手回答は、プレミアムプランで閲覧・AI診断に反映できます。
           </Text>
         </View>
       ) : (
         <View style={styles.list}>
           {historyDays.map((day) => {
-            const matchedCount = day.items.filter((i) => i.isMatched).length;
-            const total = day.items.length;
-            const rate = total > 0 ? Math.round((matchedCount / total) * 100) : 0;
+            if (day.isLockedPastDay) {
+              return (
+                <View key={day.quizDate} style={[styles.card, SHADOWS.cardSmall, styles.lockedPastCard]}>
+                  <View style={styles.dayHeader}>
+                    <Text style={styles.dayDate}>{formatDateHeading(day.quizDate)}</Text>
+                    <View style={styles.lockedBadge}>
+                      <Ionicons name="lock-closed" size={11} color="#9E6B24" />
+                      <Text style={styles.lockedBadgeText}>未回答の日</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.lockedDescText}>
+                    あなたは未回答ですが、{partnerName}さんが {day.partnerAnsweredCount}問 回答しています。
+                    プレミアムプランでは過去の未回答日の相手回答も閲覧でき、AI相性診断にも反映されます。
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.unlockCtaBtn}
+                    activeOpacity={0.85}
+                    onPress={() => router.push('/ai-report')}
+                  >
+                    <Ionicons name="diamond-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.unlockCtaBtnText}>
+                      プレミアムで過去の回答を見る ＆ AI診断に含める
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            const bothAnsweredItems = day.items.filter((i) => i.myAnswer && i.partnerAnswer);
+            const matchedCount = bothAnsweredItems.filter((i) => i.isMatched).length;
+            const totalBoth = bothAnsweredItems.length;
+            const rate = totalBoth > 0 ? Math.round((matchedCount / totalBoth) * 100) : 0;
 
             return (
               <View key={day.quizDate} style={[styles.card, SHADOWS.cardSmall]}>
                 <View style={styles.dayHeader}>
                   <Text style={styles.dayDate}>{formatDateHeading(day.quizDate)}</Text>
-                  <View style={styles.dayRateBadge}>
-                    <Text style={styles.dayRateText}>
-                      一致率 {rate}% ({matchedCount}/{total})
-                    </Text>
-                  </View>
+                  {day.isPremiumUnlocked ? (
+                    <View style={styles.premiumUnlockedBadge}>
+                      <Ionicons name="diamond" size={11} color="#8C5A1B" />
+                      <Text style={styles.premiumUnlockedBadgeText}>プレミアム解放（未回答の日）</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.dayRateBadge}>
+                      <Text style={styles.dayRateText}>
+                        一致率 {rate}% ({matchedCount}/{totalBoth})
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.dayItemsList}>
-                  {day.items.map((item) => (
-                    <View key={item.question.id} style={styles.dayItemRow}>
-                      <View style={styles.dayItemTop}>
-                        <Text style={styles.dayItemTitle}>{item.question.title}</Text>
-                        <Text
-                          style={[
-                            styles.dayItemMatchTag,
-                            { color: item.isMatched ? '#4A7C59' : '#C97A2B' },
-                          ]}
-                        >
-                          {item.isMatched ? '一致' : '不一致'}
+                  {day.items.map((item) => {
+                    const hasBoth = Boolean(item.myAnswer && item.partnerAnswer);
+                    return (
+                      <View key={item.question.id} style={styles.dayItemRow}>
+                        <View style={styles.dayItemTop}>
+                          <Text style={styles.dayItemTitle}>{item.question.title}</Text>
+                          <Text
+                            style={[
+                              styles.dayItemMatchTag,
+                              {
+                                color: !hasBoth
+                                  ? COLORS.textMuted
+                                  : item.isMatched
+                                    ? '#4A7C59'
+                                    : '#C97A2B',
+                              },
+                            ]}
+                          >
+                            {!hasBoth ? '片方回答' : item.isMatched ? '一致' : '不一致'}
+                          </Text>
+                        </View>
+                        <Text style={styles.userAnswerText}>
+                          {myName}: 「
+                          {item.myAnswer ? item.question.choices[item.myAnswer] : '未回答'}」
+                        </Text>
+                        <Text style={styles.userAnswerText}>
+                          {partnerName}: 「
+                          {item.partnerAnswer
+                            ? item.question.choices[item.partnerAnswer]
+                            : '未回答'}
+                          」
                         </Text>
                       </View>
-                      <Text style={styles.userAnswerText}>
-                        {myName}: 「
-                        {item.myAnswer ? item.question.choices[item.myAnswer] : '未回答'}」
-                      </Text>
-                      <Text style={styles.userAnswerText}>
-                        {partnerName}: 「
-                        {item.partnerAnswer
-                          ? item.question.choices[item.partnerAnswer]
-                          : '未回答'}
-                        」
-                      </Text>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               </View>
             );
@@ -233,6 +299,36 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     marginBottom: 10,
     marginTop: 4,
+  },
+  premiumGuideCard: {
+    backgroundColor: '#FFFBF3',
+    borderRadius: 14,
+    padding: 13,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#EED9B7',
+  },
+  premiumGuideHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  premiumGuideTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  premiumGuideTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#8C5A1B',
+  },
+  premiumGuideText: {
+    fontSize: 11.5,
+    color: '#7A5B32',
+    lineHeight: 17,
   },
   list: {
     gap: 14,
@@ -415,6 +511,61 @@ const styles = StyleSheet.create({
   dayItemMatchTag: {
     fontSize: 11,
     fontWeight: '800',
+  },
+  lockedPastCard: {
+    backgroundColor: '#FFFBF5',
+    borderColor: '#F0DEC0',
+  },
+  lockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FDF3E7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  lockedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9E6B24',
+  },
+  lockedDescText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  unlockCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  unlockCtaBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  premiumUnlockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FBF1DF',
+    borderWidth: 1,
+    borderColor: '#EBD3AA',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  premiumUnlockedBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#8C5A1B',
   },
   backButton: {
     flexDirection: 'row',
