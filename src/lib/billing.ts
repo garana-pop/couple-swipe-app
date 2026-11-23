@@ -264,6 +264,8 @@ function formatAiReportError(code: string): string {
       return '分析できる回答データがまだありません。今日の3問に答えるか、過去の回答データが揃うとお試しいただけます。';
     case 'DAILY_LIMIT_EXCEEDED':
       return '本日の AI 診断レポート生成回数の上限（1日3回）に達しました。明日になってから再度お試しください。';
+    case 'AI_OVERLOADED':
+      return '現在 AI サーバーが混み合っています。少し時間をおいてからもう一度お試しください。';
     case 'AI_PROVIDER_NOT_CONFIGURED':
       return 'サーバー側の AI API キー（GEMINI_API_KEY）がまだ設定されていません。';
     default:

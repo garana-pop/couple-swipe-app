@@ -9,9 +9,175 @@ const CORS_HEADERS = {
 
 const CACHE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 同データでの24時間以内の連続再生成を防止
 const DAILY_GENERATION_LIMIT = 3; // コスト安全策: 1ペアあたり1日最大3回まで
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
+const FALLBACK_GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_THINKING_BUDGET = 512;
 const GEMINI_MAX_OUTPUT_TOKENS = 2048;
+
+interface GeminiCallResult {
+  ok: boolean;
+  status: number;
+  rawText?: string;
+  modelUsed: string;
+  errorDetail?: string;
+}
+
+async function discoverFlashModel(
+  geminiApiKey: string,
+  exclude: Set<string>
+): Promise<string | null> {
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+      headers: { "x-goog-api-key": geminiApiKey },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
+    };
+    const candidates = (json.models ?? [])
+      .filter(
+        (m) =>
+          typeof m.name === "string" &&
+          Array.isArray(m.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes("generateContent")
+      )
+      .map((m) => m.name!.replace(/^models\//, ""))
+      .filter((id) => !exclude.has(id));
+
+    const flashModels = candidates.filter(
+      (id) =>
+        id.includes("flash") &&
+        !id.includes("tts") &&
+        !id.includes("image") &&
+        !id.includes("audio")
+    );
+    if (flashModels.length === 0) return candidates[0] ?? null;
+
+    // 安定版・コスト効率の良い Flash モデルを優先
+    const preferred =
+      flashModels.find((id) => id === FALLBACK_GEMINI_MODEL) ??
+      flashModels.find((id) => id === DEFAULT_GEMINI_MODEL) ??
+      flashModels.find((id) => id.includes("flash-lite") && !id.includes("exp")) ??
+      flashModels.find((id) => !id.includes("exp") && !id.includes("preview")) ??
+      flashModels[0];
+    return preferred ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function callGeminiOnce(
+  geminiApiKey: string,
+  model: string,
+  prompt: string,
+  thinkingMode: "budget" | "level" | "none"
+): Promise<{ status: number; ok: boolean; json: Record<string, unknown> }> {
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: "application/json",
+    temperature: 0.6,
+    maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
+  };
+  if (thinkingMode === "budget") {
+    generationConfig.thinkingConfig = { thinkingBudget: GEMINI_THINKING_BUDGET };
+  } else if (thinkingMode === "level") {
+    generationConfig.thinkingConfig = { thinkingLevel: "low" };
+  }
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { status: res.status, ok: res.ok, json };
+}
+
+async function invokeGeminiWithFallback(
+  geminiApiKey: string,
+  initialModel: string,
+  prompt: string
+): Promise<GeminiCallResult> {
+  let targetModel = initialModel.replace(/^models\//, "");
+  let thinkingMode: "budget" | "level" | "none" = targetModel.startsWith("gemini-3")
+    ? "level"
+    : "budget";
+  const failedModels = new Set<string>();
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const res = await callGeminiOnce(geminiApiKey, targetModel, prompt, thinkingMode);
+    if (res.ok) {
+      const candidates = res.json?.candidates as
+        | { content?: { parts?: { text?: string; thought?: boolean }[] } }[]
+        | undefined;
+      const parts = candidates?.[0]?.content?.parts ?? [];
+      const rawText = parts
+        .filter((p) => !p.thought)
+        .map((p) => p.text ?? "")
+        .join("")
+        .trim();
+      const resolvedModel =
+        typeof res.json?.modelVersion === "string" ? res.json.modelVersion : targetModel;
+      return { ok: true, status: 200, rawText, modelUsed: resolvedModel };
+    }
+
+    const errMsg = String(
+      (res.json?.error as { message?: string } | undefined)?.message ?? ""
+    );
+
+    // 400 (thinkingConfig パラメータ種別不一致など): 同一モデル内で budget -> level -> none へフォールバック
+    if (res.status === 400 && errMsg.toLowerCase().includes("thinking")) {
+      if (thinkingMode === "budget") {
+        thinkingMode = "level";
+        continue;
+      }
+      if (thinkingMode === "level") {
+        thinkingMode = "none";
+        continue;
+      }
+    }
+
+    // 404 / 503 (一時混雑) / 429 (レート制限): 別モデルへフェイルオーバー
+    if (res.status === 404 || res.status === 503 || res.status === 429) {
+      failedModels.add(targetModel);
+      if (res.status === 503) {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      let nextModel: string | null = null;
+      if (!failedModels.has(FALLBACK_GEMINI_MODEL)) {
+        nextModel = FALLBACK_GEMINI_MODEL;
+      } else if (!failedModels.has(DEFAULT_GEMINI_MODEL)) {
+        nextModel = DEFAULT_GEMINI_MODEL;
+      } else {
+        nextModel = await discoverFlashModel(geminiApiKey, failedModels);
+      }
+
+      if (nextModel) {
+        targetModel = nextModel;
+        thinkingMode = nextModel.startsWith("gemini-3") ? "level" : "budget";
+        continue;
+      }
+    }
+
+    return {
+      ok: false,
+      status: res.status,
+      modelUsed: targetModel,
+      errorDetail: errMsg.slice(0, 200),
+    };
+  }
+
+  return { ok: false, status: 502, modelUsed: targetModel, errorDetail: "Exhausted fallback attempts" };
+}
 
 interface QuestionMeta {
   category?: string;
@@ -467,37 +633,27 @@ ${summaryLines}
 }
 ※ riskPoints は 2〜3件にしてください。`;
 
-  const model = Deno.env.get("GEMINI_MODEL") || DEFAULT_GEMINI_MODEL;
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": geminiApiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.6,
-          maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
-          thinkingConfig: {
-            thinkingBudget: GEMINI_THINKING_BUDGET,
-          },
-        },
-      }),
-    }
-  );
+  const requestedModel = Deno.env.get("GEMINI_MODEL") || DEFAULT_GEMINI_MODEL;
+  const geminiResult = await invokeGeminiWithFallback(geminiApiKey, requestedModel, prompt);
 
-  if (!geminiRes.ok) {
-    return jsonResponse({ error: "AI_GENERATION_FAILED", status: geminiRes.status }, 502);
+  if (!geminiResult.ok) {
+    const isOverloaded = geminiResult.status === 503 || geminiResult.status === 429;
+    return jsonResponse(
+      {
+        error: isOverloaded ? "AI_OVERLOADED" : "AI_GENERATION_FAILED",
+        status: geminiResult.status,
+        model: geminiResult.modelUsed,
+        detail: geminiResult.errorDetail,
+      },
+      isOverloaded ? 503 : 502
+    );
   }
 
-  const geminiJson = (await geminiRes.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const rawText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const rawText = (geminiResult.rawText ?? "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const model = geminiResult.modelUsed;
 
   let parsedReport: Record<string, unknown>;
   try {
