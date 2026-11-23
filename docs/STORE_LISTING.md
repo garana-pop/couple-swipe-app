@@ -75,16 +75,22 @@ Kotaeai（コタエアイ）は、カップルや夫婦が1日3問・4方向ス�
 |---|---|---|
 | アプリアイコン | `512 × 512 px` PNG（透過なし・1MB 以下） | `store-assets/google-play/app-icon-512x512.png` |
 | フィーチャーグラフィック | `1024 × 500 px` PNG（透過なし） | `store-assets/google-play/feature-graphic-1024x500.png` |
+| スマートフォン用スクリーンショット（6 枚） | `1080 × 1920 px` PNG（透過なし・シンプル＆落ち着いたデザイン） | `store-assets/google-play/screenshots/01-home.png` 〜 `06-ai-report.png` |
 | アプリ内アプリアイコン一式 | `1024 × 1024 px`＋Adaptive 3層＋Splash | `assets/icon.png`・`assets/android-icon-*.png`・`assets/splash-icon.png` |
 
-### スマートフォン用スクリーンショット撮影ガイド（推奨 4〜6 枚）
-実機（縦 9:16〜9:20・1080×2400px 等）で以下の順にキャプチャすると、アプリの価値がひと目で伝わります：
-1. **ホーム画面（ペア連携済み）** — 「毎日3問が届く・連続ストリーク＆一致率」
-2. **4方向スワイプ画面（`quiz`）** — 「上下左右スワイプで直感回答」
-3. **待機ロック画面（`waiting`）** — 「お互いが答え終わるまで秘密！」
-4. **診断結果＆シェアカード画面（`result`）** — 「一致率と会話のきっかけを表示」
-5. **過去の回答比較＆カテゴリ別グラフ（`history`）** — 「カテゴリ別一致率＆過去比較」
-6. **AI 相性診断レポート（`ai-report`）** — 「性格タイプ＆すれ違い予防アドバイス（1人課金で2人共有）」
+### スクリーンショットの差し替え・再生成方法（テンプレート）
+1. 元画像を入れ替える場合は `store-assets/google-play/screenshots/raw/01-home.jpg` 〜 `06-ai-report.jpg` を差し替え、キャッチコピーを変えたい場合は `store-assets/google-play/screenshots/slides.json` を編集します。
+2. 以下のコマンドを実行すると `1080 × 1920 px` PNG 全 6 枚が一括再生成されます：
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/build-store-screenshots.ps1
+   ```
+3. 採用済み 6 枚の構成：
+   - `01-home.png` — ホーム画面（「1日3問、答え合わせ。」）
+   - `02-swipe.png` — 4方向スワイプ画面（「4方向スワイプで直感回答。」）
+   - `03-waiting.png` — 回答待機ロック画面（「揃うまで、答えは秘密。」）
+   - `04-result.png` — 診断結果・会話のきっかけ（「違いも、会話のきっかけに。」）
+   - `05-history.png` — 過去の回答比較＆カテゴリ別一致率（「ふたりの傾向を、静かに記録。」）
+   - `06-ai-report.png` — AI 相性レポート（「AIがふたりの相性を整理。」）
 
 ---
 

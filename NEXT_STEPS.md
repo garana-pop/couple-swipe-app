@@ -41,11 +41,11 @@ Android パッケージ名: `com.garanapop.coupleswipeapp`
 - [x] **UX・審査対応・ストア素材準備（完了）**
   - `expo-font`（必須ピア依存）・`expo-splash-screen` 導入済み（`npx expo-doctor` 全項目クリア）
   - オリジナル **Kotaeai** アプリアイコン一式差し替え済み（[assets/icon.png](./assets/icon.png)・Android Adaptive Icon 3層・[assets/splash-icon.png](./assets/splash-icon.png)・[assets/favicon.png](./assets/favicon.png)）
-  - Google Play ストア提出用グラフィック生成済み（[store-assets/google-play/app-icon-512x512.png](./store-assets/google-play/app-icon-512x512.png)・[store-assets/google-play/feature-graphic-1024x500.png](./store-assets/google-play/feature-graphic-1024x500.png)）
-  - Web 法的ページに **利用規約（[web-legal/terms.html](./web-legal/terms.html)）** を追加し、購入画面・設定画面・アカウント削除確認からリンク＆解約注意喚起を設置（`privacy.html`・`account-deletion.html` 公開確認済み、`main` へ push で `terms.html` も自動公開）
+  - Google Play ストア提出用グラフィック生成済み（[store-assets/google-play/app-icon-512x512.png](./store-assets/google-play/app-icon-512x512.png)・[store-assets/google-play/feature-graphic-1024x500.png](./store-assets/google-play/feature-graphic-1024x500.png)・スマートフォン用スクリーンショット 6 枚 [store-assets/google-play/screenshots/](./store-assets/google-play/screenshots/) ＋一括再生成テンプレート [scripts/build-store-screenshots.ps1](./scripts/build-store-screenshots.ps1)）
+  - Web 法的ページに **利用規約（[web-legal/terms.html](./web-legal/terms.html)）** を追加し、購入画面・設定画面・アカウント削除確認からリンク＆解約注意喚起を設置（`index.html`・`privacy.html`・`terms.html`・`account-deletion.html` すべて `200 OK` 公開確認済み）
   - Google Play ストア提出・定期購入・データセーフティ回答シート作成済み（[docs/STORE_LISTING.md](./docs/STORE_LISTING.md)）
   - 当日回答時の通信エラー保護・連続回答ストリーク・カテゴリ別一致率グラフ・AI 診断アーカイブ・一致率シェアカード実装済み
-- [x] EAS 環境変数登録（Supabase URL / Publishable Key）＆ Android プレビュー APK クラウドビルド成功
+- [x] EAS 環境変数登録（Supabase URL / Publishable Key）＆ 初回提出用 Android 本番 AAB（`versionCode: 2`）クラウドビルド実行済み
 
 ---
 
@@ -53,39 +53,28 @@ Android パッケージ名: `com.garanapop.coupleswipeapp`
 
 詳細なコピペ用文面・定期購入 ID・データセーフティ回答シートは [docs/STORE_LISTING.md](./docs/STORE_LISTING.md)・[docs/RELEASE_GUIDE.md](./docs/RELEASE_GUIDE.md) を参照してください。
 
-### A. GitHub へ push（`terms.html` の自動公開）＆ 最新 APK 再ビルド（任意・実機確認＆スクショ撮影用）
-- [ ] 今回の変更（アイコン・課金同期強化・利用規約）を `main` ブランチへ push し、`https://garana-pop.github.io/couple-swipe-app/terms.html` の公開を確認する
-- [ ] 実機での最終確認＆ストア用スクリーンショット（4〜6枚）撮影のため Android プレビュー APK を再ビルドする：
-  ```bash
-  npx eas-cli@latest build --platform android --profile preview
-  ```
-
-### B. Google Play 登録・初回 AAB アップロード・課金連携
-1. [ ] **Google Play デベロッパー登録**（初回登録料 $25・本人確認）
-2. [ ] **初回 本番 AAB ビルド ＆ クローズドテスト（または内部テスト）へアップロード**
-   ```bash
-   npx eas-cli@latest build --platform android --profile production
-   ```
-   ※ Google Play Console で定期購入を作成する前に、Billing 権限入りの AAB を1回アップロードしておく必要があります。
+### A. Google Play 本人確認 審査完了後の初回アップロード・課金連携
+1. [x] **Google Play デベロッパー登録（初回登録料 $25 支払済み・本人確認審査待ち）**
+2. [x] **初回提出用 本番 AAB ビルド（`versionCode: 2`）作成済み** → 審査通過後、EAS から `.aab` をダウンロードしてクローズドテスト（または内部テスト）へ初回アップロード
 3. [ ] **Google Play Console 定期購入商品の作成**（[docs/STORE_LISTING.md](./docs/STORE_LISTING.md#3-google-play-console-定期購入--revenuecat-設定シート)）
    - `couple_swipe_yearly`（基本プラン `yearly-base`・年額 **¥3,000**）
    - `couple_swipe_monthly`（基本プラン `monthly-base`・月額 **¥500**）
 4. [ ] **RevenueCat 連携＆秘密鍵登録**
    - RevenueCat にアプリ（`com.garanapop.coupleswipeapp`）と Entitlement `premium`／Offering `default`（`$rc_annual`・`$rc_monthly`）を設定
    - EAS 環境変数に `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` を登録し、本番 AAB を再ビルド
-   - Supabase Secrets に `REVENUECAT_WEBHOOK_AUTH_KEY` および `REVENUECAT_SECRET_API_KEY` を登録し、Webhook（`revenuecat-webhook`）のテスト送信で **`200 OK`** を確認
+   - Supabase Secrets に発行済みの `REVENUECAT_WEBHOOK_AUTH_KEY` および RevenueCat の `REVENUECAT_SECRET_API_KEY` を登録し、Webhook（`revenuecat-webhook`）のテスト送信で **`200 OK`** を確認
    - Google Play ライセンステストアカウントで実機テスト購入→即時解放→パートナー共有→復元を確認
 
-### C. 外部サービス設定（任意・運用強化）
+### B. 外部サービス設定（任意・運用強化）
 - [ ] **Google アカウント連携（機種変更引き継ぎ）を有効化する場合**
   - Supabase Auth の Manual Linking・Redirect URLs（`account-deletion.html` 含む）・Google Provider を設定（[docs/PHASE7_SETUP.md](./docs/PHASE7_SETUP.md)）
 - [ ] **GitHub Secrets 登録（まだの場合）**
   - `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY`（keepalive 用）、`SUPABASE_DB_URL` / `BACKUP_PASSPHRASE`（週次バックアップ用）
 
-### D. ストア掲載設定 ＆ 14日間クローズドテスト → 本番公開
+### C. ストア掲載設定 ＆ 14日間クローズドテスト → 本番公開
 - [ ] **ストア掲載情報・グラフィック登録**（[docs/STORE_LISTING.md](./docs/STORE_LISTING.md)）
   - ストア掲載名：`Kotaeai（コタエアイ）`・簡単な説明・詳しい説明を貼り付け
-  - `store-assets/google-play/app-icon-512x512.png`・`feature-graphic-1024x500.png`・実機スクリーンショット（4〜6枚）をアップロード
+  - `store-assets/google-play/app-icon-512x512.png`・`feature-graphic-1024x500.png`・`screenshots/01-home.png`〜`06-ai-report.png` をアップロード
 - [ ] **データセーフティ＆プライバシー／退会 URL 登録**
   - プライバシーポリシー：`https://garana-pop.github.io/couple-swipe-app/privacy.html`
   - アカウント削除：`https://garana-pop.github.io/couple-swipe-app/account-deletion.html`

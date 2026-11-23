@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    font-family: "Yu Gothic UI", "BIZ UDPGothic", "Hiragino Sans", "Meiryo UI", "Segoe UI", sans-serif;
+    background: #EFE9E1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    background: linear-gradient(180deg, #F3EEE7 0%, #EBE3D9 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 112px 72px 0;
+  }
+
+  /* 控えめな見出しエリア（余白重視・シンプルで落ち着いたトーン） */
+  .copy-block {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 62px;
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #96897F;
+    margin-bottom: 20px;
+  }
+  .title {
+    font-size: 56px;
+    font-weight: 800;
+    color: #2B2420;
+    line-height: 1.3;
+    letter-spacing: -0.5px;
+    margin-bottom: 18px;
+  }
+  .subtitle {
+    font-size: 26px;
+    font-weight: 500;
+    color: #70645B;
+    line-height: 1.5;
+    letter-spacing: 0.3px;
+  }
+
+  /* ミニマルなスマートフォンフレーム（マットチャコール・傾きなし） */
+  .phone-wrap {
+    position: relative;
+    width: 672px;
+    height: 1456px;
+    border-radius: 64px;
+    background: #262220;
+    padding: 14px;
+    box-shadow:
+      0 38px 88px rgba(43, 36, 32, 0.16),
+      0 10px 24px rgba(43, 36, 32, 0.09),
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.12);
+  }
+  .phone-screen {
+    position: relative;
+    width: 644px;
+    height: 1428px;
+    border-radius: 50px;
+    overflow: hidden;
+    background: #F7F0E8;
+  }
+
+  /* 実機スクショ本体（456x1024 -> 幅644pxへ鮮明スケール: 倍率 1.41228） */
+  .screen-img {
+    position: absolute;
+    left: 0;
+    top: -10px;
+    width: 644px;
+    height: 1446px;
+    display: block;
+    object-fit: cover;
+    object-position: top center;
+  }
+
+  /* 上部ステータスバー＆クリーンヘッダー（実機の通知アイコン・歯車オーバーレイを完全に置換） */
+  .clean-top-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 186px;
+    background: #F7F0E8;
+    z-index: 5;
+  }
+  .status-bar {
+    height: 68px;
+    padding: 20px 36px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #2B2420;
+  }
+  .status-time {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    font-family: "Segoe UI", sans-serif;
+  }
+  .status-icons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .app-header {
+    height: 92px;
+    padding: 10px 30px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .header-title {
+    font-size: 30px;
+    font-weight: 800;
+    color: #2D2522;
+    letter-spacing: 0.2px;
+  }
+  .back-arrow {
+    display: none;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+  }
+  .menu-icon {
+    display: none;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+  }
+  .quiz-progress-wrap {
+    display: none;
+    padding: 10px 30px 0;
+  }
+  .quiz-progress-track {
+    width: 100%;
+    height: 9px;
+    border-radius: 999px;
+    background: #E8DDD2;
+    overflow: hidden;
+  }
+  .quiz-progress-fill {
+    width: 33.3%;
+    height: 100%;
+    border-radius: 999px;
+    background: #E06D53;
+  }
+
+  /* 下部ジェスチャーバーを上品に統一 */
+  .bottom-fade {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 36px;
+    background: #F7F0E8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+  }
+  .gesture-pill {
+    width: 190px;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(45, 37, 34, 0.22);
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="copy-block">
+      <div class="eyebrow" id="eyebrow">Kotaeai  /  01</div>
+      <div class="title" id="title">1日3問、答え合わせ。</div>
+      <div class="subtitle" id="subtitle">ふだん聞けない価値観を、毎日少しずつ</div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone-screen">
+        <img class="screen-img" id="screen-img" src="" alt="Screenshot" />
+
+        <div class="clean-top-overlay" id="top-overlay">
+          <div class="status-bar">
+            <span class="status-time">9:41</span>
+            <div class="status-icons">
+              <!-- Signal bars -->
+              <svg width="24" height="16" viewBox="0 0 24 16" fill="#2B2420">
+                <rect x="0" y="10" width="4" height="6" rx="1" />
+                <rect x="6" y="7" width="4" height="9" rx="1" />
+                <rect x="12" y="4" width="4" height="12" rx="1" />
+                <rect x="18" y="0" width="4" height="16" rx="1" />
+              </svg>
+              <!-- Wi-Fi -->
+              <svg width="22" height="16" viewBox="0 0 24 18" fill="none" stroke="#2B2420" stroke-width="2.3" stroke-linecap="round">
+                <path d="M2 6C7.5 1 16.5 1 22 6" />
+                <path d="M6 10.5C9.5 7.2 14.5 7.2 18 10.5" />
+                <circle cx="12" cy="15" r="1.7" fill="#2B2420" stroke="none" />
+              </svg>
+              <!-- Battery -->
+              <svg width="34" height="16" viewBox="0 0 34 16" fill="none">
+                <rect x="1" y="1.5" width="28" height="13" rx="3.5" stroke="#2B2420" stroke-width="1.8" />
+                <rect x="3.5" y="4" width="21" height="8" rx="1.8" fill="#2B2420" />
+                <rect x="30.5" y="5" width="2.5" height="6" rx="1" fill="#2B2420" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="app-header">
+            <div class="header-left">
+              <div class="back-arrow" id="back-arrow">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2D2522" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5" />
+                  <path d="M12 19l-7-7 7-7" />
+                </svg>
+              </div>
+              <div class="header-title" id="header-title">Kotaeai</div>
+            </div>
+            <div class="menu-icon" id="menu-icon">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2D2522" stroke-width="2.1" stroke-linecap="round">
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="quiz-progress-wrap" id="quiz-progress">
+            <div class="quiz-progress-track">
+              <div class="quiz-progress-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-fade">
+          <div class="gesture-pill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

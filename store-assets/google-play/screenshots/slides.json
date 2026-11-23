@@ -1,0 +1,80 @@
+[
+  {
+    "output": "01-home.png",
+    "raw": "01-home.jpg",
+    "eyebrow": "Kotaeai  /  01",
+    "title": "1日3問、答え合わせ。",
+    "subtitle": "ふだん聞けない価値観を、毎日少しずつ",
+    "headerTitle": "Kotaeai",
+    "showBackArrow": false,
+    "showMenuIcon": true,
+    "showQuizProgress": false,
+    "cleanGear": true,
+    "mirrorTopCard": true
+  },
+  {
+    "output": "02-swipe.png",
+    "raw": "02-swipe.jpg",
+    "eyebrow": "02  /  SWIPE",
+    "title": "4方向スワイプで直感回答。",
+    "subtitle": "上下左右に動かすだけ、30秒で完了",
+    "headerTitle": "今日の質問",
+    "showBackArrow": true,
+    "showMenuIcon": false,
+    "showQuizProgress": true,
+    "cleanGear": true,
+    "mirrorTopCard": false
+  },
+  {
+    "output": "03-waiting.png",
+    "raw": "03-waiting.jpg",
+    "eyebrow": "03  /  LOCK",
+    "title": "揃うまで、答えは秘密。",
+    "subtitle": "お互いが回答を終えて初めて結果がひらく",
+    "headerTitle": "回答待機中",
+    "showBackArrow": false,
+    "showMenuIcon": false,
+    "showQuizProgress": false,
+    "cleanGear": true,
+    "mirrorTopCard": false
+  },
+  {
+    "output": "04-result.png",
+    "raw": "04-result.jpg",
+    "eyebrow": "04  /  RESULT",
+    "title": "違いも、会話のきっかけに。",
+    "subtitle": "一致率とそれぞれの回答を並べて比較",
+    "headerTitle": "診断結果",
+    "showBackArrow": true,
+    "showMenuIcon": false,
+    "showQuizProgress": false,
+    "cleanGear": true,
+    "mirrorTopCard": true
+  },
+  {
+    "output": "05-history.png",
+    "raw": "05-history.jpg",
+    "eyebrow": "05  /  HISTORY",
+    "title": "ふたりの傾向を、静かに記録。",
+    "subtitle": "カテゴリ別一致率や過去の変化を振り返る",
+    "headerTitle": "過去の回答比較",
+    "showBackArrow": true,
+    "showMenuIcon": false,
+    "showQuizProgress": false,
+    "cleanGear": true,
+    "mirrorTopCard": false
+  },
+  {
+    "output": "06-ai-report.png",
+    "raw": "06-ai-report.jpg",
+    "eyebrow": "06  /  AI ANALYSIS",
+    "title": "AIがふたりの相性を整理。",
+    "subtitle": "回答の傾向から、すれ違い予防のヒントを提案",
+    "headerTitle": "AI相性レポート",
+    "showBackArrow": true,
+    "showMenuIcon": false,
+    "showQuizProgress": false,
+    "cleanGear": true,
+    "mirrorTopCard": true
+  }
+]
