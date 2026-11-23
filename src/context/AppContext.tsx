@@ -13,6 +13,7 @@ import {
   evaluateMatch,
 } from '../constants/questions';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { resetBillingSession } from '../lib/billing';
 import { syncExtraQuestions } from '../lib/extraQuestions';
 import {
   AccountAuthInfo,
@@ -961,6 +962,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return { ok: false, error: 'アカウント削除に失敗しました。' };
       }
       await supabase.auth.signOut();
+      await resetBillingSession();
       setHasPair(false);
       setIsPairConnected(false);
       setPairId(null);

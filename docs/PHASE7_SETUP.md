@@ -21,7 +21,7 @@
 
 ### 1-2. Google Cloud Console で OAuth クライアント ID を作成
 1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成（または既存を選択）
-2. **API とサービス > OAuth 同意画面** を構成（外部・アプリ名「ふたりスワイプ」）
+2. **API とサービス > OAuth 同意画面** を構成（外部・アプリ名「Kotaeai」）
 3. **認証情報 > 認証情報を作成 > OAuth クライアント ID** → 種類は **ウェブ アプリケーション**
 4. **承認済みのリダイレクト URI** に次を登録：
    ```text

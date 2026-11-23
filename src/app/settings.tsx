@@ -282,7 +282,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.cardHeaderTexts}>
             <Text style={styles.cardTitle}>パートナーの回答通知</Text>
-            <Text style={styles.cardSubtitle}>Expo Push ＋ Supabase Edge Function</Text>
+            <Text style={styles.cardSubtitle}>回答完了をリアルタイムでお知らせ</Text>
           </View>
         </View>
 
@@ -324,7 +324,7 @@ export default function SettingsScreen() {
             </View>
             <View style={styles.cardHeaderTexts}>
               <Text style={styles.cardTitle}>アカウント保護・機種変更</Text>
-              <Text style={styles.cardSubtitle}>Google アカウント連携（linkIdentity）</Text>
+              <Text style={styles.cardSubtitle}>Google アカウント連携でデータを保護</Text>
             </View>
           </View>
           <View
@@ -419,6 +419,18 @@ export default function SettingsScreen() {
             <View style={styles.legalRowLeft}>
               <Ionicons name="shield-outline" size={17} color={COLORS.primaryDark} />
               <Text style={styles.legalRowText}>プライバシーポリシー</Text>
+            </View>
+            <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.legalRow}
+            activeOpacity={0.75}
+            onPress={() => void openExternalLink(LEGAL_URLS.termsOfService, '利用規約')}
+          >
+            <View style={styles.legalRowLeft}>
+              <Ionicons name="reader-outline" size={17} color={COLORS.primaryDark} />
+              <Text style={styles.legalRowText}>利用規約</Text>
             </View>
             <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
           </TouchableOpacity>

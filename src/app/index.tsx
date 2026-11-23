@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../context/AppContext';
@@ -118,7 +119,7 @@ export default function HomeScreen() {
   const handleDeleteAccount = () => {
     showConfirm(
       'アカウントとデータを削除',
-      'あなたの回答データ・プロフィール・ペア情報がすべて削除されます。この操作は取り消せません。',
+      'あなたの回答データ・プロフィール・ペア情報がすべて削除されます。この操作は取り消せません。\n\n※有料プランをご契約中の場合、アカウント削除だけでは自動更新は停止されません。Google Play の「定期購入」から解約手続きを行ってください。',
       '削除する',
       async () => {
         setIsMenuOpen(false);
@@ -666,7 +667,9 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.drawerFooter}>
-              <Text style={styles.drawerVersionText}>Kotaeai v1.0.0</Text>
+              <Text style={styles.drawerVersionText}>
+                Kotaeai v{Constants.expoConfig?.version ?? '1.0.0'}
+              </Text>
             </View>
           </View>
         </View>

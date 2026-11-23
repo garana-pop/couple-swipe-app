@@ -11,6 +11,8 @@ import { supabase } from './supabase';
 export interface BillingOfferingPrices {
   isStoreReady: boolean;
   yearlyPriceLabel: string;
+  yearlyPerMonthLabel: string;
+  yearlyDiscountBadge: string;
   monthlyPriceLabel: string;
   unavailableReason?: string;
 }
@@ -20,13 +22,22 @@ interface RcPackage {
   packageType?: string;
   product?: {
     identifier?: string;
+    price?: number;
     priceString?: string;
+    currencyCode?: string;
+  };
+}
+
+interface RcCustomerInfo {
+  entitlements?: {
+    active?: Record<string, unknown>;
   };
 }
 
 interface RcModule {
   configure: (config: { apiKey: string; appUserID?: string | null }) => void;
   logIn: (appUserID: string) => Promise<unknown>;
+  logOut?: () => Promise<unknown>;
   getOfferings: () => Promise<{
     current?: {
       annual?: RcPackage | null;
@@ -34,8 +45,8 @@ interface RcModule {
       availablePackages?: RcPackage[];
     } | null;
   }>;
-  purchasePackage: (pkg: RcPackage) => Promise<unknown>;
-  restorePurchases: () => Promise<unknown>;
+  purchasePackage: (pkg: RcPackage) => Promise<{ customerInfo?: RcCustomerInfo } | unknown>;
+  restorePurchases: () => Promise<RcCustomerInfo | unknown>;
 }
 
 let configuredUserId: string | null = null;
@@ -65,14 +76,14 @@ function getNativePurchasesModule(): {
   if (Constants.executionEnvironment === 'storeClient') {
     return {
       rc: null,
-      unavailableReason: 'Expo Go ではアプリ内課金を利用できません（EAS ビルド版で有効になります）。',
+      unavailableReason: 'テスト環境ではアプリ内課金を利用できません。ストア配信版アプリからご購入ください。',
     };
   }
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
     return {
       rc: null,
-      unavailableReason: 'RevenueCat の公開 API キーが未設定です（docs/RELEASE_GUIDE.md を参照してください）。',
+      unavailableReason: '現在ストア課金の準備中です。公開までしばらくお待ちください。',
     };
   }
 
@@ -82,15 +93,60 @@ function getNativePurchasesModule(): {
     const mod = require('react-native-purchases');
     const rc = (mod?.default ?? mod) as RcModule;
     if (!rc || typeof rc.configure !== 'function') {
-      return { rc: null, unavailableReason: '課金モジュールを読み込めませんでした。' };
+      return { rc: null, unavailableReason: '課金機能を読み込めませんでした。アプリを再起動してお試しください。' };
     }
     return { rc };
   } catch {
     return {
       rc: null,
-      unavailableReason: 'このビルドには課金モジュールが含まれていません（EAS 開発ビルドで有効化されます）。',
+      unavailableReason: '現在のビルドではアプリ内課金を利用できません。ストア配信版アプリをご利用ください。',
     };
   }
+}
+
+function hasAnyActiveEntitlement(info: unknown): boolean {
+  if (!info || typeof info !== 'object') return false;
+  const ci = info as RcCustomerInfo;
+  const active = ci.entitlements?.active;
+  if (!active || typeof active !== 'object') return false;
+  return Boolean(active.premium) || Object.keys(active).length > 0;
+}
+
+function formatYearlyMeta(
+  annualPkg: RcPackage | null,
+  monthlyPkg: RcPackage | null
+): { perMonthLabel: string; discountBadge: string } {
+  const annualPrice = annualPkg?.product?.price;
+  const monthlyPrice = monthlyPkg?.product?.price;
+  const currency = annualPkg?.product?.currencyCode ?? 'JPY';
+
+  let perMonthLabel = '月250円相当・2人共有';
+  if (typeof annualPrice === 'number' && annualPrice > 0) {
+    const monthlyEq = Math.round(annualPrice / 12);
+    if (currency === 'JPY') {
+      perMonthLabel = `月¥${monthlyEq.toLocaleString('ja-JP')}相当・2人共有`;
+    } else {
+      perMonthLabel = `月あたり ${(annualPrice / 12).toFixed(2)} ${currency}・2人共有`;
+    }
+  }
+
+  let discountBadge = '月額比 50% OFF';
+  if (
+    typeof annualPrice === 'number' &&
+    typeof monthlyPrice === 'number' &&
+    annualPrice > 0 &&
+    monthlyPrice > 0
+  ) {
+    const yearlyAtMonthly = monthlyPrice * 12;
+    const discountPct = Math.round((1 - annualPrice / yearlyAtMonthly) * 100);
+    if (discountPct >= 5 && discountPct < 100) {
+      discountBadge = `月額比 ${discountPct}% OFF`;
+    } else {
+      discountBadge = 'おすすめ年額';
+    }
+  }
+
+  return { perMonthLabel, discountBadge };
 }
 
 /**
@@ -100,6 +156,8 @@ export async function initializeBilling(userId: string): Promise<BillingOffering
   const fallback: BillingOfferingPrices = {
     isStoreReady: false,
     yearlyPriceLabel: '¥3,000 / 年',
+    yearlyPerMonthLabel: '月250円相当・2人共有',
+    yearlyDiscountBadge: '月額比 50% OFF',
     monthlyPriceLabel: '¥500 / 月',
   };
 
@@ -122,25 +180,33 @@ export async function initializeBilling(userId: string): Promise<BillingOffering
     const current = offerings?.current;
     cachedAnnualPkg =
       current?.annual ??
-      current?.availablePackages?.find((p) => p.packageType === 'ANNUAL') ??
+      current?.availablePackages?.find(
+        (p) => p.packageType === 'ANNUAL' || p.identifier === '$rc_annual'
+      ) ??
       null;
     cachedMonthlyPkg =
       current?.monthly ??
-      current?.availablePackages?.find((p) => p.packageType === 'MONTHLY') ??
+      current?.availablePackages?.find(
+        (p) => p.packageType === 'MONTHLY' || p.identifier === '$rc_monthly'
+      ) ??
       null;
+
+    const { perMonthLabel, discountBadge } = formatYearlyMeta(cachedAnnualPkg, cachedMonthlyPkg);
 
     return {
       isStoreReady: Boolean(cachedAnnualPkg || cachedMonthlyPkg),
       yearlyPriceLabel: cachedAnnualPkg?.product?.priceString
         ? `${cachedAnnualPkg.product.priceString} / 年`
         : fallback.yearlyPriceLabel,
+      yearlyPerMonthLabel: perMonthLabel,
+      yearlyDiscountBadge: discountBadge,
       monthlyPriceLabel: cachedMonthlyPkg?.product?.priceString
         ? `${cachedMonthlyPkg.product.priceString} / 月`
         : fallback.monthlyPriceLabel,
       unavailableReason:
         cachedAnnualPkg || cachedMonthlyPkg
           ? undefined
-          : 'ストアの商品情報（Offering）がまだ公開されていません。',
+          : 'ストアの商品情報を取得できませんでした。通信環境を確認のうえ再度お試しください。',
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -151,9 +217,26 @@ export async function initializeBilling(userId: string): Promise<BillingOffering
   }
 }
 
+/**
+ * アカウント削除・切替時に RevenueCat セッション状態をリセット
+ */
+export async function resetBillingSession(): Promise<void> {
+  configuredUserId = null;
+  cachedAnnualPkg = null;
+  cachedMonthlyPkg = null;
+  const { rc } = getNativePurchasesModule();
+  if (rc && typeof rc.logOut === 'function') {
+    try {
+      await rc.logOut();
+    } catch {
+      // 匿名状態などで logOut が不要な場合は無視
+    }
+  }
+}
+
 export async function purchaseSubscriptionPlan(
   plan: 'monthly' | 'yearly'
-): Promise<{ ok: boolean; cancelled?: boolean; error?: string }> {
+): Promise<{ ok: boolean; hasActiveEntitlement?: boolean; cancelled?: boolean; error?: string }> {
   const { rc, unavailableReason } = getNativePurchasesModule();
   if (!rc) {
     return { ok: false, error: unavailableReason ?? '現在この環境では購入できません。' };
@@ -168,11 +251,14 @@ export async function purchaseSubscriptionPlan(
   }
 
   try {
-    await rc.purchasePackage(pkg);
-    return { ok: true };
+    const result = (await rc.purchasePackage(pkg)) as { customerInfo?: RcCustomerInfo } | undefined;
+    return {
+      ok: true,
+      hasActiveEntitlement: hasAnyActiveEntitlement(result?.customerInfo),
+    };
   } catch (err) {
-    const rcErr = err as { userCancelled?: boolean; message?: string };
-    if (rcErr?.userCancelled) {
+    const rcErr = err as { userCancelled?: boolean; code?: string; message?: string };
+    if (rcErr?.userCancelled || rcErr?.code === '1') {
       return { ok: false, cancelled: true };
     }
     return {
@@ -182,18 +268,76 @@ export async function purchaseSubscriptionPlan(
   }
 }
 
-export async function restoreSubscriptionPurchases(): Promise<{ ok: boolean; error?: string }> {
+export async function restoreSubscriptionPurchases(): Promise<{
+  ok: boolean;
+  hasActiveEntitlement?: boolean;
+  error?: string;
+}> {
   const { rc, unavailableReason } = getNativePurchasesModule();
   if (!rc) {
     return { ok: false, error: unavailableReason ?? '現在この環境では復元できません。' };
   }
   try {
-    await rc.restorePurchases();
-    return { ok: true };
+    const customerInfo = await rc.restorePurchases();
+    return {
+      ok: true,
+      hasActiveEntitlement: hasAnyActiveEntitlement(customerInfo),
+    };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `購入の復元に失敗しました（${detail}）。` };
   }
+}
+
+/**
+ * 購入直後・復元直後に Supabase Edge Function（sync-subscription）を呼び出し、
+ * Webhook 到着前でも即座に DB（user_subscriptions）へ最新課金状態を反映する
+ */
+export async function syncSubscriptionWithServer(): Promise<{
+  ok: boolean;
+  synced: boolean;
+  isPremium?: boolean;
+}> {
+  if (!supabase) return { ok: false, synced: false };
+  try {
+    const { data, error } = await supabase.functions.invoke('sync-subscription');
+    if (error || !data || typeof data !== 'object') {
+      return { ok: false, synced: false };
+    }
+    const payload = data as { ok?: boolean; synced?: boolean; isPremium?: boolean };
+    return {
+      ok: Boolean(payload.ok),
+      synced: Boolean(payload.synced),
+      isPremium: typeof payload.isPremium === 'boolean' ? payload.isPremium : undefined,
+    };
+  } catch {
+    return { ok: false, synced: false };
+  }
+}
+
+/**
+ * サーバー側同期を実行し、Webhook 遅延がある場合も数秒リトライして最新の PairEntitlement を取得する
+ */
+export async function syncAndFetchPairEntitlement(
+  expectPremium = false
+): Promise<PairEntitlement | null> {
+  await syncSubscriptionWithServer();
+  let ent = await fetchPairEntitlement();
+  if (!expectPremium || ent?.isPremium) {
+    return ent;
+  }
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    if (attempt === 1) {
+      await syncSubscriptionWithServer();
+    }
+    ent = await fetchPairEntitlement();
+    if (ent?.isPremium) {
+      return ent;
+    }
+  }
+  return ent;
 }
 
 function parseReportRecord(raw: unknown): PairAiReportRecord | null {
@@ -300,7 +444,7 @@ function formatAiReportError(code: string): string {
     case 'AI_OVERLOADED':
       return '現在 AI サーバーが混み合っています。少し時間をおいてからもう一度お試しください。';
     case 'AI_PROVIDER_NOT_CONFIGURED':
-      return 'サーバー側の AI API キー（GEMINI_API_KEY）がまだ設定されていません。';
+      return '現在 AI 診断機能をメンテナンス中です。しばらくしてからお試しください。';
     default:
       return 'AI 相性レポートの生成に失敗しました。しばらくしてからもう一度お試しください。';
   }
@@ -319,7 +463,7 @@ export async function generateServerAiReport(
   error?: string;
 }> {
   if (!supabase) {
-    return { ok: false, error: 'Supabase が未設定です。' };
+    return { ok: false, error: 'サーバーに接続されていません。' };
   }
 
   const questionCatalog: Record<

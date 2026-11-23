@@ -7,6 +7,7 @@ export const APP_SHORT_NAME = 'Kotaeai';
 
 export const LEGAL_URLS = {
   privacyPolicy: 'https://garana-pop.github.io/couple-swipe-app/privacy.html',
+  termsOfService: 'https://garana-pop.github.io/couple-swipe-app/terms.html',
   accountDeletion: 'https://garana-pop.github.io/couple-swipe-app/account-deletion.html',
   googlePlaySubscriptions: 'https://play.google.com/store/account/subscriptions',
 } as const;

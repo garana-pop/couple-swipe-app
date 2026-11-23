@@ -1,4 +1,4 @@
-# 運用・コスト管理ガイド（ふたりスワイプ）
+# 運用・コスト管理ガイド（Kotaeai）
 
 最終更新: 2026-11-22  
 対象 Supabase プロジェクト: `couple-swipe-app` (`zfnbyxntyxgmoebvvifu` / 東京リージョン `ap-northeast-1`)

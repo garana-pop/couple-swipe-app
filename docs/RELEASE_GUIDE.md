@@ -55,9 +55,9 @@ AI 相性レポート生成（Edge Function: `generate-ai-report`）は **サー
    - Google Play アプリ（`com.garanapop.coupleswipeapp`）を登録し、サービスアカウントを接続
    - Entitlement `premium` を作成し、Offering `default` に `$rc_annual`（年額）と `$rc_monthly`（月額）を紐づけ
    - **API Keys** から **Google (Public) API Key**（`goog_...`）をコピー → 上記セクション1の `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` へ設定
-3. **RevenueCat Webhook を Supabase Edge Function に接続（ペア共有課金の要）**
+3. **RevenueCat Webhook ＆ 即時同期を Supabase Edge Function に接続（ペア共有課金の要）**
    - 任意の強力なランダム文字列を1つ生成し、Supabase の [Edge Functions > Secrets](https://supabase.com/dashboard/project/zfnbyxntyxgmoebvvifu/functions/secrets) に `REVENUECAT_WEBHOOK_AUTH_KEY` として登録
-   - （推奨・購入直後の即時反映用）RevenueCat の **Secret API Key (V1)** を `REVENUECAT_SECRET_API_KEY` として登録
+   - **強く推奨（購入・復元直後の即時反映 ＆ `TRANSFER` 同期用）**: RevenueCat の **Secret API Key (V1)** を `REVENUECAT_SECRET_API_KEY` として登録（`sync-subscription`・`revenuecat-webhook`・`generate-ai-report` が自動で参照します）
    - RevenueCat ダッシュボードの **Integrations > Webhooks > Add new configuration** で以下を設定：
      - **Webhook URL**: `https://zfnbyxntyxgmoebvvifu.supabase.co/functions/v1/revenuecat-webhook`
      - **Authorization header value**: `Bearer <REVENUECAT_WEBHOOK_AUTH_KEY と同じ値>`
@@ -73,6 +73,7 @@ Google Play 審査では、アプリ外の公開 URL（プライバシーポリ�
 2. GitHub リポジトリの **Settings > Pages > Build and deployment > Source** を **GitHub Actions** に変更
 3. `.github/workflows/deploy-legal-pages.yml` が自動実行され、以下が公開されます：
    - プライバシーポリシー: `https://garana-pop.github.io/couple-swipe-app/privacy.html`
+   - 利用規約: `https://garana-pop.github.io/couple-swipe-app/terms.html`
    - アカウント削除ページ: `https://garana-pop.github.io/couple-swipe-app/account-deletion.html`
 4. Supabase の [Authentication > URL Configuration > Redirect URLs](https://supabase.com/dashboard/project/zfnbyxntyxgmoebvvifu/auth/url-configuration) に `https://garana-pop.github.io/couple-swipe-app/account-deletion.html` を追加（Web 退会ページの Google ログイン即時削除が有効になります）
 
@@ -80,12 +81,14 @@ Google Play 審査では、アプリ外の公開 URL（プライバシーポリ�
 
 ## 5. Google Play デベロッパー登録・ストア素材・14日間クローズドテスト
 
+詳細なコピペ用ストア説明文・データセーフティ回答シート・定期購入 ID・クローズドテスト手順は [docs/STORE_LISTING.md](./STORE_LISTING.md) を参照してください。
+
 ### ストア提出チェックリスト
 - [ ] Google Play Console デベロッパー登録（初回登録料 $25）
-- [ ] アプリアイコン（`512x512 px` PNG・透過なし）
-- [ ] フィーチャーグラフィック（`1024x500 px` PNG / JPEG）
+- [x] アプリアイコン（`store-assets/google-play/app-icon-512x512.png`・`512x512 px` PNG・透過なし）
+- [x] フィーチャーグラフィック（`store-assets/google-play/feature-graphic-1024x500.png`・`1024x500 px` PNG）
 - [ ] スマートフォン用スクリーンショット（最低2枚、推奨4〜6枚：ホーム / 4択スワイプ / 待機ロック / 結果一致率 / 履歴比較 / AIレポート）
-- [ ] **データセーフティ** 申告（匿名ID・任意のメールアドレス・回答履歴・通知トークン・購入履歴／アカウント削除 URL として上記 `account-deletion.html` を登録）
+- [ ] **データセーフティ** 申告（[docs/STORE_LISTING.md](./STORE_LISTING.md) の回答シート参照／アカウント削除 URL として上記 `account-deletion.html` を登録）
 - [ ] プライバシーポリシー URL として上記 `privacy.html` を登録
 - [ ] **クローズドテスト（個人アカウント必須要件）**：
   - 本番用 AAB（`npx eas-cli@latest build --profile production --platform android`）をクローズドテストトラックへアップロード

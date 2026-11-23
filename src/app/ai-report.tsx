@@ -21,8 +21,16 @@ import {
   initializeBilling,
   purchaseSubscriptionPlan,
   restoreSubscriptionPurchases,
+  syncAndFetchPairEntitlement,
 } from '../lib/billing';
 import type { AiReportData, PairAiReportRecord, PairEntitlement } from '../types';
+
+function formatPlanName(productId: string | null | undefined): string {
+  const raw = (productId ?? '').toLowerCase();
+  if (raw.includes('year') || raw.includes('annual')) return '年額プラン';
+  if (raw.includes('month')) return '月額プラン';
+  return 'ふたりプレミアムプラン';
+}
 
 const SAMPLE_REPORT: AiReportData = {
   overallScore: 84,
@@ -75,6 +83,7 @@ export default function AiReportScreen() {
     partnerName,
     myName,
     getQuestionsById,
+    fetchHistory,
   } = useApp();
 
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
@@ -85,17 +94,16 @@ export default function AiReportScreen() {
   const [offering, setOffering] = useState<BillingOfferingPrices>({
     isStoreReady: false,
     yearlyPriceLabel: '¥3,000 / 年',
+    yearlyPerMonthLabel: '月250円相当・2人共有',
+    yearlyDiscountBadge: '月額比 50% OFF',
     monthlyPriceLabel: '¥500 / 月',
   });
   const [generating, setGenerating] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
 
-  const refreshEntitlementAndBilling = useCallback(async () => {
-    const [ent, offer] = await Promise.all([
-      isSupabaseReady ? fetchPairEntitlement() : Promise.resolve(null),
-      userId ? initializeBilling(userId) : Promise.resolve(null),
-    ]);
-    if (ent) {
+  const applyEntitlement = useCallback(
+    async (ent: PairEntitlement | null) => {
+      if (!ent) return;
       setEntitlement(ent);
       if (ent.isPremium && pairId) {
         const hist = await fetchPairAiReportHistory(pairId, 20);
@@ -115,11 +123,20 @@ export default function AiReportScreen() {
         setReportHistory(ent.latestReport ? [ent.latestReport] : []);
         setSelectedReportId(ent.latestReport?.id ?? null);
       }
-    }
+    },
+    [pairId]
+  );
+
+  const refreshEntitlementAndBilling = useCallback(async () => {
+    const [ent, offer] = await Promise.all([
+      isSupabaseReady ? fetchPairEntitlement() : Promise.resolve(null),
+      userId ? initializeBilling(userId) : Promise.resolve(null),
+    ]);
+    await applyEntitlement(ent);
     if (offer) {
       setOffering(offer);
     }
-  }, [isSupabaseReady, userId, pairId]);
+  }, [isSupabaseReady, userId, applyEntitlement]);
 
   useEffect(() => {
     let active = true;
@@ -185,9 +202,9 @@ export default function AiReportScreen() {
   const handleSubscribe = async () => {
     if (!offering.isStoreReady) {
       showAlert(
-        'ストア課金の準備について',
+        'ストア課金について',
         offering.unavailableReason ??
-          'Google Play 課金（RevenueCat）は EAS ビルド版のアプリで利用できます。'
+          '現在ストア課金の準備中です。公開までしばらくお待ちください。'
       );
       return;
     }
@@ -201,12 +218,21 @@ export default function AiReportScreen() {
         return;
       }
 
-      // サーバー側で課金状態を同期（Webhook 到着前でも generate-ai-report / get_pair_entitlement で反映）
-      await refreshEntitlementAndBilling();
-      showAlert(
-        'ご加入ありがとうございます！',
-        `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。AI相性診断と、過去の未回答質問への回答・相手の結果閲覧が解放されています。`
-      );
+      // サーバー側で即時同期（sync-subscription ＋ Webhook 到着待ちリトライ）
+      const syncedEnt = await syncAndFetchPairEntitlement(true);
+      await applyEntitlement(syncedEnt);
+      if (syncedEnt?.isPremium) {
+        void fetchHistory();
+        showAlert(
+          'ご加入ありがとうございます！',
+          `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。AI相性診断と、過去の未回答質問への回答・相手の結果閲覧が解放されています。`
+        );
+      } else {
+        showAlert(
+          'ご購入ありがとうございます',
+          '決済が完了しました。ご契約状態の反映に数秒かかる場合があります。画面を切り替えても反映されない場合は「以前の購入を復元する」をお試しください。'
+        );
+      }
     } finally {
       setPurchasing(false);
     }
@@ -220,8 +246,26 @@ export default function AiReportScreen() {
         showAlert('復元エラー', res.error ?? '購入情報の復元に失敗しました。');
         return;
       }
-      await refreshEntitlementAndBilling();
-      showAlert('復元処理が完了しました', '最新の契約状態をサーバーと同期しました。');
+
+      const syncedEnt = await syncAndFetchPairEntitlement(Boolean(res.hasActiveEntitlement));
+      await applyEntitlement(syncedEnt);
+      if (syncedEnt?.isPremium) {
+        void fetchHistory();
+        showAlert(
+          '購入を復元しました',
+          '「ふたりプレミアムプラン」のご契約を確認し、すべてのプレミアム機能を解放しました。'
+        );
+      } else if (!res.hasActiveEntitlement) {
+        showAlert(
+          '有効なご契約が見つかりませんでした',
+          'この Google アカウントに紐づく有効な定期購入が見つかりませんでした。購入時と同じ Google アカウントで Google Play にログインしているかご確認ください。'
+        );
+      } else {
+        showAlert(
+          '復元処理を受け付けました',
+          '契約情報の反映に数秒かかる場合があります。少し時間をおいて画面を開き直してください。'
+        );
+      }
     } finally {
       setPurchasing(false);
     }
@@ -269,6 +313,25 @@ export default function AiReportScreen() {
               {latestReportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
             </Text>
           </View>
+          {entitlement && (
+            <View style={styles.subStatusPill}>
+              <Ionicons name="diamond" size={13} color="#4A7C59" />
+              <Text style={styles.subStatusPillText}>
+                {formatPlanName(entitlement.productId)}（
+                {entitlement.paidByPartner && !entitlement.paidByMe
+                  ? `${partnerName}さんの契約を共有`
+                  : 'ご契約中'}
+                ）
+                {entitlement.expiresAt
+                  ? entitlement.status === 'grace_period'
+                    ? ` ・ お支払い確認中（${formatShortDate(entitlement.expiresAt)}まで）`
+                    : entitlement.willRenew
+                      ? ` ・ 次回更新 ${formatShortDate(entitlement.expiresAt)}`
+                      : ` ・ ${formatShortDate(entitlement.expiresAt)}まで利用可（自動更新停止）`
+                  : ''}
+              </Text>
+            </View>
+          )}
           <Text style={styles.premiumMetaText}>
             分析対象データ：計 {entitlement?.analyzableDaysCount ?? 0}日分（双方回答{' '}
             {entitlement?.revealedDaysCount ?? 0}日
@@ -547,11 +610,11 @@ export default function AiReportScreen() {
               onPress={() => setSelectedPlan('yearly')}
             >
               <View style={styles.planBestBadge}>
-                <Text style={styles.planBestText}>50% OFF</Text>
+                <Text style={styles.planBestText}>{offering.yearlyDiscountBadge}</Text>
               </View>
               <Text style={styles.planName}>年額プラン</Text>
               <Text style={styles.planPrice}>{offering.yearlyPriceLabel}</Text>
-              <Text style={styles.planSubPrice}>(月250円・2人共有)</Text>
+              <Text style={styles.planSubPrice}>({offering.yearlyPerMonthLabel})</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -596,10 +659,16 @@ export default function AiReportScreen() {
           </TouchableOpacity>
 
           <Text style={styles.subNotes}>
-            定期購入は自動更新されます。次回更新の24時間前までに Google Play の定期購入管理からいつでも解約できます。
+            お支払いは Google Play アカウントへ請求されます。定期購入は自動更新されますが、次回更新の24時間前までに Google Play の定期購入管理からいつでも解約できます。
           </Text>
 
           <View style={styles.legalLinksRow}>
+            <TouchableOpacity
+              onPress={() => void openExternalLink(LEGAL_URLS.termsOfService, '利用規約')}
+            >
+              <Text style={styles.legalLinkText}>利用規約</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>•</Text>
             <TouchableOpacity
               onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
             >
@@ -628,13 +697,19 @@ export default function AiReportScreen() {
         </View>
       )}
 
-      {/* 課金済みユーザー向け：プライバシーポリシー・解約管理リンク */}
+      {/* 課金済みユーザー向け：利用規約・プライバシーポリシー・解約管理リンク */}
       {isPremium && (
         <View style={styles.premiumLegalFooter}>
           <Text style={styles.subNotes}>
             プランの確認・解約は Google Play の定期購入管理からいつでも行えます。
           </Text>
           <View style={styles.legalLinksRow}>
+            <TouchableOpacity
+              onPress={() => void openExternalLink(LEGAL_URLS.termsOfService, '利用規約')}
+            >
+              <Text style={styles.legalLinkText}>利用規約</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>•</Text>
             <TouchableOpacity
               onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
             >
@@ -732,6 +807,25 @@ const styles = StyleSheet.create({
   premiumControlCard: {
     backgroundColor: '#F4FAF6',
     borderColor: '#C8E2D1',
+  },
+  subStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E8F4EC',
+    borderWidth: 1,
+    borderColor: '#C4E0CD',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 10,
+  },
+  subStatusPillText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#2F593C',
+    lineHeight: 16,
   },
   premiumMetaText: {
     fontSize: 12,
