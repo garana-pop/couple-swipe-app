@@ -282,6 +282,143 @@ function evaluateMatch(
   return false;
 }
 
+function getTimeBandLabel(hour: number): string {
+  if (hour >= 5 && hour <= 10) return "朝（5〜10時頃）";
+  if (hour >= 11 && hour <= 16) return "昼（11〜16時頃）";
+  if (hour >= 17 && hour <= 20) return "夕方（17〜20時頃）";
+  if (hour >= 21 && hour <= 23) return "夜（21〜23時頃）";
+  return "深夜（0〜4時頃）";
+}
+
+interface RhythmEntryInput {
+  date: string;
+  myCreatedAtMs: number | null;
+  partnerCreatedAtMs: number | null;
+}
+
+function summarizeUserRhythm(
+  name: string,
+  daySessions: Map<string, number[]>,
+  dateFormatter: Intl.DateTimeFormat,
+  hourFormatter: Intl.DateTimeFormat
+): string {
+  const totalDays = daySessions.size;
+  if (totalDays === 0) {
+    return `- ${name}: 回答データなし`;
+  }
+
+  let sameDayCount = 0;
+  let catchUpCount = 0;
+  const bandCounts = new Map<string, number>();
+  const validGapsSec: number[] = [];
+
+  for (const [quizDate, rawTimes] of daySessions.entries()) {
+    const times = [...rawTimes].sort((a, b) => a - b);
+    const firstMs = times[0];
+    const firstDateObj = new Date(firstMs);
+    const answeredDate = dateFormatter.format(firstDateObj);
+    const hour = Number(hourFormatter.format(firstDateObj)) % 24;
+    const band = getTimeBandLabel(hour);
+    bandCounts.set(band, (bandCounts.get(band) ?? 0) + 1);
+
+    if (answeredDate > quizDate) {
+      catchUpCount++;
+    } else {
+      sameDayCount++;
+    }
+
+    for (let i = 1; i < times.length; i++) {
+      const gapSec = (times[i] - times[i - 1]) / 1000;
+      // 途中離脱（2分超）や一括インポート（0秒以下）を除外して自然な回答テンポのみ集計
+      if (gapSec > 0 && gapSec <= 120) {
+        validGapsSec.push(gapSec);
+      }
+    }
+  }
+
+  const sortedBands = [...bandCounts.entries()].sort((a, b) => b[1] - a[1]);
+  let bandText = "データ不足";
+  if (sortedBands.length === 1) {
+    bandText = `${sortedBands[0][0]}が中心`;
+  } else if (sortedBands.length >= 2) {
+    const [top, second] = sortedBands;
+    bandText =
+      second[1] >= top[1] * 0.5
+        ? `${top[0]}・${second[0]}が多め`
+        : `${top[0]}が中心`;
+  }
+
+  let paceText = "";
+  if (validGapsSec.length >= 4) {
+    validGapsSec.sort((a, b) => a - b);
+    const medianSec = validGapsSec[Math.floor(validGapsSec.length / 2)];
+    if (medianSec <= 8) {
+      paceText = "／回答テンポ: テンポ良く直感で答える傾向";
+    } else if (medianSec <= 25) {
+      paceText = "／回答テンポ: 落ち着いてバランスよく答える傾向";
+    } else {
+      paceText = "／回答テンポ: 1問ずつじっくり吟味して答える傾向";
+    }
+  }
+
+  return `- ${name}: 回答日数${totalDays}日（当日回答${sameDayCount}日・過去日追っかけ${catchUpCount}日）／主な回答時間帯: ${bandText}${paceText}`;
+}
+
+function buildBehaviorRhythmSummary(
+  entries: RhythmEntryInput[],
+  pairTz: string,
+  myName: string,
+  partnerName: string
+): string {
+  const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: pairTz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const hourFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: pairTz,
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const myDaySessions = new Map<string, number[]>();
+  const partnerDaySessions = new Map<string, number[]>();
+
+  for (const e of entries) {
+    if (e.myCreatedAtMs && e.myCreatedAtMs > 0) {
+      if (!myDaySessions.has(e.date)) myDaySessions.set(e.date, []);
+      myDaySessions.get(e.date)!.push(e.myCreatedAtMs);
+    }
+    if (e.partnerCreatedAtMs && e.partnerCreatedAtMs > 0) {
+      if (!partnerDaySessions.has(e.date)) partnerDaySessions.set(e.date, []);
+      partnerDaySessions.get(e.date)!.push(e.partnerCreatedAtMs);
+    }
+  }
+
+  let myFirstDays = 0;
+  let partnerFirstDays = 0;
+  for (const [quizDate, myTimes] of myDaySessions.entries()) {
+    const partnerTimes = partnerDaySessions.get(quizDate);
+    if (!partnerTimes || partnerTimes.length === 0) continue;
+    const myMin = Math.min(...myTimes);
+    const partnerMin = Math.min(...partnerTimes);
+    if (myMin < partnerMin) myFirstDays++;
+    else if (partnerMin < myMin) partnerFirstDays++;
+  }
+
+  const lines = [
+    summarizeUserRhythm(myName, myDaySessions, dateFormatter, hourFormatter),
+    summarizeUserRhythm(partnerName, partnerDaySessions, dateFormatter, hourFormatter),
+  ];
+  if (myFirstDays + partnerFirstDays >= 2) {
+    lines.push(
+      `- 先に回答を始める割合（双方回答日）: ${myName}が先 ${myFirstDays}日 / ${partnerName}が先 ${partnerFirstDays}日`
+    );
+  }
+  return lines.join("\n");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -438,6 +575,8 @@ Deno.serve(async (req: Request) => {
     myChoice: string | null;
     partnerChoice: string | null;
     matched: boolean | null;
+    myCreatedAtMs: number | null;
+    partnerCreatedAtMs: number | null;
     latestAnswerMs: number;
   }
 
@@ -472,6 +611,8 @@ Deno.serve(async (req: Request) => {
           myChoice: meta?.choices?.[myDir] ?? myDir,
           partnerChoice: meta?.choices?.[partnerDir] ?? partnerDir,
           matched: evaluateMatch(meta?.matchRule, myDir, partnerDir),
+          myCreatedAtMs: myRec?.createdAtMs ?? null,
+          partnerCreatedAtMs: partnerRec?.createdAtMs ?? null,
           latestAnswerMs,
         };
         bothDayEntries.push(entry);
@@ -486,6 +627,8 @@ Deno.serve(async (req: Request) => {
             myChoice: myDir ? (meta?.choices?.[myDir] ?? myDir) : null,
             partnerChoice: partnerDir ? (meta?.choices?.[partnerDir] ?? partnerDir) : null,
             matched: null,
+            myCreatedAtMs: myRec?.createdAtMs ?? null,
+            partnerCreatedAtMs: partnerRec?.createdAtMs ?? null,
             latestAnswerMs,
           });
         }
@@ -597,22 +740,50 @@ Deno.serve(async (req: Request) => {
   const summaryLines = analyzableEntries
     .slice(0, 80)
     .map((e) => {
+      const shortDate = e.date.slice(5).replace("-", "/");
+      const myLate =
+        e.myCreatedAtMs && e.myCreatedAtMs > 0
+          ? dateFormatter.format(new Date(e.myCreatedAtMs)) > e.date
+          : false;
+      const partnerLate =
+        e.partnerCreatedAtMs && e.partnerCreatedAtMs > 0
+          ? dateFormatter.format(new Date(e.partnerCreatedAtMs)) > e.date
+          : false;
+      const myTag = myLate ? "(後日回答)" : "";
+      const partnerTag = partnerLate ? "(後日回答)" : "";
+
       if (e.myChoice && e.partnerChoice) {
-        return `[${e.category}] ${e.title} -> ${myName}:「${e.myChoice}」 / ${partnerName}:「${e.partnerChoice}」 (${e.matched ? "一致" : "不一致"})`;
+        return `[${shortDate}][${e.category}] ${e.title} -> ${myName}:「${e.myChoice}」${myTag} / ${partnerName}:「${e.partnerChoice}」${partnerTag} (${e.matched ? "一致" : "不一致"})`;
       }
       if (!e.myChoice && e.partnerChoice) {
-        return `[${e.category}][過去日・${myName}未回答] ${e.title} -> ${myName}:未回答 / ${partnerName}:「${e.partnerChoice}」`;
+        return `[${shortDate}][${e.category}][過去日・${myName}未回答] ${e.title} -> ${myName}:未回答 / ${partnerName}:「${e.partnerChoice}」${partnerTag}`;
       }
-      return `[${e.category}][過去日・${partnerName}未回答] ${e.title} -> ${myName}:「${e.myChoice}」 / ${partnerName}:未回答`;
+      return `[${shortDate}][${e.category}][過去日・${partnerName}未回答] ${e.title} -> ${myName}:「${e.myChoice}」${myTag} / ${partnerName}:未回答`;
     })
     .join("\n");
+
+  const behaviorRhythmSummary = buildBehaviorRhythmSummary(
+    analyzableEntries,
+    pairTz,
+    myName,
+    partnerName
+  );
+  const rhythmInstruction =
+    totalAnalyzedDays >= 5
+      ? "質問への回答内容（自己申告）を主軸にしつつ、上記の回答リズム・活動時間帯の違いや回答ペースも二人の生活リズムやすれ違い予防アドバイスへ自然に織り込んでください。"
+      : `まだ回答日数が少ない（${totalAnalyzedDays}日分）ため、上記の回答リズム・時間帯傾向は参考程度にとどめて断定せず、質問への回答内容を主軸に分析してください。`;
 
   const prompt = `あなたはカップル専門の優しく的確な関係性アナリストです。
 以下は「${myName}」と「${partnerName}」が回答したスワイプ診断の履歴（計${totalAnalyzedDays}日分：双方完了${revealedDaysCount}日＋未回答を含む過去日${pastPartialDaysCount}日・計${analyzableEntries.length}問・${matchRateText}）です。
 この実データだけに基づき、二人の相性・性格傾向・将来のすれ違い予防アドバイスを日本語の JSON のみで返してください。
 ※「過去日・未回答」と付いた設問の回答も、その本人の性格傾向・価値観の分析およびすれ違い予測にしっかり反映してください。
+※ ${rhythmInstruction}
+※ 細かい時刻（例：「23時42分」など分単位）には触れず、「朝型・夜型」「マイペース派」など自然な表現にしてください。また、後日回答や未回答が多い側を責める表現は厳禁とし、「自分の落ち着いたタイミングで丁寧に向き合うタイプ」など肯定的に表現してください。
 
-【回答履歴】
+【回答リズム・行動傾向（集計サマリー）】
+${behaviorRhythmSummary}
+
+【回答履歴（日付付き）】
 ${summaryLines}
 
 【出力JSONスキーマ（キー名厳守）】
