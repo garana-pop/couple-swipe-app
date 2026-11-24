@@ -3,6 +3,7 @@ import {
   SwipeDirection,
   Question,
   HistoryDayItem,
+  CalendarDaySummary,
   DayQuizData,
   CategoryMatchStat,
   PairStats,
@@ -75,6 +76,9 @@ interface AppContextType {
   myName: string;
   partnerName: string;
   todayDate: string;
+  pairStartDate: string | null;
+  isPairPremium: boolean;
+  setPairPremium: (next: boolean) => void;
   questions: Question[];
   myAnswers: Record<string, SwipeDirection>;
   partnerAnswers: Record<string, SwipeDirection>;
@@ -84,6 +88,7 @@ interface AppContextType {
   hasSeenTutorial: boolean;
   isTutorialVisible: boolean;
   historyDays: HistoryDayItem[];
+  calendarDays: Record<string, CalendarDaySummary>;
   isHistoryLoading: boolean;
   pairStats: PairStats;
   dailyReminder: DailyReminderSettings;
@@ -160,6 +165,27 @@ function formatPastDateLabel(pastDateStr: string, currentDateStr: string): { bad
   };
 }
 
+function parseCalendarSummaryMap(rawDays: unknown): Record<string, CalendarDaySummary> {
+  const map: Record<string, CalendarDaySummary> = {};
+  if (!Array.isArray(rawDays)) return map;
+  for (const row of rawDays) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const quizDate = typeof r.quiz_date === 'string' ? r.quiz_date : '';
+    if (!quizDate) continue;
+    map[quizDate] = {
+      quizDate,
+      totalQuestions: Number(r.total_questions ?? 0),
+      myAnsweredCount: Number(r.my_answered_count ?? 0),
+      partnerAnsweredCount: Number(r.partner_answered_count ?? 0),
+      isMyCompleted: Boolean(r.is_my_completed),
+      isPartnerCompleted: Boolean(r.is_partner_completed),
+      isRevealed: Boolean(r.is_revealed),
+    };
+  }
+  return map;
+}
+
 export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -178,6 +204,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [myName, setMyName] = useState('あなた');
   const [partnerName, setPartnerName] = useState('パートナー');
   const [todayDate, setTodayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [pairStartDate, setPairStartDate] = useState<string | null>(null);
+  const [isPairPremium, setIsPairPremium] = useState(false);
 
   const [questions, setQuestions] = useState<Question[]>(TODAY_QUESTIONS);
   const [myAnswers, setMyAnswers] = useState<Record<string, SwipeDirection>>({});
@@ -195,6 +223,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isTutorialVisible, setIsTutorialVisible] = useState(false);
 
   const [historyDays, setHistoryDays] = useState<HistoryDayItem[]>([]);
+  const [calendarDays, setCalendarDays] = useState<Record<string, CalendarDaySummary>>({});
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [dailyReminder, setDailyReminder] = useState<DailyReminderSettings>(DEFAULT_DAILY_REMINDER);
   const [pushStatus, setPushStatus] = useState<PushRegistrationResult | null>(null);
@@ -258,11 +287,18 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (pairState.today_date) {
         setTodayDate(pairState.today_date);
       }
+      setPairStartDate(
+        typeof pairState.pair_start_date === 'string' ? pairState.pair_start_date : null
+      );
+      setIsPairPremium(Boolean(pairState.is_premium));
 
       if (!pairState.has_pair || !pairState.pair_id) {
         setQuestions(TODAY_QUESTIONS);
         setMyAnswers({});
         setPartnerAnswers({});
+        setHistoryDays([]);
+        setCalendarDays({});
+        setPairStartDate(null);
         setDayStatus({
           totalQuestions: TODAY_QUESTIONS.length,
           myAnsweredCount: 0,
@@ -346,11 +382,28 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       await loadAnswersForDay(pairState.pair_id, quizDate, currentUserId);
 
-      // 履歴も初回ロード時に同期し、ホームのストリーク・通算一致率を即時表示する
-      const { data: histData, error: histErr } = await supabase.rpc('get_pair_history', {
-        p_limit: 60,
-        p_offset: 0,
-      });
+      // 履歴とカレンダーサマリーも初回ロード時に並列同期し、ストリーク・未回答日数・通算一致率を即時表示する
+      const [histRes, calRes] = await Promise.all([
+        supabase.rpc('get_pair_history', {
+          p_limit: 60,
+          p_offset: 0,
+        }),
+        supabase.rpc('get_pair_calendar_summary'),
+      ]);
+
+      if (!calRes.error && calRes.data && typeof calRes.data === 'object') {
+        const cal = calRes.data as Record<string, unknown>;
+        if (typeof cal.pair_start_date === 'string') {
+          setPairStartDate(cal.pair_start_date);
+        }
+        if (typeof cal.is_premium === 'boolean') {
+          setIsPairPremium(cal.is_premium);
+        }
+        setCalendarDays(parseCalendarSummaryMap(cal.days));
+      }
+
+      const histData = histRes.data;
+      const histErr = histRes.error;
       if (!histErr && Array.isArray(histData)) {
         const missingHistQuestion = histData.some((day: any) => {
           const rawAnswers: any[] = Array.isArray(day.answers) ? day.answers : [];
@@ -599,11 +652,41 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         .eq('quiz_date', quizDate)
         .maybeSingle();
 
-      if (setErr || !setRow || !Array.isArray(setRow.question_ids) || setRow.question_ids.length === 0) {
+      let qIds: string[] = [];
+      if (!setErr && setRow && Array.isArray(setRow.question_ids) && setRow.question_ids.length > 0) {
+        qIds = setRow.question_ids as string[];
+      } else if (quizDate < todayDate) {
+        // 誰もアプリを開かなかった過去日の場合はプレミアム限定でオンデマンド生成
+        const { data: createdSet, error: createErr } = await supabase.rpc(
+          'get_or_create_past_daily_set',
+          {
+            p_quiz_date: quizDate,
+            p_question_pool: catalogRef.current.activePoolIds,
+          }
+        );
+        if (createErr) {
+          if (createErr.message?.includes('PREMIUM_REQUIRED')) {
+            throw new Error(
+              '過去の未回答お題への回答には「ふたりプレミアムプラン」への加入が必要です。'
+            );
+          }
+          if (createErr.message?.includes('INVALID_PAST_DATE')) {
+            throw new Error('ペア開始日以前の日付や未来の日付には回答できません。');
+          }
+          return null;
+        }
+        if (
+          !createdSet ||
+          !Array.isArray(createdSet.question_ids) ||
+          createdSet.question_ids.length === 0
+        ) {
+          return null;
+        }
+        qIds = createdSet.question_ids as string[];
+      } else {
         return null;
       }
 
-      const qIds = setRow.question_ids as string[];
       if (qIds.some((id) => !catalogRef.current.questionsById[id])) {
         await refreshQuestionCatalog({ force: true, fullRefresh: true });
       }
@@ -685,7 +768,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isRevealed: Boolean(status?.is_revealed),
       };
     },
-    [userId, pairId, refreshQuestionCatalog]
+    [userId, pairId, todayDate, refreshQuestionCatalog]
   );
 
   const submitPastAnswer = useCallback(
@@ -890,14 +973,32 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchHistory = useCallback(async () => {
     if (!supabase || !userId || !hasPair) {
       setHistoryDays([]);
+      setCalendarDays({});
       return;
     }
     setIsHistoryLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_pair_history', {
-        p_limit: 60,
-        p_offset: 0,
-      });
+      const [histRes, calRes] = await Promise.all([
+        supabase.rpc('get_pair_history', {
+          p_limit: 60,
+          p_offset: 0,
+        }),
+        supabase.rpc('get_pair_calendar_summary'),
+      ]);
+
+      if (!calRes.error && calRes.data && typeof calRes.data === 'object') {
+        const cal = calRes.data as Record<string, unknown>;
+        if (typeof cal.pair_start_date === 'string') {
+          setPairStartDate(cal.pair_start_date);
+        }
+        if (typeof cal.is_premium === 'boolean') {
+          setIsPairPremium(cal.is_premium);
+        }
+        setCalendarDays(parseCalendarSummaryMap(cal.days));
+      }
+
+      const data = histRes.data;
+      const error = histRes.error;
       if (error || !Array.isArray(data)) {
         return;
       }
@@ -970,6 +1071,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setMyAnswers({});
       setPartnerAnswers({});
       setHistoryDays([]);
+      setCalendarDays({});
+      setPairStartDate(null);
+      setIsPairPremium(false);
       // 新しい匿名セッションを作成
       const { data: anonData } = await supabase.auth.signInAnonymously();
       setUserId(anonData.user?.id ?? null);
@@ -1101,13 +1205,72 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [questions, myAnswers, partnerAnswers]);
 
+  const setPairPremium = useCallback((next: boolean) => {
+    setIsPairPremium(next);
+  }, []);
+
+  const effectiveCalendarDays = useMemo<Record<string, CalendarDaySummary>>(() => {
+    const merged: Record<string, CalendarDaySummary> = { ...calendarDays };
+
+    for (const day of historyDays) {
+      if (!merged[day.quizDate]) {
+        merged[day.quizDate] = {
+          quizDate: day.quizDate,
+          totalQuestions: day.totalQuestions,
+          myAnsweredCount: day.myAnsweredCount,
+          partnerAnsweredCount: day.partnerAnsweredCount,
+          isMyCompleted: day.isMyCompleted,
+          isPartnerCompleted: day.isPartnerCompleted,
+          isRevealed: day.isRevealed,
+        };
+      }
+    }
+
+    if (hasPair && todayDate) {
+      const myCount = Math.max(
+        dayStatus.myAnsweredCount,
+        questions.filter((q) => Boolean(myAnswers[q.id])).length
+      );
+      const totalQ = Math.max(dayStatus.totalQuestions, questions.length);
+      merged[todayDate] = {
+        quizDate: todayDate,
+        totalQuestions: totalQ,
+        myAnsweredCount: myCount,
+        partnerAnsweredCount: dayStatus.partnerAnsweredCount,
+        isMyCompleted,
+        isPartnerCompleted,
+        isRevealed: dayStatus.isRevealed || (isMyCompleted && isPartnerCompleted),
+      };
+    }
+
+    return merged;
+  }, [
+    calendarDays,
+    historyDays,
+    hasPair,
+    todayDate,
+    dayStatus,
+    questions,
+    myAnswers,
+    isMyCompleted,
+    isPartnerCompleted,
+  ]);
+
   const pairStats = useMemo<PairStats>(() => {
     const revealedDates = new Set<string>();
+    const historyDatesSet = new Set<string>();
     const categoryAcc = new Map<string, { matched: number; total: number }>();
     let totalMatched = 0;
     let totalBoth = 0;
 
+    for (const rec of Object.values(effectiveCalendarDays)) {
+      if (rec.isRevealed) {
+        revealedDates.add(rec.quizDate);
+      }
+    }
+
     for (const day of historyDays) {
+      historyDatesSet.add(day.quizDate);
       if (day.isRevealed) {
         revealedDates.add(day.quizDate);
       }
@@ -1125,7 +1288,12 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     // 今日の双方回答が完了済みだがまだ historyDays に未反映の場合も即時合算
-    if (isMyCompleted && isPartnerCompleted && !revealedDates.has(todayDate) && matchSummary.details.length > 0) {
+    if (
+      isMyCompleted &&
+      isPartnerCompleted &&
+      !historyDatesSet.has(todayDate) &&
+      matchSummary.details.length > 0
+    ) {
       revealedDates.add(todayDate);
       for (const item of matchSummary.details) {
         if (!item.myAnswer || !item.partnerAnswer) continue;
@@ -1148,6 +1316,42 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       cursor = shiftIsoDate(cursor, -1);
     }
 
+    // 自身の未回答日数をペア開始日〜今日で算出（カレンダー表示と完全一致）
+    let myUnansweredDays = 0;
+    let myPastUnansweredDays = 0;
+    let pastPartnerAnsweredUnansweredDays = 0;
+
+    if (hasPair && todayDate) {
+      let effectiveStart = pairStartDate;
+      for (const dateKey of Object.keys(effectiveCalendarDays)) {
+        if (!effectiveStart || dateKey < effectiveStart) {
+          effectiveStart = dateKey;
+        }
+      }
+      if (!effectiveStart || effectiveStart > todayDate) {
+        effectiveStart = todayDate;
+      }
+
+      let dayCursor = effectiveStart;
+      let guard = 0;
+      while (dayCursor <= todayDate && guard < 2000) {
+        const rec = effectiveCalendarDays[dayCursor];
+        if (dayCursor === todayDate) {
+          if (!isMyCompleted) {
+            myUnansweredDays++;
+          }
+        } else if (!rec?.isMyCompleted) {
+          myPastUnansweredDays++;
+          myUnansweredDays++;
+          if ((rec?.partnerAnsweredCount ?? 0) > 0) {
+            pastPartnerAnsweredUnansweredDays++;
+          }
+        }
+        dayCursor = shiftIsoDate(dayCursor, 1);
+        guard++;
+      }
+    }
+
     const categoryStats: CategoryMatchStat[] = [...categoryAcc.entries()]
       .map(([category, stat]) => ({
         category,
@@ -1161,11 +1365,23 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       currentStreak,
       isTodayIncludedInStreak,
       totalRevealedDays: revealedDates.size,
+      myUnansweredDays,
+      myPastUnansweredDays,
+      pastPartnerAnsweredUnansweredDays,
       overallMatchRate: totalBoth > 0 ? Math.round((totalMatched / totalBoth) * 100) : null,
       totalBothAnsweredQuestions: totalBoth,
       categoryStats,
     };
-  }, [historyDays, todayDate, isMyCompleted, isPartnerCompleted, matchSummary.details]);
+  }, [
+    effectiveCalendarDays,
+    historyDays,
+    hasPair,
+    pairStartDate,
+    todayDate,
+    isMyCompleted,
+    isPartnerCompleted,
+    matchSummary.details,
+  ]);
 
   return (
     <AppContext.Provider
@@ -1183,6 +1399,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         myName,
         partnerName,
         todayDate,
+        pairStartDate,
+        isPairPremium,
+        setPairPremium,
         questions,
         myAnswers,
         partnerAnswers,
@@ -1192,6 +1411,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         hasSeenTutorial,
         isTutorialVisible,
         historyDays,
+        calendarDays: effectiveCalendarDays,
         isHistoryLoading,
         pairStats,
         dailyReminder,

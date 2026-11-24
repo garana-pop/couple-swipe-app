@@ -68,6 +68,7 @@ export default function ResultScreen() {
     todayDate,
     isPartnerCompleted,
     isMyCompleted,
+    isPairPremium,
     partnerName,
     myName,
     matchSummary,
@@ -384,6 +385,63 @@ export default function ResultScreen() {
           );
         })}
       </View>
+
+      {/* 過去の未回答日がある場合：結果確認直後の自然な遡り回答・プレミアム導線 */}
+      {!isPastResult && pairStats.myPastUnansweredDays > 0 && (
+        <View style={[styles.catchUpBanner, SHADOWS.cardSmall]}>
+          <View style={styles.catchUpHeader}>
+            <Ionicons
+              name={isPairPremium ? 'calendar' : 'diamond'}
+              size={15}
+              color="#9E6B24"
+            />
+            <Text style={styles.catchUpTitle}>
+              過去の未回答が {pairStats.myPastUnansweredDays}日分 残っています
+            </Text>
+          </View>
+          <Text style={styles.catchUpText}>
+            {isPairPremium
+              ? '回答カレンダーから未回答の過去日をタップすると、続けて遡って回答できます。'
+              : pairStats.pastPartnerAnsweredUnansweredDays > 0
+                ? `うち ${pairStats.pastPartnerAnsweredUnansweredDays}日 は ${partnerName} さんが回答済み！プレミアムプランならカレンダーから遡って回答して、相手の答えと一致率を見られます。`
+                : '答え忘れた過去日も、プレミアムプランなら回答カレンダーからいつでも遡って回答できます（片方の課金で2人とも利用OK）。'}
+          </Text>
+          {isPairPremium ? (
+            <TouchableOpacity
+              style={styles.catchUpPrimaryBtn}
+              activeOpacity={0.85}
+              onPress={() =>
+                router.push({ pathname: '/history', params: { openCalendar: '1' } })
+              }
+            >
+              <Ionicons name="calendar-outline" size={15} color="#FFFFFF" />
+              <Text style={styles.catchUpBtnText}>回答カレンダーから遡って回答する</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.catchUpActionsRow}>
+              <TouchableOpacity
+                style={styles.catchUpOutlineBtn}
+                activeOpacity={0.8}
+                onPress={() =>
+                  router.push({ pathname: '/history', params: { openCalendar: '1' } })
+                }
+              >
+                <Text style={styles.catchUpOutlineBtnText}>カレンダーを見る</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.catchUpPremiumBtn}
+                activeOpacity={0.85}
+                onPress={() =>
+                  router.push({ pathname: '/ai-report', params: { focus: 'plans' } })
+                }
+              >
+                <Ionicons name="diamond" size={14} color="#FFFFFF" />
+                <Text style={styles.catchUpBtnText}>プレミアムで遡る</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
 
       {isPastResult && (
         <TouchableOpacity
@@ -978,5 +1036,77 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.textMuted,
+  },
+  catchUpBanner: {
+    backgroundColor: '#FFFBF3',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#EED9B7',
+  },
+  catchUpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 5,
+  },
+  catchUpTitle: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#8C5A1B',
+  },
+  catchUpText: {
+    fontSize: 11.5,
+    color: '#7A5B32',
+    lineHeight: 17,
+    marginBottom: 11,
+  },
+  catchUpActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  catchUpOutlineBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E4C796',
+    borderRadius: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  catchUpOutlineBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#8C5A1B',
+  },
+  catchUpPremiumBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#C87D28',
+    borderRadius: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  catchUpPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 11,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  catchUpBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

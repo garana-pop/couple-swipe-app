@@ -90,9 +90,17 @@ export default function QuizScreen() {
         setPastMyAnswers(loaded.myAnswers);
         const firstUnanswered = loaded.questions.findIndex((q) => !loaded.myAnswers[q.id]);
         setCurrentIndex(firstUnanswered >= 0 ? firstUnanswered : 0);
-      } catch {
+      } catch (err) {
         if (active) {
-          setPastLoadError('過去の質問データの読み込みに失敗しました。');
+          const msg =
+            err instanceof Error && err.message
+              ? err.message
+              : '過去の質問データの読み込みに失敗しました。';
+          setPastLoadError(msg);
+          if (msg.includes('プレミアム')) {
+            showAlert('プレミアム限定機能', msg);
+            router.replace({ pathname: '/ai-report', params: { focus: 'plans' } });
+          }
         }
       } finally {
         if (active) {
@@ -156,7 +164,7 @@ export default function QuizScreen() {
         setRetryNonce((n) => n + 1);
         showAlert('回答できませんでした', res.error ?? '過去の質問の保存に失敗しました。');
         if (res.error?.includes('プレミアム')) {
-          router.replace('/ai-report');
+          router.replace({ pathname: '/ai-report', params: { focus: 'plans' } });
         }
         return;
       }

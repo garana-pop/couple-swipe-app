@@ -19,6 +19,8 @@ export default function WaitingScreen() {
     myName,
     dayStatus,
     isPartnerCompleted,
+    isPairPremium,
+    pairStats,
     isSupabaseReady,
     refreshDayStatus,
   } = useApp();
@@ -167,15 +169,33 @@ export default function WaitingScreen() {
       <TouchableOpacity
         style={styles.premiumHintCard}
         activeOpacity={0.85}
-        onPress={() => router.push('/ai-report')}
+        onPress={() =>
+          isPairPremium && pairStats.myPastUnansweredDays > 0
+            ? router.push({ pathname: '/history', params: { openCalendar: '1' } })
+            : router.push({ pathname: '/ai-report', params: { focus: 'plans' } })
+        }
       >
         <View style={styles.premiumHintHeader}>
-          <Ionicons name="diamond-outline" size={14} color="#8C5A1B" />
-          <Text style={styles.premiumHintTitle}>過去の未回答日について</Text>
+          <Ionicons
+            name={isPairPremium && pairStats.myPastUnansweredDays > 0 ? 'calendar-outline' : 'diamond-outline'}
+            size={14}
+            color="#8C5A1B"
+          />
+          <Text style={styles.premiumHintTitle}>
+            {pairStats.myPastUnansweredDays > 0
+              ? isPairPremium
+                ? `待っている間に過去の未回答（${pairStats.myPastUnansweredDays}日分）に遡り回答`
+                : `過去の未回答が ${pairStats.myPastUnansweredDays}日分 あります`
+              : '過去の未回答日もカレンダーから遡って回答'}
+          </Text>
           <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
         </View>
         <Text style={styles.premiumHintText}>
-          当日の回答はお互い完了するまで秘密ですが、プレミアムプランでは自分が未回答だった過去日の質問に後から回答でき、回答後に相手の答えと一致率を見られます（AI相性診断にも反映）。
+          {pairStats.myPastUnansweredDays > 0 && isPairPremium
+            ? 'プレミアム特典として、回答カレンダーから未回答の過去日をタップすると今から遡って回答できます。'
+            : pairStats.pastPartnerAnsweredUnansweredDays > 0 && !isPairPremium
+              ? `うち ${pairStats.pastPartnerAnsweredUnansweredDays}日 は ${partnerName} さんが回答済み！待っている間にプレミアムでカレンダーから遡って回答し、相手の答えと一致率を見てみませんか？`
+              : '当日の回答はお互い完了するまで秘密ですが、プレミアムプランでは自分が未回答だった過去日の質問にカレンダーから遡って回答でき、回答後に相手の答えと一致率を見られます（AI相性診断にも反映）。'}
         </Text>
       </TouchableOpacity>
 

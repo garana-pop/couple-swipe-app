@@ -3,7 +3,8 @@
   Google Play 提出用スクリーンショット（1080x1920 PNG）をテンプレートから一括生成します。
 .DESCRIPTION
   store-assets/google-play/screenshots/raw/ に配置した実機スクリーンショットと
-  slides.json・template.html を使い、シンプルで落ち着いたストア提出用画像（1080x1920 PNG）を生成します。
+  slides.json・template.html・assets/icon.png を使い、
+  新アプリアイコンの雰囲気と統一したストア提出用画像（1080x1920 PNG）を生成します。
   別画像に差し替えたい場合は raw/ の画像を更新するか slides.json の文言を編集して再実行してください。
 #>
 param(
@@ -18,6 +19,7 @@ $ssDir = Join-Path $repoRoot "store-assets\google-play\screenshots"
 $rawDir = Join-Path $ssDir "raw"
 $slidesPath = Join-Path $ssDir "slides.json"
 $templatePath = Join-Path $ssDir "template.html"
+$iconPath = Join-Path $repoRoot "assets\icon.png"
 
 if (-not $EdgePath) {
   $candidates = @(
@@ -34,14 +36,18 @@ if (-not $EdgePath -or -not (Test-Path $EdgePath)) {
 
 $slides = Get-Content -Raw -Encoding UTF8 $slidesPath | ConvertFrom-Json
 $templateHtml = Get-Content -Raw -Encoding UTF8 $templatePath
-$tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "kotaeai-store-ss"
-New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+$tmpDir = Join-Path $repoRoot ".expo\tmp-store-ss"
+$edgeProfile = Join-Path $tmpDir "edge-profile"
+New-Item -ItemType Directory -Force -Path $edgeProfile | Out-Null
 
-function Clean-FloatingGearOverlay {
+$iconUri = "file:///" + ($iconPath -replace '\\', '/')
+
+function Clean-RawScreenshot {
   param(
     [string]$InputPath,
     [string]$OutputPath,
-    [bool]$MirrorTopCard = $false
+    [bool]$MirrorTopCard = $false,
+    [bool]$ReplaceHomeHeart = $false
   )
   $src = [System.Drawing.Bitmap]::FromFile($InputPath)
   try {
@@ -71,6 +77,20 @@ function Clean-FloatingGearOverlay {
       }
     }
 
+    # Slide 1 ペアカードの小さなハート領域をカード背景の純白で綺麗に除去（HTML側のミニマルピルに置換）
+    if ($ReplaceHomeHeart) {
+      $white = [System.Drawing.Color]::FromArgb(255, 255, 255)
+      $hxMin = [int][Math]::Floor($w * 0.149)
+      $hxMax = [int][Math]::Ceiling($w * 0.184)
+      $hyMin = [int][Math]::Floor($h * 0.161)
+      $hyMax = [int][Math]::Ceiling($h * 0.176)
+      for ($y = $hyMin; $y -le $hyMax; $y++) {
+        for ($x = $hxMin; $x -le $hxMax; $x++) {
+          $bmp.SetPixel($x, $y, $white)
+        }
+      }
+    }
+
     $bmp.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
     $bmp.Dispose()
   } finally {
@@ -84,10 +104,13 @@ foreach ($slide in $slides) {
     throw "元スクリーンショットが見つかりません: $rawFile"
   }
 
+  $replaceHeart = [bool]($slide.PSObject.Properties['replaceHomeHeart'] -and $slide.replaceHomeHeart)
+  $showBrandIcon = [bool]($slide.PSObject.Properties['showBrandIcon'] -and $slide.showBrandIcon)
+
   $imgForRender = $rawFile
-  if ($slide.cleanGear) {
+  if ($slide.cleanGear -or $replaceHeart) {
     $cleanedPath = Join-Path $tmpDir ("clean_" + [System.IO.Path]::GetFileNameWithoutExtension($slide.raw) + ".png")
-    Clean-FloatingGearOverlay -InputPath $rawFile -OutputPath $cleanedPath -MirrorTopCard ([bool]$slide.mirrorTopCard)
+    Clean-RawScreenshot -InputPath $rawFile -OutputPath $cleanedPath -MirrorTopCard ([bool]$slide.mirrorTopCard) -ReplaceHomeHeart $replaceHeart
     $imgForRender = $cleanedPath
   }
 
@@ -96,6 +119,9 @@ foreach ($slide in $slides) {
   $menuDisplay = if ($slide.showMenuIcon) { "flex" } else { "none" }
   $progDisplay = if ($slide.showQuizProgress) { "block" } else { "none" }
   $overlayHeight = if ($slide.showQuizProgress) { "192px" } else { "176px" }
+  $brandDisplay = if ($showBrandIcon) { "block" } else { "none" }
+  $tickDisplay = if ($showBrandIcon) { "none" } else { "inline-block" }
+  $connectorDisplay = if ($replaceHeart) { "flex" } else { "none" }
 
   $injectScript = @"
 <script>
@@ -104,6 +130,11 @@ foreach ($slide in $slides) {
   document.getElementById('subtitle').textContent = $(ConvertTo-Json ([string]$slide.subtitle));
   document.getElementById('header-title').textContent = $(ConvertTo-Json ([string]$slide.headerTitle));
   document.getElementById('screen-img').src = $(ConvertTo-Json $imgUri);
+  document.getElementById('brand-icon-img').src = $(ConvertTo-Json $iconUri);
+  document.getElementById('brand-badge').style.display = '$brandDisplay';
+  document.getElementById('tick-left').style.display = '$tickDisplay';
+  document.getElementById('tick-right').style.display = '$tickDisplay';
+  document.getElementById('home-pair-connector').style.display = '$connectorDisplay';
   document.getElementById('back-arrow').style.display = '$backDisplay';
   document.getElementById('menu-icon').style.display = '$menuDisplay';
   document.getElementById('quiz-progress').style.display = '$progDisplay';
@@ -121,16 +152,24 @@ foreach ($slide in $slides) {
   if (Test-Path $tmpShot) { Remove-Item $tmpShot -Force }
 
   $fileUri = "file:///" + ($htmlFile -replace '\\', '/')
-  $args = @(
+  $edgeArgs = @(
     "--headless=new",
+    "--no-sandbox",
     "--disable-gpu",
+    "--no-first-run",
+    "--disable-extensions",
+    "--user-data-dir=$edgeProfile",
     "--hide-scrollbars",
     "--force-device-scale-factor=1",
     "--window-size=1080,1920",
     "--screenshot=$tmpShot",
     $fileUri
   )
-  $proc = Start-Process -FilePath $EdgePath -ArgumentList $args -Wait -PassThru -NoNewWindow
+  $proc = Start-Process -FilePath $EdgePath -ArgumentList $edgeArgs -PassThru -NoNewWindow
+  if (-not $proc.WaitForExit(15000)) {
+    $proc.Kill()
+    throw "レンダリングがタイムアウトしました: $($slide.output)"
+  }
   if (-not (Test-Path $tmpShot)) {
     throw "レンダリング失敗: $($slide.output) (exit $($proc.ExitCode))"
   }

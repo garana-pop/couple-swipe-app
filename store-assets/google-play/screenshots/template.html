@@ -8,7 +8,7 @@
     width: 1080px;
     height: 1920px;
     overflow: hidden;
-    font-family: "Yu Gothic UI", "BIZ UDPGothic", "Hiragino Sans", "Meiryo UI", "Segoe UI", sans-serif;
+    font-family: "Noto Sans JP", "Yu Gothic UI", "BIZ UDPGothic", "Hiragino Sans", "Meiryo UI", "Segoe UI", sans-serif;
     background: #EFE9E1;
     -webkit-font-smoothing: antialiased;
   }
@@ -17,39 +17,81 @@
     position: relative;
     width: 1080px;
     height: 1920px;
-    background: linear-gradient(180deg, #F3EEE7 0%, #EBE3D9 100%);
+    background:
+      radial-gradient(circle at 50% 42%, rgba(242, 160, 126, 0.20) 0%, rgba(242, 160, 126, 0.06) 44%, rgba(242, 160, 126, 0) 72%),
+      radial-gradient(circle at 50% 8%, rgba(255, 250, 244, 0.85) 0%, rgba(255, 250, 244, 0) 46%),
+      linear-gradient(180deg, #F6F1EA 0%, #ECE3D8 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 112px 72px 0;
+    padding: 104px 72px 0;
   }
 
-  /* 控えめな見出しエリア（余白重視・シンプルで落ち着いたトーン） */
+  /* 控えめな見出しエリア（余白重視・シンプルで落ち着いたトーン＋新アイコンと調和する微細な温もり） */
   .copy-block {
     width: 100%;
     text-align: center;
-    margin-bottom: 62px;
+    margin-bottom: 58px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
+
+  .eyebrow-row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 22px;
+    min-height: 44px;
+  }
+
+  .brand-badge {
+    display: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 8px 18px rgba(176, 70, 44, 0.22),
+      0 2px 5px rgba(130, 48, 28, 0.14);
+    flex-shrink: 0;
+  }
+  .brand-badge img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+
+  .eyebrow-tick {
+    width: 16px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(224, 109, 83, 0.48);
+  }
+
   .eyebrow {
     display: inline-block;
-    font-size: 20px;
+    font-family: "Noto Sans", "Segoe UI", sans-serif;
+    font-size: 21px;
     font-weight: 700;
     letter-spacing: 3px;
-    color: #96897F;
-    margin-bottom: 20px;
+    color: #A26755;
   }
+
   .title {
     font-size: 56px;
-    font-weight: 800;
+    font-weight: 700;
     color: #2B2420;
-    line-height: 1.3;
+    line-height: 1.32;
     letter-spacing: -0.5px;
     margin-bottom: 18px;
   }
   .subtitle {
     font-size: 26px;
     font-weight: 500;
-    color: #70645B;
+    color: #6E6259;
     line-height: 1.5;
     letter-spacing: 0.3px;
   }
@@ -63,8 +105,8 @@
     background: #262220;
     padding: 14px;
     box-shadow:
-      0 38px 88px rgba(43, 36, 32, 0.16),
-      0 10px 24px rgba(43, 36, 32, 0.09),
+      0 40px 92px rgba(72, 48, 36, 0.18),
+      0 12px 26px rgba(43, 36, 32, 0.10),
       inset 0 0 0 1.5px rgba(255, 255, 255, 0.12);
   }
   .phone-screen {
@@ -86,6 +128,26 @@
     display: block;
     object-fit: cover;
     object-position: top center;
+  }
+
+  /* Slide 1 ペアカードのアイコン差替（ハート不使用ガイドライン準拠のミニマルなリンクピル） */
+  .home-pair-connector {
+    display: none;
+    position: absolute;
+    left: 96px;
+    top: 222px;
+    width: 24px;
+    height: 24px;
+    background: #FFFFFF;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
+  }
+  .home-pair-connector-pill {
+    width: 14px;
+    height: 4px;
+    border-radius: 999px;
+    background: #E06D53;
   }
 
   /* 上部ステータスバー＆クリーンヘッダー（実機の通知アイコン・歯車オーバーレイを完全に置換） */
@@ -132,7 +194,7 @@
   }
   .header-title {
     font-size: 30px;
-    font-weight: 800;
+    font-weight: 700;
     color: #2D2522;
     letter-spacing: 0.2px;
   }
@@ -192,7 +254,14 @@
 <body>
   <div class="canvas">
     <div class="copy-block">
-      <div class="eyebrow" id="eyebrow">Kotaeai  /  01</div>
+      <div class="eyebrow-row">
+        <div class="brand-badge" id="brand-badge">
+          <img id="brand-icon-img" src="" alt="Kotaeai" />
+        </div>
+        <span class="eyebrow-tick" id="tick-left"></span>
+        <div class="eyebrow" id="eyebrow">Kotaeai  /  01</div>
+        <span class="eyebrow-tick" id="tick-right"></span>
+      </div>
       <div class="title" id="title">1日3問、答え合わせ。</div>
       <div class="subtitle" id="subtitle">ふだん聞けない価値観を、毎日少しずつ</div>
     </div>
@@ -200,6 +269,10 @@
     <div class="phone-wrap">
       <div class="phone-screen">
         <img class="screen-img" id="screen-img" src="" alt="Screenshot" />
+
+        <div class="home-pair-connector" id="home-pair-connector">
+          <span class="home-pair-connector-pill"></span>
+        </div>
 
         <div class="clean-top-overlay" id="top-overlay">
           <div class="status-bar">

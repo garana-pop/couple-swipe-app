@@ -44,6 +44,7 @@ export default function HomeScreen() {
     questions,
     isMyCompleted,
     isPartnerCompleted,
+    isPairPremium,
     matchSummary,
     pairStats,
     isTutorialVisible,
@@ -358,7 +359,14 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={styles.streakMetaGroup}>
-                  <Text style={styles.streakMetaText}>完了 {pairStats.totalRevealedDays}日</Text>
+                  <Text
+                    style={[
+                      styles.streakMetaText,
+                      pairStats.myUnansweredDays > 0 && styles.streakMetaUnanswered,
+                    ]}
+                  >
+                    未回答 {pairStats.myUnansweredDays}日
+                  </Text>
                   {pairStats.overallMatchRate !== null ? (
                     <>
                       <Text style={styles.streakMetaDot}>•</Text>
@@ -374,6 +382,70 @@ export default function HomeScreen() {
 
             {/* 今日の質問メインアクションカード（連携済み時は最上部に配置） */}
             {renderActionCard()}
+
+            {/* 過去の未回答日がある場合：カレンダー確認＆プレミアム遡り回答の自然な導線 */}
+            {pairStats.myPastUnansweredDays > 0 && (
+              <View style={[styles.pastCatchUpCard, SHADOWS.cardSmall]}>
+                <View style={styles.pastCatchUpHeader}>
+                  <View style={styles.pastCatchUpTitleRow}>
+                    <Ionicons
+                      name={isPairPremium ? 'calendar' : 'diamond'}
+                      size={15}
+                      color="#9E6B24"
+                    />
+                    <Text style={styles.pastCatchUpTitle}>
+                      過去の未回答お題が {pairStats.myPastUnansweredDays}日分 あります
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.pastCatchUpDesc}>
+                  {isPairPremium
+                    ? 'プレミアム特典として、回答カレンダーから未回答の過去日をタップすると遡って回答できます。'
+                    : pairStats.pastPartnerAnsweredUnansweredDays > 0
+                      ? `${partnerName}さんが回答済みの日が ${pairStats.pastPartnerAnsweredUnansweredDays}日 あります。プレミアムプランならカレンダーから遡って回答して、相手の答えと一致率を見られます。`
+                      : '答え忘れた日も、プレミアムプランなら回答カレンダーからいつでも遡って回答できます（片方の課金で2人とも利用OK）。'}
+                </Text>
+
+                {isPairPremium ? (
+                  <TouchableOpacity
+                    style={styles.pastCatchUpPrimaryBtn}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      router.push({ pathname: '/history', params: { openCalendar: '1' } })
+                    }
+                  >
+                    <Ionicons name="calendar-outline" size={15} color="#FFFFFF" />
+                    <Text style={styles.pastCatchUpPrimaryBtnText}>
+                      回答カレンダーから遡って回答する
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.pastCatchUpActions}>
+                    <TouchableOpacity
+                      style={styles.pastCatchUpOutlineBtn}
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        router.push({ pathname: '/history', params: { openCalendar: '1' } })
+                      }
+                    >
+                      <Ionicons name="calendar-outline" size={14} color="#8C5A1B" />
+                      <Text style={styles.pastCatchUpOutlineBtnText}>カレンダーで確認</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.pastCatchUpPremiumBtn}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push({ pathname: '/ai-report', params: { focus: 'plans' } })
+                      }
+                    >
+                      <Ionicons name="diamond" size={14} color="#FFFFFF" />
+                      <Text style={styles.pastCatchUpPrimaryBtnText}>プレミアムで遡る</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
           </>
         ) : (
           <>
@@ -563,8 +635,15 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.menuItemTextBox}>
                   <Text style={styles.menuItemTitle}>過去の回答との比較</Text>
-                  <Text style={styles.menuItemSubtext}>出題履歴・過去の未回答お題に回答</Text>
+                  <Text style={styles.menuItemSubtext}>回答カレンダー・出題履歴・過去お題に回答</Text>
                 </View>
+                {pairStats.myUnansweredDays > 0 && (
+                  <View style={styles.menuUnansweredBadge}>
+                    <Text style={styles.menuUnansweredBadgeText}>
+                      未回答 {pairStats.myUnansweredDays}日
+                    </Text>
+                  </View>
+                )}
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
 
@@ -581,7 +660,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.menuItemTextBox}>
                   <Text style={styles.menuItemTitle}>AI相性診断・プレミアム</Text>
-                  <Text style={styles.menuItemSubtext}>AI分析＆過去質問への回答・閲覧を解放</Text>
+                  <Text style={styles.menuItemSubtext}>過去日への遡り回答＆AI相性診断を解放</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
@@ -1348,5 +1427,103 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  streakMetaUnanswered: {
+    color: '#C97A2B',
+    fontWeight: '800',
+  },
+  pastCatchUpCard: {
+    backgroundColor: '#FFFBF3',
+    borderRadius: 18,
+    padding: 15,
+    marginTop: 2,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#EED9B7',
+  },
+  pastCatchUpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  pastCatchUpTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  pastCatchUpTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#8C5A1B',
+  },
+  pastCatchUpDesc: {
+    fontSize: 11.5,
+    color: '#7A5B32',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  pastCatchUpActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pastCatchUpOutlineBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E4C796',
+    borderRadius: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  pastCatchUpOutlineBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#8C5A1B',
+  },
+  pastCatchUpPremiumBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#C87D28',
+    borderRadius: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  pastCatchUpPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  pastCatchUpPrimaryBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  menuUnansweredBadge: {
+    backgroundColor: '#FDF3E7',
+    borderWidth: 1,
+    borderColor: '#EED4AE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginRight: 4,
+  },
+  menuUnansweredBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#9E6B24',
   },
 });

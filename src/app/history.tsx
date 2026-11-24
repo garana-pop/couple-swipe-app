@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
+import { AnswerCalendarModal } from '../components/AnswerCalendarModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 function formatDateHeading(dateStr: string): string {
@@ -19,6 +20,7 @@ function formatDateHeading(dateStr: string): string {
 }
 
 export default function HistoryScreen() {
+  const { openCalendar } = useLocalSearchParams<{ openCalendar?: string }>();
   const {
     questions,
     myAnswers,
@@ -26,13 +28,27 @@ export default function HistoryScreen() {
     isPartnerCompleted,
     partnerName,
     myName,
+    todayDate,
+    pairStartDate,
+    isPairPremium,
     historyDays,
+    calendarDays,
     isHistoryLoading,
     pairStats,
     fetchHistory,
     isSupabaseReady,
     hasPair,
   } = useApp();
+
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const didAutoOpenCalendarRef = useRef(false);
+
+  useEffect(() => {
+    if (openCalendar === '1' && !didAutoOpenCalendarRef.current) {
+      didAutoOpenCalendarRef.current = true;
+      setIsCalendarVisible(true);
+    }
+  }, [openCalendar]);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,8 +58,77 @@ export default function HistoryScreen() {
     }, [isSupabaseReady, hasPair, fetchHistory])
   );
 
+  const handleOpenCalendar = () => {
+    setIsCalendarVisible(true);
+  };
+
+  const handleAnswerDate = (dateStr: string, isToday: boolean) => {
+    setIsCalendarVisible(false);
+    if (isToday) {
+      router.push('/quiz');
+    } else {
+      router.push({ pathname: '/quiz', params: { date: dateStr } });
+    }
+  };
+
+  const handleOpenResult = (dateStr: string, isToday: boolean) => {
+    setIsCalendarVisible(false);
+    if (isToday) {
+      router.push('/result');
+    } else {
+      router.push({ pathname: '/result', params: { date: dateStr } });
+    }
+  };
+
+  const handleOpenWaiting = () => {
+    setIsCalendarVisible(false);
+    router.push('/waiting');
+  };
+
+  const handleOpenPremium = () => {
+    setIsCalendarVisible(false);
+    router.push({ pathname: '/ai-report', params: { focus: 'plans' } });
+  };
+
+  const calendarSubtext = (() => {
+    if (!hasPair) {
+      return 'ペア連携すると毎日の回答・未回答をカレンダーで確認できます';
+    }
+    if (pairStats.myPastUnansweredDays > 0) {
+      if (isPairPremium) {
+        return `過去の未回答 ${pairStats.myPastUnansweredDays}日分をタップして遡って回答できます`;
+      }
+      if (pairStats.pastPartnerAnsweredUnansweredDays > 0) {
+        return `${partnerName}さん回答済みの過去日あり・プレミアムで遡って回答OK`;
+      }
+      return `過去の未回答 ${pairStats.myPastUnansweredDays}日分・プレミアムで遡って回答できます`;
+    }
+    if (pairStats.myUnansweredDays > 0) {
+      return '今日のお題が未回答です・カレンダーからすぐ回答できます';
+    }
+    return '毎日の回答・未回答ステータスをカレンダーで一覧確認できます';
+  })();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <>
+      <Stack.Screen
+        options={{
+          title: '過去の回答比較',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={handleOpenCalendar}
+              style={styles.headerCalendarBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="calendar-outline" size={22} color={COLORS.text} />
+              {pairStats.myUnansweredDays > 0 && <View style={styles.headerCalendarDot} />}
+            </TouchableOpacity>
+          ),
+        }}
+      />
+
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.headerSection}>
         <Text style={styles.headerTitle}>質問の比較とタイムライン</Text>
         <Text style={styles.headerDesc}>
@@ -51,7 +136,7 @@ export default function HistoryScreen() {
         </Text>
       </View>
 
-      {/* 連続回答ストリーク ＆ カテゴリ別一致率カード */}
+      {/* 連続回答ストリーク ＆ 自身の未回答日数 ＆ カテゴリ別一致率カード */}
       <View style={[styles.card, SHADOWS.cardSmall, styles.statsCard]}>
         <View style={styles.statsKpiRow}>
           <View style={styles.kpiItem}>
@@ -68,10 +153,28 @@ export default function HistoryScreen() {
 
           <View style={styles.kpiDivider} />
 
-          <View style={styles.kpiItem}>
-            <Text style={styles.kpiValue}>{pairStats.totalRevealedDays}日</Text>
-            <Text style={styles.kpiLabel}>双方完了日数</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.kpiItem}
+            activeOpacity={0.7}
+            onPress={handleOpenCalendar}
+          >
+            <View style={styles.kpiValueRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={15}
+                color={pairStats.myUnansweredDays > 0 ? '#C97A2B' : '#4A7C59'}
+              />
+              <Text
+                style={[
+                  styles.kpiValue,
+                  pairStats.myUnansweredDays > 0 && styles.kpiValueUnanswered,
+                ]}
+              >
+                {pairStats.myUnansweredDays}日
+              </Text>
+            </View>
+            <Text style={styles.kpiLabel}>未回答日数</Text>
+          </TouchableOpacity>
 
           <View style={styles.kpiDivider} />
 
@@ -125,6 +228,39 @@ export default function HistoryScreen() {
           </Text>
         )}
       </View>
+
+      {/* 回答カレンダーボタン（「今日のお題（前回との比較）」の直上に配置） */}
+      <TouchableOpacity
+        style={[
+          styles.calendarTriggerCard,
+          SHADOWS.cardSmall,
+          pairStats.myPastUnansweredDays > 0 && styles.calendarTriggerCardHighlight,
+        ]}
+        activeOpacity={0.82}
+        onPress={handleOpenCalendar}
+      >
+        <View style={styles.calendarTriggerIconBox}>
+          <Ionicons name="calendar" size={20} color={COLORS.primary} />
+        </View>
+        <View style={styles.calendarTriggerBody}>
+          <View style={styles.calendarTriggerTopRow}>
+            <Text style={styles.calendarTriggerTitle}>回答カレンダーを開く</Text>
+            {pairStats.myUnansweredDays > 0 ? (
+              <View style={styles.calendarUnansweredPill}>
+                <Text style={styles.calendarUnansweredPillText}>
+                  未回答 {pairStats.myUnansweredDays}日
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.calendarDonePill}>
+                <Text style={styles.calendarDonePillText}>全回答済</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.calendarTriggerSub}>{calendarSubtext}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+      </TouchableOpacity>
 
       {/* 今日の再出題比較セクション */}
       <Text style={styles.sectionLabel}>今日のお題（前回との比較）</Text>
@@ -207,22 +343,51 @@ export default function HistoryScreen() {
       {/* 過去の履歴タイムライン（Supabase 実データ） */}
       <Text style={styles.sectionLabel}>過去の履歴タイムライン</Text>
 
-      <TouchableOpacity
-        style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
-        activeOpacity={0.85}
-        onPress={() => router.push('/ai-report')}
-      >
-        <View style={styles.premiumGuideHeader}>
-          <View style={styles.premiumGuideTitleRow}>
-            <Ionicons name="diamond" size={14} color="#9E6B24" />
-            <Text style={styles.premiumGuideTitle}>過去の未回答お題もプレミアムで回答＆閲覧OK</Text>
+      {isPairPremium ? (
+        <TouchableOpacity
+          style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
+          activeOpacity={0.85}
+          onPress={handleOpenCalendar}
+        >
+          <View style={styles.premiumGuideHeader}>
+            <View style={styles.premiumGuideTitleRow}>
+              <Ionicons name="diamond" size={14} color="#9E6B24" />
+              <Text style={styles.premiumGuideTitle}>
+                {pairStats.myPastUnansweredDays > 0
+                  ? `プレミアム有効中：未回答 ${pairStats.myPastUnansweredDays}日分を遡って回答できます`
+                  : 'プレミアム有効中：過去日もカレンダーからいつでも遡り回答OK'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
           </View>
-          <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
-        </View>
-        <Text style={styles.premiumGuideText}>
-          プレミアムプランに加入すると、自分が未回答だった過去日の質問に後から回答でき、回答すると相手の答えと一致率が見られます（AI相性診断にも自動反映・当日は双方完了まで秘密）。
-        </Text>
-      </TouchableOpacity>
+          <Text style={styles.premiumGuideText}>
+            回答カレンダーから未回答の過去日をタップすると、その日の3問に遡って回答できます（回答完了と同時に相手の答えと一致率が解放されます）。
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
+          activeOpacity={0.85}
+          onPress={() => router.push({ pathname: '/ai-report', params: { focus: 'plans' } })}
+        >
+          <View style={styles.premiumGuideHeader}>
+            <View style={styles.premiumGuideTitleRow}>
+              <Ionicons name="diamond" size={14} color="#9E6B24" />
+              <Text style={styles.premiumGuideTitle}>
+                {pairStats.myPastUnansweredDays > 0
+                  ? `過去の未回答 ${pairStats.myPastUnansweredDays}日分もプレミアムで遡り回答OK`
+                  : '過去の未回答お題もプレミアムで遡って回答＆閲覧OK'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
+          </View>
+          <Text style={styles.premiumGuideText}>
+            {pairStats.pastPartnerAnsweredUnansweredDays > 0
+              ? `${partnerName}さんが回答済みの未回答日が ${pairStats.pastPartnerAnsweredUnansweredDays}日 あります。プレミアムプランに加入すると、カレンダーから過去日に遡って回答し、相手の答えと一致率を見られます（片方の課金で2人とも利用OK）。`
+              : 'プレミアムプランに加入すると、自分が未回答だった過去日の質問にカレンダーから遡って回答でき、回答すると相手の答えと一致率が見られます（AI相性診断にも自動反映・当日は双方完了まで秘密）。'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {isHistoryLoading ? (
         <View style={styles.loadingBox}>
@@ -261,11 +426,13 @@ export default function HistoryScreen() {
                   <TouchableOpacity
                     style={styles.unlockCtaBtn}
                     activeOpacity={0.85}
-                    onPress={() => router.push('/ai-report')}
+                    onPress={() =>
+                      router.push({ pathname: '/ai-report', params: { focus: 'plans' } })
+                    }
                   >
                     <Ionicons name="diamond-outline" size={14} color="#FFFFFF" />
                     <Text style={styles.unlockCtaBtnText}>
-                      プレミアムで過去の質問に回答 ＆ 結果を見る
+                      プレミアムで過去の質問に遡って回答 ＆ 結果を見る
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -393,10 +560,46 @@ export default function HistoryScreen() {
         <Text style={styles.backButtonText}>戻る</Text>
       </TouchableOpacity>
     </ScrollView>
+
+      <AnswerCalendarModal
+        visible={isCalendarVisible}
+        onClose={() => setIsCalendarVisible(false)}
+        hasPair={hasPair}
+        todayDate={todayDate}
+        pairStartDate={pairStartDate}
+        isPairPremium={isPairPremium}
+        partnerName={partnerName}
+        calendarDays={calendarDays}
+        historyDays={historyDays}
+        myUnansweredDays={pairStats.myUnansweredDays}
+        myPastUnansweredDays={pairStats.myPastUnansweredDays}
+        pastPartnerAnsweredUnansweredDays={pairStats.pastPartnerAnsweredUnansweredDays}
+        onAnswerDate={handleAnswerDate}
+        onOpenResult={handleOpenResult}
+        onOpenWaiting={handleOpenWaiting}
+        onOpenPremium={handleOpenPremium}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  headerCalendarBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    position: 'relative',
+  },
+  headerCalendarDot: {
+    position: 'absolute',
+    top: 3,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#C97A2B',
+    borderWidth: 1,
+    borderColor: COLORS.background,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -441,6 +644,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     color: COLORS.text,
+  },
+  kpiValueUnanswered: {
+    color: '#C97A2B',
   },
   kpiLabel: {
     fontSize: 10.5,
@@ -514,6 +720,74 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     marginBottom: 10,
     marginTop: 4,
+  },
+  calendarTriggerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  calendarTriggerCardHighlight: {
+    backgroundColor: '#FFFDF8',
+    borderColor: '#EBD3AA',
+  },
+  calendarTriggerIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarTriggerBody: {
+    flex: 1,
+    gap: 3,
+  },
+  calendarTriggerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flexWrap: 'wrap',
+  },
+  calendarTriggerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  calendarUnansweredPill: {
+    backgroundColor: '#FDF3E7',
+    borderWidth: 1,
+    borderColor: '#EED4AE',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+  },
+  calendarUnansweredPillText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#9E6B24',
+  },
+  calendarDonePill: {
+    backgroundColor: '#E8F4EC',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+  },
+  calendarDonePillText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#3B6347',
+  },
+  calendarTriggerSub: {
+    fontSize: 11.5,
+    color: COLORS.textMuted,
+    lineHeight: 16,
   },
   premiumGuideCard: {
     backgroundColor: '#FFFBF3',

@@ -441,6 +441,7 @@ export async function fetchPairEntitlement(): Promise<PairEntitlement | null> {
     productId: typeof d.product_id === 'string' ? d.product_id : null,
     expiresAt: typeof d.expires_at === 'string' ? d.expires_at : null,
     willRenew: Boolean(d.will_renew),
+    pairStartDate: typeof d.pair_start_date === 'string' ? d.pair_start_date : null,
     revealedDaysCount: Number(d.revealed_days_count ?? 0),
     pastPartnerOnlyDaysCount: Number(d.past_partner_only_days_count ?? 0),
     pastUnansweredDaysCount: Number(d.past_unanswered_days_count ?? 0),

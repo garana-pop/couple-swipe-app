@@ -9,6 +9,8 @@
     "showBackArrow": false,
     "showMenuIcon": true,
     "showQuizProgress": false,
+    "showBrandIcon": true,
+    "replaceHomeHeart": true,
     "cleanGear": true,
     "mirrorTopCard": true
   },

@@ -123,6 +123,16 @@ export interface PairBreakupReflectionRecord {
   report: BreakupReflectionData;
 }
 
+export interface CalendarDaySummary {
+  quizDate: string; // YYYY-MM-DD
+  totalQuestions: number;
+  myAnsweredCount: number;
+  partnerAnsweredCount: number;
+  isMyCompleted: boolean;
+  isPartnerCompleted: boolean;
+  isRevealed: boolean;
+}
+
 export interface PairEntitlement {
   hasPair: boolean;
   isPremium: boolean;
@@ -132,6 +142,7 @@ export interface PairEntitlement {
   productId: string | null;
   expiresAt: string | null;
   willRenew: boolean;
+  pairStartDate?: string | null;
   revealedDaysCount: number;
   pastPartnerOnlyDaysCount: number;
   pastUnansweredDaysCount: number;
@@ -150,6 +161,9 @@ export interface PairStats {
   currentStreak: number;
   isTodayIncludedInStreak: boolean;
   totalRevealedDays: number;
+  myUnansweredDays: number;
+  myPastUnansweredDays: number;
+  pastPartnerAnsweredUnansweredDays: number;
   overallMatchRate: number | null;
   totalBothAnsweredQuestions: number;
   categoryStats: CategoryMatchStat[];

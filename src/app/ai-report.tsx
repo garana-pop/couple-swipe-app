@@ -103,7 +103,7 @@ function formatShortDate(iso: string): string {
 }
 
 export default function AiReportScreen() {
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode, focus } = useLocalSearchParams<{ mode?: string; focus?: string }>();
   const {
     userId,
     pairId,
@@ -114,12 +114,14 @@ export default function AiReportScreen() {
     myName,
     getQuestionsById,
     fetchHistory,
+    setPairPremium,
   } = useApp();
 
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
   const reflectionSectionYRef = useRef<number>(0);
   const subCardYRef = useRef<number>(0);
   const didAutoScrollReflectionRef = useRef(false);
+  const didAutoScrollPlansRef = useRef(false);
 
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [loadingEntitlement, setLoadingEntitlement] = useState(true);
@@ -161,10 +163,30 @@ export default function AiReportScreen() {
     }
   }, [mode, loadingEntitlement, isReflectionOpen]);
 
+  useEffect(() => {
+    if (
+      focus === 'plans' &&
+      !loadingEntitlement &&
+      !entitlement?.isPremium &&
+      !didAutoScrollPlansRef.current
+    ) {
+      didAutoScrollPlansRef.current = true;
+      setTimeout(() => {
+        if (subCardYRef.current > 0) {
+          scrollViewRef.current?.scrollTo({
+            y: Math.max(0, subCardYRef.current - 16),
+            animated: true,
+          });
+        }
+      }, 240);
+    }
+  }, [focus, loadingEntitlement, entitlement?.isPremium]);
+
   const applyEntitlement = useCallback(
     async (ent: PairEntitlement | null) => {
       if (!ent) return;
       setEntitlement(ent);
+      setPairPremium(Boolean(ent.isPremium));
       if (ent.isPremium && pairId) {
         const { compatibilityReports, reflectionReports } = await fetchPairAllAiReports(
           pairId,
@@ -191,7 +213,7 @@ export default function AiReportScreen() {
         setSelectedReportId(ent.latestReport?.id ?? null);
       }
     },
-    [pairId]
+    [pairId, setPairPremium]
   );
 
   const refreshEntitlementAndBilling = useCallback(async () => {
@@ -391,9 +413,9 @@ export default function AiReportScreen() {
           <Ionicons name="sparkles" size={15} color="#F2A07E" />
           <Text style={styles.badgeText}>AI COUPLE ANALYSIS</Text>
         </View>
-        <Text style={styles.heroTitle}>ふたりの深層AI診断レポート</Text>
+        <Text style={styles.heroTitle}>ふたりプレミアム ＆ AI相性診断</Text>
         <Text style={styles.heroDesc}>
-          毎日のスワイプ回答履歴（自分が未回答だった過去の日の相手の回答も含む）をAIが分析し、性格傾向や価値観のすれ違い予防策をレポートします。
+          答え忘れた過去のお題へカレンダーから遡って回答できるほか、二人のスワイプ履歴をAIが分析し、性格傾向やすれ違い予防策をレポートします。
         </Text>
         <View style={styles.shareBadge}>
           <Ionicons
@@ -463,11 +485,13 @@ export default function AiReportScreen() {
             <TouchableOpacity
               style={styles.pastCatchUpBtn}
               activeOpacity={0.85}
-              onPress={() => router.push('/history')}
+              onPress={() =>
+                router.push({ pathname: '/history', params: { openCalendar: '1' } })
+              }
             >
-              <Ionicons name="play-circle-outline" size={16} color="#8C5A1B" />
+              <Ionicons name="calendar-outline" size={16} color="#8C5A1B" />
               <Text style={styles.pastCatchUpBtnText}>
-                過去の未回答お題（{entitlement?.pastUnansweredDaysCount}日分）に回答する
+                カレンダーから未回答お題（{entitlement?.pastUnansweredDaysCount}日分）に遡って回答
               </Text>
               <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
             </TouchableOpacity>
@@ -691,15 +715,28 @@ export default function AiReportScreen() {
             <Text style={styles.subTitle}>ふたりプレミアムプラン</Text>
           </View>
           <Text style={styles.subSubtitle}>
-            1人が加入すれば2人とも利用OK！ペア共有でプレミアム機能がすべて解放されます。
+            1人が加入すれば2人とも利用OK！カレンダーからの遡り回答と深層AI診断がすべて解放されます。
           </Text>
+
+          {(entitlement?.pastUnansweredDaysCount ?? 0) > 0 && (
+            <View style={styles.subUnansweredCallout}>
+              <Ionicons name="calendar" size={15} color="#8C5A1B" />
+              <Text style={styles.subUnansweredCalloutText}>
+                現在、未回答の過去日が {entitlement?.pastUnansweredDaysCount}日分 あります
+                {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
+                  ? `（うち ${entitlement?.pastPartnerOnlyDaysCount}日 はパートナー回答済み！）`
+                  : ''}
+                。加入後すぐ回答カレンダーから遡って回答できます。
+              </Text>
+            </View>
+          )}
 
           <View style={styles.perksBox}>
             <View style={styles.perkRow}>
               <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
               <Text style={styles.perkText}>
-                <Text style={styles.perkBold}>過去の未回答質問に回答＆相手の結果を解放</Text>
-                ：答え忘れた過去日の質問に履歴から後から回答でき、回答すると相手の答えと一致率が見られます（※当日は双方回答まで秘密）
+                <Text style={styles.perkBold}>回答カレンダーから過去の未回答日へ遡り回答＆結果解放</Text>
+                ：答え忘れた過去日をタップして遡って回答でき、回答すると相手の答えと一致率が見られます（※当日は双方回答まで秘密）
               </Text>
             </View>
             <View style={styles.perkRow}>
@@ -760,8 +797,8 @@ export default function AiReportScreen() {
                 <Ionicons name="lock-open" size={17} color="#FFFFFF" />
                 <Text style={styles.subscribeBtnText}>
                   {selectedPlan === 'yearly'
-                    ? `${offering.yearlyPriceLabel} で全レポートを解放`
-                    : `${offering.monthlyPriceLabel} で全レポートを解放`}
+                    ? `${offering.yearlyPriceLabel} でプレミアムを解放`
+                    : `${offering.monthlyPriceLabel} でプレミアムを解放`}
                 </Text>
               </>
             )}
@@ -1384,6 +1421,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     marginBottom: 12,
+    lineHeight: 17,
+  },
+  subUnansweredCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFF5E2',
+    borderWidth: 1,
+    borderColor: '#EBC98D',
+    borderRadius: 12,
+    padding: 11,
+    marginBottom: 12,
+  },
+  subUnansweredCalloutText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#7A4E16',
     lineHeight: 17,
   },
   perksBox: {
