@@ -16,6 +16,7 @@ import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../context/AppContext';
+import { KotaeaiLogo } from '../components/KotaeaiLogo';
 import { TutorialModal } from '../components/TutorialModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { showAlert, showConfirm } from '../lib/alert';
@@ -303,6 +304,8 @@ export default function HomeScreen() {
       <Stack.Screen
         options={{
           title: 'Kotaeai',
+          headerTitleAlign: 'left',
+          headerTitle: () => <KotaeaiLogo />,
           headerRight: () => (
             <TouchableOpacity
               onPress={() => setIsMenuOpen(true)}

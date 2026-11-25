@@ -15,6 +15,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../context/AppContext';
+import { AnswerCalendarModal } from '../components/AnswerCalendarModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { evaluateMatch } from '../constants/questions';
 import { APP_DISPLAY_NAME, APP_SHORT_NAME } from '../lib/links';
@@ -65,15 +66,21 @@ export default function ResultScreen() {
   const rawDate = Array.isArray(dateParam) ? dateParam[0] : dateParam;
 
   const {
+    isSupabaseReady,
+    hasPair,
     todayDate,
+    pairStartDate,
     isPartnerCompleted,
     isMyCompleted,
     isPairPremium,
     partnerName,
     myName,
     matchSummary,
+    historyDays,
+    calendarDays,
     pairStats,
     loadDayQuizData,
+    fetchHistory,
   } = useApp();
 
   const isPastResult = Boolean(
@@ -84,6 +91,43 @@ export default function ResultScreen() {
   const [pastData, setPastData] = useState<DayQuizData | null>(null);
   const [loadingPast, setLoadingPast] = useState(isPastResult);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+
+  const handleOpenCalendar = () => {
+    if (isSupabaseReady && hasPair) {
+      void fetchHistory();
+    }
+    setIsCalendarVisible(true);
+  };
+
+  const handleAnswerDate = (dateStr: string, isToday: boolean) => {
+    setIsCalendarVisible(false);
+    if (isToday) {
+      router.push('/quiz');
+    } else {
+      router.push({ pathname: '/quiz', params: { date: dateStr } });
+    }
+  };
+
+  const handleOpenResultFromCalendar = (dateStr: string, isToday: boolean) => {
+    setIsCalendarVisible(false);
+    if (dateStr === targetDate) return;
+    if (isToday) {
+      router.replace('/result');
+    } else {
+      router.push({ pathname: '/result', params: { date: dateStr } });
+    }
+  };
+
+  const handleOpenWaitingFromCalendar = () => {
+    setIsCalendarVisible(false);
+    router.push('/waiting');
+  };
+
+  const handleOpenPremiumFromCalendar = () => {
+    setIsCalendarVisible(false);
+    router.push({ pathname: '/ai-report', params: { focus: 'plans' } });
+  };
 
   // 当日モード: 双方完了していない場合はロック画面へ
   useEffect(() => {
@@ -410,9 +454,7 @@ export default function ResultScreen() {
             <TouchableOpacity
               style={styles.catchUpPrimaryBtn}
               activeOpacity={0.85}
-              onPress={() =>
-                router.push({ pathname: '/history', params: { openCalendar: '1' } })
-              }
+              onPress={handleOpenCalendar}
             >
               <Ionicons name="calendar-outline" size={15} color="#FFFFFF" />
               <Text style={styles.catchUpBtnText}>回答カレンダーから遡って回答する</Text>
@@ -422,9 +464,7 @@ export default function ResultScreen() {
               <TouchableOpacity
                 style={styles.catchUpOutlineBtn}
                 activeOpacity={0.8}
-                onPress={() =>
-                  router.push({ pathname: '/history', params: { openCalendar: '1' } })
-                }
+                onPress={handleOpenCalendar}
               >
                 <Text style={styles.catchUpOutlineBtnText}>カレンダーを見る</Text>
               </TouchableOpacity>
@@ -453,6 +493,26 @@ export default function ResultScreen() {
           <Text style={styles.historyBackButtonText}>過去の回答一覧へ戻る</Text>
         </TouchableOpacity>
       )}
+
+      {/* 控えめな関連機能導線（AI相性診断・回答カレンダー） */}
+      <View style={styles.subtleLinksRow}>
+        <TouchableOpacity
+          style={styles.subtleLinkBtn}
+          activeOpacity={0.75}
+          onPress={() => router.push('/ai-report')}
+        >
+          <Ionicons name="sparkles-outline" size={15} color={COLORS.primaryDark} />
+          <Text style={styles.subtleLinkBtnText}>AI診断する</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.subtleLinkBtn}
+          activeOpacity={0.75}
+          onPress={handleOpenCalendar}
+        >
+          <Ionicons name="calendar-outline" size={15} color={COLORS.primaryDark} />
+          <Text style={styles.subtleLinkBtnText}>回答カレンダー</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* ホームに戻るボタン */}
       <TouchableOpacity
@@ -540,6 +600,26 @@ export default function ResultScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 回答カレンダーモーダル（結果画面のまま直接開閉） */}
+      <AnswerCalendarModal
+        visible={isCalendarVisible}
+        onClose={() => setIsCalendarVisible(false)}
+        hasPair={hasPair}
+        todayDate={todayDate}
+        pairStartDate={pairStartDate}
+        isPairPremium={isPairPremium}
+        partnerName={partnerName}
+        calendarDays={calendarDays}
+        historyDays={historyDays}
+        myUnansweredDays={pairStats.myUnansweredDays}
+        myPastUnansweredDays={pairStats.myPastUnansweredDays}
+        pastPartnerAnsweredUnansweredDays={pairStats.pastPartnerAnsweredUnansweredDays}
+        onAnswerDate={handleAnswerDate}
+        onOpenResult={handleOpenResultFromCalendar}
+        onOpenWaiting={handleOpenWaitingFromCalendar}
+        onOpenPremium={handleOpenPremiumFromCalendar}
+      />
     </ScrollView>
   );
 }
@@ -857,6 +937,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  subtleLinksRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  subtleLinkBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 10,
+  },
+  subtleLinkBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
   homeButton: {
     flexDirection: 'row',

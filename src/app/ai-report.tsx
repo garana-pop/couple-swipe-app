@@ -132,6 +132,7 @@ export default function AiReportScreen() {
   const [reflectionHistory, setReflectionHistory] = useState<PairBreakupReflectionRecord[]>([]);
   const [reflectionExpandedOverride, setReflectionExpandedOverride] = useState<boolean | null>(null);
   const isReflectionOpen = reflectionExpandedOverride ?? mode === 'reflection';
+  const [isSampleOpen, setIsSampleOpen] = useState(false);
   const [generatingReflection, setGeneratingReflection] = useState(false);
   const [offering, setOffering] = useState<BillingOfferingPrices>({
     isStoreReady: false,
@@ -414,239 +415,8 @@ export default function AiReportScreen() {
     }
   };
 
-  return (
-    <ScrollView
-      ref={scrollViewRef}
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      {/* プレミアムバナー */}
-      <View style={styles.heroBanner}>
-        <View style={styles.badgeRow}>
-          <Ionicons name="sparkles" size={15} color="#F2A07E" />
-          <Text style={styles.badgeText}>AI COUPLE ANALYSIS</Text>
-        </View>
-        <Text style={styles.heroTitle}>ふたりプレミアム ＆ AI相性診断</Text>
-        <Text style={styles.heroDesc}>
-          答え忘れた過去のお題へカレンダーから遡って回答できるほか、二人のスワイプ履歴をAIが分析し、性格傾向やすれ違い予防策をレポートします。
-        </Text>
-        <View style={styles.shareBadge}>
-          <Ionicons
-            name={isPremium ? 'checkmark-circle' : 'gift-outline'}
-            size={14}
-            color="#FFFFFF"
-          />
-          <Text style={styles.shareBadgeText}>
-            {isPremium
-              ? entitlement?.paidByPartner && !entitlement?.paidByMe
-                ? `${partnerName}さんのプランで解放済み！`
-                : 'ふたりプレミアムプラン有効中'
-              : '片方の課金でパートナーも一緒に閲覧OK！'}
-          </Text>
-        </View>
-      </View>
-
-      {/* 有料ペア向け：実レポート生成／更新アクションカード */}
-      {loadingEntitlement ? (
-        <View style={[styles.card, SHADOWS.card, styles.loadingBox]}>
-          <ActivityIndicator color={COLORS.primary} />
-          <Text style={styles.loadingText}>課金状態と最新レポートを確認中...</Text>
-        </View>
-      ) : isPremium ? (
-        <View style={[styles.card, SHADOWS.card, styles.premiumControlCard]}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="sparkles" size={18} color="#4A7C59" />
-            <Text style={styles.cardTitle}>
-              {latestReportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
-            </Text>
-          </View>
-          {entitlement && (
-            <View style={styles.subStatusPill}>
-              <Ionicons name="diamond" size={13} color="#4A7C59" />
-              <Text style={styles.subStatusPillText}>
-                {formatPlanName(entitlement.productId)}（
-                {entitlement.paidByPartner && !entitlement.paidByMe
-                  ? `${partnerName}さんの契約を共有`
-                  : 'ご契約中'}
-                ）
-                {entitlement.expiresAt
-                  ? entitlement.status === 'grace_period'
-                    ? ` ・ お支払い確認中（${formatShortDate(entitlement.expiresAt)}まで）`
-                    : entitlement.willRenew
-                      ? ` ・ 次回更新 ${formatShortDate(entitlement.expiresAt)}`
-                      : ` ・ ${formatShortDate(entitlement.expiresAt)}まで利用可（自動更新停止）`
-                  : ''}
-              </Text>
-            </View>
-          )}
-          <Text style={styles.premiumMetaText}>
-            分析対象データ：計 {entitlement?.analyzableDaysCount ?? 0}日分（双方回答{' '}
-            {entitlement?.revealedDaysCount ?? 0}日
-            {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
-              ? ` ＋ 過去未回答日の相手回答 ${entitlement?.pastPartnerOnlyDaysCount}日`
-              : ''}
-            ）
-            {latestReportRecord
-              ? `\n最終更新: ${formatDateTime(latestReportRecord.createdAt)}（${latestReportRecord.analyzedAnswers}問を分析）`
-              : ''}
-            {(entitlement?.pastUnansweredDaysCount ?? 0) > 0
-              ? `\n※ 過去の未回答お題が ${entitlement?.pastUnansweredDaysCount}日分 あります。「過去の回答との比較」から後から回答して相手の結果を見られます。`
-              : '\n※ 過去の未回答お題は「過去の回答との比較」からいつでも回答できます。'}
-          </Text>
-
-          {(entitlement?.pastUnansweredDaysCount ?? 0) > 0 && (
-            <TouchableOpacity
-              style={styles.pastCatchUpBtn}
-              activeOpacity={0.85}
-              onPress={() =>
-                router.push({ pathname: '/history', params: { openCalendar: '1' } })
-              }
-            >
-              <Ionicons name="calendar-outline" size={16} color="#8C5A1B" />
-              <Text style={styles.pastCatchUpBtnText}>
-                カレンダーから未回答お題（{entitlement?.pastUnansweredDaysCount}日分）に遡って回答
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={styles.generateBtn}
-            activeOpacity={0.85}
-            disabled={generating || !isPairConnected}
-            onPress={() => void handleGenerateReport(Boolean(latestReportRecord))}
-          >
-            {generating ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="sparkles-outline" size={17} color="#FFFFFF" />
-                <Text style={styles.generateBtnText}>
-                  {latestReportRecord ? '最新データでレポートを更新する' : 'AI相性レポートを生成する'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.sampleNoticeBanner}>
-          <Ionicons name="eye-outline" size={16} color="#9E6B24" />
-          <Text style={styles.sampleNoticeText}>
-            以下はサンプルプレビューです。プレミアムプランに加入（またはパートナーが加入）すると、二人の実データ（双方回答 {entitlement?.revealedDaysCount ?? 0}日分
-            {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
-              ? `＋あなたが未回答の過去日 ${entitlement?.pastPartnerOnlyDaysCount}日分`
-              : ''}
-            ）から AI が専用レポートを生成し、過去の未回答の質問にも後から回答して相手の結果を見られるようになります。
-          </Text>
-        </View>
-      )}
-
-      {/* 有料ペア向け：過去のAI診断アーカイブ（横並びで見返し＆比較） */}
-      {isPremium && reportHistory.length > 0 && (
-        <View style={styles.archiveSection}>
-          <View style={styles.archiveHeader}>
-            <View style={styles.archiveTitleRow}>
-              <Ionicons name="albums-outline" size={16} color={COLORS.primaryDark} />
-              <Text style={styles.archiveTitle}>
-                AI診断アーカイブ（全 {reportHistory.length}件）
-              </Text>
-            </View>
-            {isViewingOlderReport && latestReportRecord && (
-              <TouchableOpacity
-                style={styles.backLatestBtn}
-                onPress={() => handleSelectArchiveReport(latestReportRecord.id)}
-              >
-                <Text style={styles.backLatestBtnText}>最新へ戻す</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={styles.archiveHint}>
-            カードをタップすると、下の詳細レポートへ移動・切り替えできます
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.archiveScrollContent}
-          >
-            {reportHistory.map((item, idx) => {
-              const isSelected = activeReportRecord?.id === item.id;
-              const prevItem = reportHistory[idx + 1];
-              const delta = prevItem
-                ? item.report.overallScore - prevItem.report.overallScore
-                : null;
-
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.archiveCard,
-                    SHADOWS.cardSmall,
-                    isSelected && styles.archiveCardActive,
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => handleSelectArchiveReport(item.id)}
-                >
-                  <View style={styles.archiveCardTop}>
-                    <Text style={[styles.archiveDate, isSelected && styles.archiveDateActive]}>
-                      {formatShortDate(item.createdAt)}
-                    </Text>
-                    <View style={styles.archiveChipRow}>
-                      {isSelected && (
-                        <View style={styles.viewingChip}>
-                          <Text style={styles.viewingChipText}>表示中</Text>
-                        </View>
-                      )}
-                      {idx === 0 && (
-                        <View style={styles.latestChip}>
-                          <Text style={styles.latestChipText}>最新</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={styles.archiveScoreRow}>
-                    <Text style={[styles.archiveScore, isSelected && styles.archiveScoreActive]}>
-                      {item.report.overallScore}
-                      <Text style={styles.archiveScoreUnit}>点</Text>
-                    </Text>
-                    {delta !== null && (
-                      <Text
-                        style={[
-                          styles.archiveDelta,
-                          {
-                            color:
-                              delta > 0 ? '#4A7C59' : delta < 0 ? '#C85338' : COLORS.textMuted,
-                          },
-                        ]}
-                      >
-                        {delta > 0 ? `▲+${delta}` : delta < 0 ? `▼${delta}` : '±0'}
-                      </Text>
-                    )}
-                  </View>
-
-                  <Text style={styles.archiveMeta}>
-                    {item.analyzedDays}日・{item.analyzedAnswers}問
-                  </Text>
-                  <Text style={styles.archiveTags} numberOfLines={1}>
-                    {item.report.myType.tag} × {item.report.partnerType.tag}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {isViewingOlderReport && activeReportRecord && (
-            <View style={styles.olderViewingBanner}>
-              <Ionicons name="time-outline" size={14} color={COLORS.primaryDark} />
-              <Text style={styles.olderViewingText}>
-                {formatDateTime(activeReportRecord.createdAt)} に生成した過去レポートを表示中です
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-
+  const renderReportCards = () => (
+    <>
       {/* セクション1: AI性格タイプ分析 */}
       <View
         style={[styles.card, SHADOWS.card]}
@@ -729,9 +499,98 @@ export default function AiReportScreen() {
           </View>
         ) : null}
       </View>
+    </>
+  );
 
-      {/* サブスクリプション購入カード（未加入時のみ表示） */}
-      {!isPremium && (
+  return (
+    <ScrollView
+      ref={scrollViewRef}
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+    >
+      {/* 読み込み中 / 有料ペア管理カード / 未課金プランカード */}
+      {loadingEntitlement ? (
+        <View style={[styles.card, SHADOWS.card, styles.loadingBox]}>
+          <ActivityIndicator color={COLORS.primary} />
+          <Text style={styles.loadingText}>課金状態と最新レポートを確認中...</Text>
+        </View>
+      ) : isPremium ? (
+        <View style={[styles.card, SHADOWS.card, styles.premiumControlCard]}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="sparkles" size={18} color="#4A7C59" />
+            <Text style={styles.cardTitle}>
+              {latestReportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
+            </Text>
+          </View>
+          {entitlement && (
+            <View style={styles.subStatusPill}>
+              <Ionicons name="diamond" size={13} color="#4A7C59" />
+              <Text style={styles.subStatusPillText}>
+                {formatPlanName(entitlement.productId)}（
+                {entitlement.paidByPartner && !entitlement.paidByMe
+                  ? `${partnerName}さんの契約を共有`
+                  : 'ご契約中'}
+                ）
+                {entitlement.expiresAt
+                  ? entitlement.status === 'grace_period'
+                    ? ` ・ お支払い確認中（${formatShortDate(entitlement.expiresAt)}まで）`
+                    : entitlement.willRenew
+                      ? ` ・ 次回更新 ${formatShortDate(entitlement.expiresAt)}`
+                      : ` ・ ${formatShortDate(entitlement.expiresAt)}まで利用可（自動更新停止）`
+                  : ''}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.premiumMetaText}>
+            分析対象データ：計 {entitlement?.analyzableDaysCount ?? 0}日分（双方回答{' '}
+            {entitlement?.revealedDaysCount ?? 0}日
+            {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
+              ? ` ＋ 過去未回答日の相手回答 ${entitlement?.pastPartnerOnlyDaysCount}日`
+              : ''}
+            ）
+            {latestReportRecord
+              ? `\n最終更新: ${formatDateTime(latestReportRecord.createdAt)}（${latestReportRecord.analyzedAnswers}問を分析）`
+              : ''}
+            {(entitlement?.pastUnansweredDaysCount ?? 0) > 0
+              ? `\n※ 過去の未回答お題が ${entitlement?.pastUnansweredDaysCount}日分 あります。「過去の回答との比較」から後から回答して相手の結果を見られます。`
+              : '\n※ 過去の未回答お題は「過去の回答との比較」からいつでも回答できます。'}
+          </Text>
+
+          {(entitlement?.pastUnansweredDaysCount ?? 0) > 0 && (
+            <TouchableOpacity
+              style={styles.pastCatchUpBtn}
+              activeOpacity={0.85}
+              onPress={() =>
+                router.push({ pathname: '/history', params: { openCalendar: '1' } })
+              }
+            >
+              <Ionicons name="calendar-outline" size={16} color="#8C5A1B" />
+              <Text style={styles.pastCatchUpBtnText}>
+                カレンダーから未回答お題（{entitlement?.pastUnansweredDaysCount}日分）に遡って回答
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.generateBtn}
+            activeOpacity={0.85}
+            disabled={generating || !isPairConnected}
+            onPress={() => void handleGenerateReport(Boolean(latestReportRecord))}
+          >
+            {generating ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="sparkles-outline" size={17} color="#FFFFFF" />
+                <Text style={styles.generateBtnText}>
+                  {latestReportRecord ? '最新データでレポートを更新する' : 'AI相性レポートを生成する'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : (
         <View
           style={[styles.card, SHADOWS.card, styles.subCard]}
           onLayout={(e) => {
@@ -878,6 +737,138 @@ export default function AiReportScreen() {
           </View>
         </View>
       )}
+
+      {/* 有料ペア向け：過去のAI診断アーカイブ（横並びで見返し＆比較） */}
+      {isPremium && reportHistory.length > 0 && (
+        <View style={styles.archiveSection}>
+          <View style={styles.archiveHeader}>
+            <View style={styles.archiveTitleRow}>
+              <Ionicons name="albums-outline" size={16} color={COLORS.primaryDark} />
+              <Text style={styles.archiveTitle}>
+                AI診断アーカイブ（全 {reportHistory.length}件）
+              </Text>
+            </View>
+            {isViewingOlderReport && latestReportRecord && (
+              <TouchableOpacity
+                style={styles.backLatestBtn}
+                onPress={() => handleSelectArchiveReport(latestReportRecord.id)}
+              >
+                <Text style={styles.backLatestBtnText}>最新へ戻す</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={styles.archiveHint}>
+            カードをタップすると、下の詳細レポートへ移動・切り替えできます
+          </Text>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.archiveScrollContent}
+          >
+            {reportHistory.map((item, idx) => {
+              const isSelected = activeReportRecord?.id === item.id;
+              const prevItem = reportHistory[idx + 1];
+              const delta = prevItem
+                ? item.report.overallScore - prevItem.report.overallScore
+                : null;
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.archiveCard,
+                    SHADOWS.cardSmall,
+                    isSelected && styles.archiveCardActive,
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => handleSelectArchiveReport(item.id)}
+                >
+                  <View style={styles.archiveCardTop}>
+                    <Text style={[styles.archiveDate, isSelected && styles.archiveDateActive]}>
+                      {formatShortDate(item.createdAt)}
+                    </Text>
+                    <View style={styles.archiveChipRow}>
+                      {isSelected && (
+                        <View style={styles.viewingChip}>
+                          <Text style={styles.viewingChipText}>表示中</Text>
+                        </View>
+                      )}
+                      {idx === 0 && (
+                        <View style={styles.latestChip}>
+                          <Text style={styles.latestChipText}>最新</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.archiveScoreRow}>
+                    <Text style={[styles.archiveScore, isSelected && styles.archiveScoreActive]}>
+                      {item.report.overallScore}
+                      <Text style={styles.archiveScoreUnit}>点</Text>
+                    </Text>
+                    {delta !== null && (
+                      <Text
+                        style={[
+                          styles.archiveDelta,
+                          {
+                            color:
+                              delta > 0 ? '#4A7C59' : delta < 0 ? '#C85338' : COLORS.textMuted,
+                          },
+                        ]}
+                      >
+                        {delta > 0 ? `▲+${delta}` : delta < 0 ? `▼${delta}` : '±0'}
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text style={styles.archiveMeta}>
+                    {item.analyzedDays}日・{item.analyzedAnswers}問
+                  </Text>
+                  <Text style={styles.archiveTags} numberOfLines={1}>
+                    {item.report.myType.tag} × {item.report.partnerType.tag}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {isViewingOlderReport && activeReportRecord && (
+            <View style={styles.olderViewingBanner}>
+              <Ionicons name="time-outline" size={14} color={COLORS.primaryDark} />
+              <Text style={styles.olderViewingText}>
+                {formatDateTime(activeReportRecord.createdAt)} に生成した過去レポートを表示中です
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* 実レポート表示（有料＆生成済み） / サンプルプレビュー（初期折り畳み・プランカードのすぐ下） */}
+      {!loadingEntitlement &&
+        (isShowingSample ? (
+          <View style={styles.sampleAccordionOuter}>
+            <TouchableOpacity
+              style={styles.sampleToggleBtn}
+              activeOpacity={0.75}
+              onPress={() => setIsSampleOpen((prev) => !prev)}
+            >
+              <Ionicons name="eye-outline" size={16} color={COLORS.primaryDark} />
+              <Text style={styles.sampleToggleText}>
+                AI相性レポートのサンプルを見る
+              </Text>
+              <Ionicons
+                name={isSampleOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+
+            {isSampleOpen && <View style={styles.sampleAccordionBody}>{renderReportCards()}</View>}
+          </View>
+        ) : (
+          renderReportCards()
+        ))}
 
       {/* 課金済みユーザー向け：利用規約・プライバシーポリシー・解約管理リンク */}
       {isPremium && (
@@ -1097,51 +1088,6 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingBottom: 40,
   },
-  heroBanner: {
-    backgroundColor: '#3E3430',
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 16,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#F2A07E',
-    letterSpacing: 1,
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  heroDesc: {
-    fontSize: 13,
-    color: '#D8CDC4',
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  shareBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  shareBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   loadingBox: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -1213,22 +1159,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  sampleNoticeBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#FDF6E9',
-    borderWidth: 1,
-    borderColor: '#F0DEC0',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 16,
+  sampleAccordionOuter: {
+    marginBottom: 12,
   },
-  sampleNoticeText: {
+  sampleToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  sampleToggleText: {
     flex: 1,
-    fontSize: 12,
-    color: '#8C6226',
-    lineHeight: 18,
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primaryDark,
+  },
+  sampleAccordionBody: {
+    marginTop: 12,
   },
   card: {
     backgroundColor: COLORS.card,

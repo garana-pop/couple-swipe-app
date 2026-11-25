@@ -522,7 +522,9 @@ function formatAiReportError(code: string): string {
     case 'NOT_ENOUGH_DATA':
       return '分析できる回答データがまだありません。回答履歴が1日分以上溜まるとお試しいただけます。';
     case 'DAILY_LIMIT_EXCEEDED':
-      return '本日の AI 診断レポート生成回数の上限（1日3回）に達しました。明日になってから再度お試しください。';
+      return '本日の AI 診断レポート生成回数の上限（1日2回）に達しました。明日になってから再度お試しください。';
+    case 'MONTHLY_LIMIT_EXCEEDED':
+      return '直近30日間の AI 診断レポート生成回数の上限（月30回）に達しました。しばらく期間をあけてから再度お試しください。';
     case 'AI_OVERLOADED':
       return '現在 AI サーバーが混み合っています。少し時間をおいてからもう一度お試しください。';
     case 'AI_PROVIDER_NOT_CONFIGURED':

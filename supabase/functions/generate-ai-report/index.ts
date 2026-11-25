@@ -8,7 +8,8 @@ const CORS_HEADERS = {
 };
 
 const CACHE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 同データでの24時間以内の連続再生成を防止
-const DAILY_GENERATION_LIMIT = 3; // コスト安全策: 1ペアあたり1日最大3回まで
+const DAILY_GENERATION_LIMIT = 2; // コスト安全策: 1ペアあたり1日最大2回まで
+const MONTHLY_GENERATION_LIMIT = 30; // コスト安全策: 1ペアあたり直近30日間で最大30回まで（年額プランでも確実に黒字維持）
 const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
 const FALLBACK_GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_THINKING_BUDGET = 512;
@@ -711,14 +712,15 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // 5.5. 日次生成回数制限（1ペアあたりペア基準タイムゾーンで1日3回まで）
+  // 5.5. 日次・月次生成回数制限（1ペアあたり1日最大2回・直近30日間で最大30回まで）
+  const thirtyDaysAgoIso = new Date(nowMs - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: recentReports } = await admin
     .from("pair_ai_reports")
     .select("created_at")
     .eq("pair_id", pairId)
-    .gte("created_at", new Date(nowMs - 48 * 60 * 60 * 1000).toISOString())
+    .gte("created_at", thirtyDaysAgoIso)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(MONTHLY_GENERATION_LIMIT + 5);
 
   const dateFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: pairTz,
@@ -726,7 +728,8 @@ Deno.serve(async (req: Request) => {
     month: "2-digit",
     day: "2-digit",
   });
-  const todayGeneratedCount = (recentReports ?? []).filter((r) => {
+  const recentList = recentReports ?? [];
+  const todayGeneratedCount = recentList.filter((r) => {
     const d = new Date(r.created_at as string);
     return !Number.isNaN(d.getTime()) && dateFormatter.format(d) === todayDate;
   }).length;
@@ -736,6 +739,16 @@ Deno.serve(async (req: Request) => {
       {
         error: "DAILY_LIMIT_EXCEEDED",
         limit: DAILY_GENERATION_LIMIT,
+      },
+      429
+    );
+  }
+
+  if (recentList.length >= MONTHLY_GENERATION_LIMIT) {
+    return jsonResponse(
+      {
+        error: "MONTHLY_LIMIT_EXCEEDED",
+        limit: MONTHLY_GENERATION_LIMIT,
       },
       429
     );
