@@ -118,6 +118,7 @@ export default function AiReportScreen() {
   } = useApp();
 
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
+  const reportDetailYRef = useRef<number>(0);
   const reflectionSectionYRef = useRef<number>(0);
   const subCardYRef = useRef<number>(0);
   const didAutoScrollReflectionRef = useRef(false);
@@ -256,6 +257,18 @@ export default function AiReportScreen() {
   const isShowingSample = !isPremium || !activeReportRecord;
 
   const latestReflectionRecord = reflectionHistory[0] ?? null;
+
+  const handleSelectArchiveReport = useCallback((reportId: string) => {
+    setSelectedReportId(reportId);
+    setTimeout(() => {
+      if (reportDetailYRef.current > 0) {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, reportDetailYRef.current - 12),
+          animated: true,
+        });
+      }
+    }, 60);
+  }, []);
 
   const handleGenerateReflection = async (forceRefresh: boolean) => {
     if (!isSupabaseReady) {
@@ -541,12 +554,15 @@ export default function AiReportScreen() {
             {isViewingOlderReport && latestReportRecord && (
               <TouchableOpacity
                 style={styles.backLatestBtn}
-                onPress={() => setSelectedReportId(latestReportRecord.id)}
+                onPress={() => handleSelectArchiveReport(latestReportRecord.id)}
               >
                 <Text style={styles.backLatestBtnText}>最新へ戻す</Text>
               </TouchableOpacity>
             )}
           </View>
+          <Text style={styles.archiveHint}>
+            カードをタップすると、下の詳細レポートへ移動・切り替えできます
+          </Text>
 
           <ScrollView
             horizontal
@@ -569,17 +585,24 @@ export default function AiReportScreen() {
                     isSelected && styles.archiveCardActive,
                   ]}
                   activeOpacity={0.8}
-                  onPress={() => setSelectedReportId(item.id)}
+                  onPress={() => handleSelectArchiveReport(item.id)}
                 >
                   <View style={styles.archiveCardTop}>
                     <Text style={[styles.archiveDate, isSelected && styles.archiveDateActive]}>
                       {formatShortDate(item.createdAt)}
                     </Text>
-                    {idx === 0 && (
-                      <View style={styles.latestChip}>
-                        <Text style={styles.latestChipText}>最新</Text>
-                      </View>
-                    )}
+                    <View style={styles.archiveChipRow}>
+                      {isSelected && (
+                        <View style={styles.viewingChip}>
+                          <Text style={styles.viewingChipText}>表示中</Text>
+                        </View>
+                      )}
+                      {idx === 0 && (
+                        <View style={styles.latestChip}>
+                          <Text style={styles.latestChipText}>最新</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   <View style={styles.archiveScoreRow}>
@@ -625,7 +648,12 @@ export default function AiReportScreen() {
       )}
 
       {/* セクション1: AI性格タイプ分析 */}
-      <View style={[styles.card, SHADOWS.card]}>
+      <View
+        style={[styles.card, SHADOWS.card]}
+        onLayout={(e) => {
+          reportDetailYRef.current = e.nativeEvent.layout.y;
+        }}
+      >
         <View style={styles.cardHeaderBetween}>
           <View style={styles.cardHeaderInline}>
             <Ionicons name="analytics" size={19} color={COLORS.primary} />
@@ -1576,7 +1604,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 4,
+  },
+  archiveHint: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginBottom: 9,
   },
   archiveTitleRow: {
     flexDirection: 'row',
@@ -1605,7 +1638,7 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   archiveCard: {
-    width: 158,
+    width: 176,
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 12,
@@ -1620,15 +1653,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 4,
     marginBottom: 6,
   },
+  archiveChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   archiveDate: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: COLORS.textMuted,
   },
   archiveDateActive: {
     color: COLORS.primaryDark,
+  },
+  viewingChip: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  viewingChipText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   latestChip: {
     backgroundColor: '#4A7C59',

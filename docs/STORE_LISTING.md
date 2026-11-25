@@ -78,7 +78,7 @@ Kotaeai（コタエアイ）は、カップルや夫婦が1日3問・4方向ス�
 | 利用規約 URL（任意欄／アプリ内掲載済み） | `https://garana-pop.github.io/couple-swipe-app/terms.html` |
 | アカウント削除 URL（データセーフティ欄） | `https://garana-pop.github.io/couple-swipe-app/account-deletion.html` |
 | ウェブサイト | `https://garana-pop.github.io/couple-swipe-app/` |
-| デベロッパー連絡先メールアドレス | ご自身のサポート用メールアドレスを入力 |
+| デベロッパー連絡先メールアドレス | `hoshimi1006@gmail.com` |
 
 ---
 

@@ -102,7 +102,16 @@ interface AppContextType {
     isFinalQuestion?: boolean
   ) => Promise<{ ok: boolean; error?: string }>;
   createPair: (displayName?: string) => Promise<{ ok: boolean; error?: string }>;
-  joinPair: (code: string, displayName?: string) => Promise<{ ok: boolean; error?: string }>;
+  joinPair: (
+    code: string,
+    displayName?: string
+  ) => Promise<{ ok: boolean; relinked?: boolean; error?: string }>;
+  issuePairRelinkCode: () => Promise<{
+    ok: boolean;
+    code?: string;
+    expiresAt?: string;
+    error?: string;
+  }>;
   leavePair: () => Promise<{ ok: boolean; error?: string }>;
   regenerateInviteCode: () => Promise<{ ok: boolean; error?: string }>;
   updateMyName: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -137,8 +146,23 @@ function formatJoinError(message: string): string {
   if (message.includes('INVITE_CODE_EXPIRED')) {
     return 'この招待コードは有効期限が切れています。パートナーに再発行を依頼してください。';
   }
+  if (message.includes('RELINK_CODE_USED')) {
+    return 'この再連携コードはすでに使用済みです。もう一度パートナーに再発行を依頼してください。';
+  }
+  if (message.includes('RELINK_CODE_EXPIRED')) {
+    return 'この再連携コードは有効期限（5分）が切れています。パートナーに再発行を依頼してください。';
+  }
+  if (message.includes('RELINK_PAIR_CHANGED')) {
+    return 'ペアの状態が変更されたため再連携できませんでした。最新の状態を確認してもう一度お試しください。';
+  }
+  if (message.includes('CANNOT_RELINK_SELF')) {
+    return '自分で発行した再連携コードは自分の端末では使えません。再インストールしたパートナー側の端末で入力してください。';
+  }
+  if (message.includes('PARTNER_NOT_CONNECTED')) {
+    return 'パートナーと2人で連携中の状態でのみ再連携コードを発行できます。';
+  }
   if (message.includes('PAIR_IS_FULL')) {
-    return 'このペアはすでに2人が参加済みです。';
+    return 'このペアはすでに2人が参加済みです。再インストールや機種変更による再連携の場合は、連携中のパートナー側メニューから「パートナー再連携コード」を発行して入力してください。';
   }
   if (message.includes('ALREADY_IN_PAIR')) {
     return 'すでに別のペアに参加しています。先にペアを解除してください。';
@@ -880,7 +904,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 
   const joinPair = useCallback(
-    async (code: string, displayName?: string): Promise<{ ok: boolean; error?: string }> => {
+    async (
+      code: string,
+      displayName?: string
+    ): Promise<{ ok: boolean; relinked?: boolean; error?: string }> => {
       if (!supabase) {
         return {
           ok: false,
@@ -893,7 +920,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!auth.uid) {
           return { ok: false, error: auth.error ?? '認証が完了していません。' };
         }
-        const { error } = await supabase.rpc('join_pair', {
+        const { data, error } = await supabase.rpc('join_pair', {
           p_invite_code: code,
           p_display_name: displayName ?? myName,
         });
@@ -901,13 +928,40 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return { ok: false, error: formatJoinError(error.message) };
         }
         await loadPairAndDailyData(auth.uid);
-        return { ok: true };
+        return { ok: true, relinked: Boolean(data?.relinked) };
       } finally {
         setIsLoading(false);
       }
     },
     [ensureAuthenticatedUserId, myName, loadPairAndDailyData]
   );
+
+  const issuePairRelinkCode = useCallback(async (): Promise<{
+    ok: boolean;
+    code?: string;
+    expiresAt?: string;
+    error?: string;
+  }> => {
+    if (!supabase) {
+      return { ok: false, error: 'Supabase が未設定です。' };
+    }
+    const auth = await ensureAuthenticatedUserId();
+    if (!auth.uid) {
+      return { ok: false, error: auth.error ?? '認証が完了していません。' };
+    }
+    const { data, error } = await supabase.rpc('issue_pair_relink_code');
+    if (error || !data?.relink_code) {
+      return {
+        ok: false,
+        error: error ? formatJoinError(error.message) : '再連携コードの発行に失敗しました。',
+      };
+    }
+    return {
+      ok: true,
+      code: String(data.relink_code),
+      expiresAt: typeof data.expires_at === 'string' ? data.expires_at : undefined,
+    };
+  }, [ensureAuthenticatedUserId]);
 
   const leavePair = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!supabase) {
@@ -1421,6 +1475,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         submitPastAnswer,
         createPair,
         joinPair,
+        issuePairRelinkCode,
         leavePair,
         regenerateInviteCode,
         updateMyName,

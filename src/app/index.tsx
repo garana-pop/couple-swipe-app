@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -52,6 +52,7 @@ export default function HomeScreen() {
     showTutorial,
     createPair,
     joinPair,
+    issuePairRelinkCode,
     leavePair,
     regenerateInviteCode,
     updateMyName,
@@ -66,7 +67,31 @@ export default function HomeScreen() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [leavingPair, setLeavingPair] = useState(false);
+  const [isRelinkModalOpen, setIsRelinkModalOpen] = useState(false);
+  const [relinkCode, setRelinkCode] = useState<string | null>(null);
+  const [relinkExpiresAt, setRelinkExpiresAt] = useState<string | null>(null);
+  const [relinkNowMs, setRelinkNowMs] = useState(() => Date.now());
+  const [issuingRelink, setIssuingRelink] = useState(false);
+  const [relinkCopied, setRelinkCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isRelinkModalOpen || !relinkExpiresAt) return;
+    const timer = setInterval(() => {
+      setRelinkNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isRelinkModalOpen, relinkExpiresAt]);
+
+  const relinkRemainingSec = relinkExpiresAt
+    ? Math.max(0, Math.ceil((Date.parse(relinkExpiresAt) - relinkNowMs) / 1000))
+    : 0;
+  const isRelinkExpired = Boolean(relinkCode && relinkExpiresAt && relinkRemainingSec <= 0);
+  const formatCountdown = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
 
   const handleCopyCode = async () => {
     if (!pairCode) return;
@@ -100,8 +125,50 @@ export default function HomeScreen() {
       showAlert('連携エラー', res.error ?? 'ペアリングに失敗しました。');
       return;
     }
-    showAlert('連携完了', 'パートナーと正常にペアリングされました。');
+    if (res.relinked) {
+      showAlert(
+        '再連携が完了しました',
+        'パートナーとのペアに再連携し、これまでの回答履歴と記録を引き継ぎました。'
+      );
+    } else {
+      showAlert('連携完了', 'パートナーと正常にペアリングされました。');
+    }
     setInputCode('');
+  };
+
+  const handleOpenRelinkModal = () => {
+    setIsMenuOpen(false);
+    setRelinkCopied(false);
+    setRelinkNowMs(Date.now());
+    setIsRelinkModalOpen(true);
+  };
+
+  const handleIssueRelinkCode = async () => {
+    setIssuingRelink(true);
+    try {
+      const res = await issuePairRelinkCode();
+      if (!res.ok || !res.code) {
+        showAlert('発行エラー', res.error ?? '再連携コードの発行に失敗しました。');
+        return;
+      }
+      setRelinkCode(res.code);
+      setRelinkExpiresAt(res.expiresAt ?? new Date(Date.now() + 5 * 60 * 1000).toISOString());
+      setRelinkNowMs(Date.now());
+      setRelinkCopied(false);
+    } finally {
+      setIssuingRelink(false);
+    }
+  };
+
+  const handleCopyRelinkCode = async () => {
+    if (!relinkCode) return;
+    await Clipboard.setStringAsync(relinkCode);
+    setRelinkCopied(true);
+    setTimeout(() => setRelinkCopied(false), 2000);
+    showAlert(
+      '再連携コードをコピーしました',
+      `「${relinkCode}」（5分間・1回限り有効）をパートナーへ送ってください。`
+    );
   };
 
   const handleLeavePair = () => {
@@ -304,20 +371,6 @@ export default function HomeScreen() {
                     <Ionicons name="create-outline" size={13} color={COLORS.primaryDark} />
                     <Text style={styles.compactActionChipText}>名前</Text>
                   </TouchableOpacity>
-                  {pairCode ? (
-                    <TouchableOpacity
-                      style={styles.compactActionChip}
-                      activeOpacity={0.7}
-                      onPress={handleCopyCode}
-                    >
-                      <Text style={styles.compactCodeText}>{pairCode}</Text>
-                      <Ionicons
-                        name={copied ? 'checkmark-circle' : 'copy-outline'}
-                        size={13}
-                        color={copied ? '#4A7C59' : COLORS.textMuted}
-                      />
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
               </View>
 
@@ -561,7 +614,9 @@ export default function HomeScreen() {
                   </TouchableOpacity>
 
                   <View style={styles.inputSection}>
-                    <Text style={styles.inputLabel}>パートナーの招待コードを入力して参加：</Text>
+                    <Text style={styles.inputLabel}>
+                      パートナーの招待コード／再連携コードを入力して参加：
+                    </Text>
                     <View style={styles.inputRow}>
                       <TextInput
                         style={styles.input}
@@ -705,7 +760,24 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
 
-              {pairCode ? (
+              {isPairConnected ? (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.7}
+                  onPress={handleOpenRelinkModal}
+                >
+                  <View style={[styles.menuItemIconBox, { backgroundColor: '#F5ECE3' }]}>
+                    <Ionicons name="key-outline" size={20} color={COLORS.primaryDark} />
+                  </View>
+                  <View style={styles.menuItemTextBox}>
+                    <Text style={styles.menuItemTitle}>パートナー再連携コードを発行</Text>
+                    <Text style={styles.menuItemSubtext}>
+                      再インストール・機種変更時の引き継ぎ（5分・1回限り）
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
+                </TouchableOpacity>
+              ) : pairCode ? (
                 <TouchableOpacity
                   style={styles.menuItem}
                   activeOpacity={0.7}
@@ -827,6 +899,141 @@ export default function HomeScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* パートナー再連携ワンタイムコード発行・再発行モーダル */}
+      <Modal
+        visible={isRelinkModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!issuingRelink) setIsRelinkModalOpen(false);
+        }}
+      >
+        <View style={styles.confirmOverlay}>
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => {
+              if (!issuingRelink) setIsRelinkModalOpen(false);
+            }}
+          />
+          <View style={[styles.confirmDialog, SHADOWS.cardFloating]}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: '#F5ECE3' }]}>
+              <Ionicons name="key-outline" size={22} color={COLORS.primaryDark} />
+            </View>
+            <Text style={styles.confirmTitle}>パートナー再連携コード</Text>
+            <Text style={styles.confirmMessage}>
+              {partnerName}さんがアプリを再インストール・機種変更して連携が切れた場合に使用します。
+              {'\n'}
+              コードは <Text style={styles.relinkBold}>5分間・1回限り有効</Text> で、再発行すると前のコードは自動で無効になります。
+              {'\n'}
+              ※相手が Google 連携済みの場合は、先に相手端末の「設定 ＞ Google ログインで復元」をお試しください。
+            </Text>
+
+            {relinkCode ? (
+              <View style={styles.relinkCodeBox}>
+                <Text
+                  style={[
+                    styles.relinkCodeValue,
+                    isRelinkExpired && styles.relinkCodeValueExpired,
+                  ]}
+                  selectable
+                >
+                  {relinkCode}
+                </Text>
+                <View
+                  style={[
+                    styles.relinkTimerPill,
+                    isRelinkExpired && styles.relinkTimerPillExpired,
+                  ]}
+                >
+                  <Ionicons
+                    name={isRelinkExpired ? 'alert-circle-outline' : 'time-outline'}
+                    size={13}
+                    color={isRelinkExpired ? '#B84A39' : '#4A7C59'}
+                  />
+                  <Text
+                    style={[
+                      styles.relinkTimerText,
+                      isRelinkExpired && styles.relinkTimerTextExpired,
+                    ]}
+                  >
+                    {isRelinkExpired
+                      ? '有効期限切れ（下のボタンから再発行できます）'
+                      : `残り ${formatCountdown(relinkRemainingSec)} ・ 1回限り有効`}
+                  </Text>
+                </View>
+
+                <View style={styles.relinkActionStack}>
+                  <TouchableOpacity
+                    style={[
+                      styles.relinkPrimaryBtn,
+                      isRelinkExpired && styles.relinkPrimaryBtnDisabled,
+                    ]}
+                    activeOpacity={0.85}
+                    disabled={isRelinkExpired || issuingRelink}
+                    onPress={() => void handleCopyRelinkCode()}
+                  >
+                    <Ionicons
+                      name={relinkCopied ? 'checkmark-circle' : 'copy-outline'}
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.relinkPrimaryBtnText}>
+                      {relinkCopied ? 'コピーしました' : 'コードをコピーして送る'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.confirmActionsRow}>
+                    <TouchableOpacity
+                      style={styles.confirmCancelBtn}
+                      activeOpacity={0.8}
+                      disabled={issuingRelink}
+                      onPress={() => void handleIssueRelinkCode()}
+                    >
+                      {issuingRelink ? (
+                        <ActivityIndicator size="small" color={COLORS.primaryDark} />
+                      ) : (
+                        <Text style={styles.confirmCancelBtnText}>コードを再発行</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.confirmCancelBtn}
+                      activeOpacity={0.8}
+                      disabled={issuingRelink}
+                      onPress={() => setIsRelinkModalOpen(false)}
+                    >
+                      <Text style={styles.confirmCancelBtnText}>閉じる</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.confirmActionsRow}>
+                <TouchableOpacity
+                  style={styles.confirmCancelBtn}
+                  activeOpacity={0.8}
+                  disabled={issuingRelink}
+                  onPress={() => setIsRelinkModalOpen(false)}
+                >
+                  <Text style={styles.confirmCancelBtnText}>キャンセル</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.relinkIssueBtn}
+                  activeOpacity={0.85}
+                  disabled={issuingRelink}
+                  onPress={() => void handleIssueRelinkCode()}
+                >
+                  {issuingRelink ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.relinkPrimaryBtnText}>発行する（5分）</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -1427,6 +1634,79 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  relinkBold: {
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  relinkCodeBox: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  relinkCodeValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: COLORS.primaryDark,
+    letterSpacing: 3.2,
+    marginBottom: 8,
+  },
+  relinkCodeValueExpired: {
+    color: COLORS.textLight,
+    textDecorationLine: 'line-through',
+  },
+  relinkTimerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EDF6F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  relinkTimerPillExpired: {
+    backgroundColor: '#FDECEC',
+  },
+  relinkTimerText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#3B6347',
+  },
+  relinkTimerTextExpired: {
+    color: '#B84A39',
+  },
+  relinkActionStack: {
+    width: '100%',
+    gap: 8,
+  },
+  relinkPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  relinkPrimaryBtnDisabled: {
+    opacity: 0.45,
+  },
+  relinkPrimaryBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  relinkIssueBtn: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   streakMetaUnanswered: {
     color: '#C97A2B',

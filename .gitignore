@@ -41,6 +41,11 @@ yarn-error.*
 /ios
 /android
 
-# Firebase admin service account private keys (NEVER commit)
+# Firebase / Google Cloud service account private keys (NEVER commit)
 *firebase-adminsdk*.json
 firebase-service-account*.json
+*play-billing*.json
+
+# Build artifacts
+*.aab
+*.apk
