@@ -27,7 +27,6 @@ export const COLORS = {
       bg: '#CFE5D6',
       border: '#C8E2D1',
       shadow: 'rgba(74, 124, 89, 0.25)',
-      label: '上へスワイプ',
     },
     DOWN: {
       color: '#D45D6E',      // ダスティローズ
@@ -35,7 +34,6 @@ export const COLORS = {
       bg: '#F6D0D7',
       border: '#F8CBD2',
       shadow: 'rgba(212, 93, 110, 0.25)',
-      label: '下へスワイプ',
     },
     LEFT: {
       color: '#4D779E',      // スモーキーブルー
@@ -43,7 +41,6 @@ export const COLORS = {
       bg: '#CCE0EF',
       border: '#CBE0ED',
       shadow: 'rgba(77, 119, 158, 0.25)',
-      label: '左へスワイプ',
     },
     RIGHT: {
       color: '#C97A2B',      // ハニーアンバー
@@ -51,11 +48,10 @@ export const COLORS = {
       bg: '#F6D8B4',
       border: '#F7DEC1',
       shadow: 'rgba(201, 122, 43, 0.25)',
-      label: '右へスワイプ',
     },
   } as Record<
     SwipeDirection,
-    { color: string; activeText: string; bg: string; border: string; shadow: string; label: string }
+    { color: string; activeText: string; bg: string; border: string; shadow: string }
   >,
 };
 

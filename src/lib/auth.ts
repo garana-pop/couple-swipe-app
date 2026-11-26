@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import type { User } from '@supabase/supabase-js';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import i18n from '../i18n';
 import { supabase } from './supabase';
 
 // Web で OAuth ポップアップ/リダイレクトから復帰した際のセッション完了処理
@@ -66,19 +67,19 @@ export function getAuthRedirectUrl(): string {
 function formatOAuthError(rawMessage: string): string {
   const lower = rawMessage.toLowerCase();
   if (lower.includes('manual linking') || lower.includes('manual_linking')) {
-    return 'Supabase の Auth 設定で「Enable Manual Linking」を ON にしてください。';
+    return i18n.t('errors.oauth.manualLinking');
   }
   if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) {
-    return 'Supabase の Authentication > Providers で Google ログインを有効にしてください。';
+    return i18n.t('errors.oauth.providerDisabled');
   }
   if (
     lower.includes('identity_already_exists') ||
     lower.includes('already linked') ||
     lower.includes('already registered')
   ) {
-    return 'この Google アカウントは既に別のデータに紐づいています。機種変更後のデータ復元は下の「既存データを復元」ボタンをお試しください。';
+    return i18n.t('errors.oauth.identityAlreadyExists');
   }
-  return `Google 認証に失敗しました（${rawMessage}）。`;
+  return i18n.t('errors.oauth.generic', { detail: rawMessage });
 }
 
 /**
@@ -88,7 +89,7 @@ export async function completeAuthFromUrl(
   url: string
 ): Promise<{ ok: boolean; error?: string }> {
   if (!supabase) {
-    return { ok: false, error: 'Supabase が未設定です。' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
 
   const params = parseRedirectParams(url);
@@ -126,7 +127,7 @@ export async function completeAuthFromUrl(
     return { ok: true };
   }
 
-  return { ok: false, error: '認証情報の受け取りに失敗しました。もう一度お試しください。' };
+  return { ok: false, error: i18n.t('errors.oauth.receiveFailed') };
 }
 
 /**
@@ -139,7 +140,7 @@ export async function linkGoogleIdentity(): Promise<{
   error?: string;
 }> {
   if (!supabase) {
-    return { ok: false, error: 'Supabase が未設定です。' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
 
   const redirectTo = getAuthRedirectUrl();
@@ -162,7 +163,7 @@ export async function linkGoogleIdentity(): Promise<{
   }
 
   if (!data?.url) {
-    return { ok: false, error: 'Google 認証 URL の取得に失敗しました。' };
+    return { ok: false, error: i18n.t('errors.oauth.authUrlFailed') };
   }
 
   const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
@@ -170,7 +171,7 @@ export async function linkGoogleIdentity(): Promise<{
     return { ok: false, cancelled: true };
   }
   if (res.type !== 'success' || !res.url) {
-    return { ok: false, error: 'Google 連携が中断されました。' };
+    return { ok: false, error: i18n.t('errors.oauth.linkCancelled') };
   }
 
   const completed = await completeAuthFromUrl(res.url);
@@ -191,7 +192,7 @@ export async function signInWithGoogleAccount(): Promise<{
   error?: string;
 }> {
   if (!supabase) {
-    return { ok: false, error: 'Supabase が未設定です。' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
 
   const redirectTo = getAuthRedirectUrl();
@@ -214,7 +215,7 @@ export async function signInWithGoogleAccount(): Promise<{
   }
 
   if (!data?.url) {
-    return { ok: false, error: 'Google ログイン URL の取得に失敗しました。' };
+    return { ok: false, error: i18n.t('errors.oauth.loginUrlFailed') };
   }
 
   const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
@@ -222,7 +223,7 @@ export async function signInWithGoogleAccount(): Promise<{
     return { ok: false, cancelled: true };
   }
   if (res.type !== 'success' || !res.url) {
-    return { ok: false, error: 'Google ログインが中断されました。' };
+    return { ok: false, error: i18n.t('errors.oauth.loginCancelled') };
   }
 
   return completeAuthFromUrl(res.url);

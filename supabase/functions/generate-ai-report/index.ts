@@ -456,16 +456,22 @@ Deno.serve(async (req: Request) => {
 
   let forceRefresh = false;
   let reportMode: "compatibility" | "breakup_reflection" = "compatibility";
+  let requestedLocale = "ja";
   let clientCatalog: Record<string, QuestionMeta> = {};
+  const supportedLocales = new Set(["ja", "en", "fr", "ko", "ru", "th", "zh-Hans", "zh-Hant"]);
   try {
     const body = (await req.json()) as {
       forceRefresh?: unknown;
       mode?: unknown;
+      locale?: unknown;
       questionCatalog?: unknown;
     };
     forceRefresh = Boolean(body?.forceRefresh);
     if (body?.mode === "breakup_reflection") {
       reportMode = "breakup_reflection";
+    }
+    if (typeof body?.locale === "string" && supportedLocales.has(body.locale)) {
+      requestedLocale = body.locale;
     }
     if (body?.questionCatalog && typeof body.questionCatalog === "object") {
       clientCatalog = body.questionCatalog as Record<string, QuestionMeta>;
@@ -573,17 +579,26 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // extra_questions をサーバー側辞書として補完
+  // extra_questions をサーバー側辞書として補完（クライアント辞書に無い項目のみ、対象ロケール優先で補完）
   const { data: extraRows } = await admin
     .from("extra_questions")
-    .select("id, category, title, choices, match_rule");
+    .select("id, category, title, choices, translations, match_rule");
 
   const mergedCatalog: Record<string, QuestionMeta> = { ...clientCatalog };
   for (const row of extraRows ?? []) {
-    mergedCatalog[row.id as string] = {
-      category: row.category as string,
-      title: row.title as string,
-      choices: row.choices as Record<string, string>,
+    const qId = row.id as string;
+    if (mergedCatalog[qId]) continue;
+    const translations = (row.translations ?? {}) as Record<
+      string,
+      { category?: string; title?: string; choices?: Record<string, string> }
+    >;
+    const localized =
+      translations[requestedLocale] ??
+      (requestedLocale !== "ja" ? translations.en : undefined);
+    mergedCatalog[qId] = {
+      category: localized?.category || (row.category as string),
+      title: localized?.title || (row.title as string),
+      choices: localized?.choices || (row.choices as Record<string, string>),
       matchRule: row.match_rule as string,
     };
   }
@@ -676,14 +691,27 @@ Deno.serve(async (req: Request) => {
     0
   );
 
-  // 5. キャッシュチェック（同一モードで24時間以内＆回答に変化がなければ再課金せずキャッシュ返却）
-  //    ※ 過去日に追っかけ回答が追加された場合も latestAnalyzedAnswerMs > reportCreatedMs で即キャッシュ無効化
-  const { data: recentModeReports } = await admin
+  // 5. キャッシュチェック（同一モード・同一ロケールで24時間以内＆回答に変化がなければキャッシュ返却）
+  let recentModeReports: Record<string, unknown>[] | null = null;
+  const withLocaleCache = await admin
     .from("pair_ai_reports")
-    .select("id, analyzed_days, analyzed_answers, model_used, created_at, report_json")
+    .select("id, locale, analyzed_days, analyzed_answers, model_used, created_at, report_json")
     .eq("pair_id", pairId)
+    .eq("locale", requestedLocale)
     .order("created_at", { ascending: false })
     .limit(15);
+
+  if (!withLocaleCache.error) {
+    recentModeReports = withLocaleCache.data as Record<string, unknown>[];
+  } else {
+    const legacyCache = await admin
+      .from("pair_ai_reports")
+      .select("id, analyzed_days, analyzed_answers, model_used, created_at, report_json")
+      .eq("pair_id", pairId)
+      .order("created_at", { ascending: false })
+      .limit(15);
+    recentModeReports = (legacyCache.data ?? []) as Record<string, unknown>[];
+  }
 
   const latestReport = (recentModeReports ?? []).find((r) => {
     const rType = (r.report_json as { reportType?: string } | null)?.reportType;
@@ -702,6 +730,7 @@ Deno.serve(async (req: Request) => {
         cached: true,
         reportRecord: {
           id: latestReport.id,
+          locale: latestReport.locale ?? requestedLocale,
           analyzed_days: latestReport.analyzed_days,
           analyzed_answers: latestReport.analyzed_answers,
           model_used: latestReport.model_used,
@@ -766,12 +795,58 @@ Deno.serve(async (req: Request) => {
     .select("id, display_name")
     .in("id", profileIds);
 
-  const myName =
-    (profiles ?? []).find((p) => p.id === uid)?.display_name?.trim() || "あなた";
-  const partnerName =
+  const localeOutputNames: Record<string, string> = {
+    ja: "Japanese (ja)",
+    en: "English (US, en-US)",
+    fr: "French (France, fr-FR)",
+    ko: "Korean (ko)",
+    ru: "Russian (ru)",
+    th: "Thai (th)",
+    "zh-Hans": "Simplified Chinese (zh-Hans)",
+    "zh-Hant": "Traditional Chinese (zh-Hant)",
+  };
+  const defaultSelfNames: Record<string, string> = {
+    ja: "あなた",
+    en: "You",
+    fr: "Vous",
+    ko: "나",
+    ru: "Вы",
+    th: "คุณ",
+    "zh-Hans": "你",
+    "zh-Hant": "你",
+  };
+  const defaultPartnerNames: Record<string, string> = {
+    ja: isSoloRemaining ? "お相手" : "パートナー",
+    en: isSoloRemaining ? "Your ex-partner" : "Partner",
+    fr: isSoloRemaining ? "Votre ex-partenaire" : "Partenaire",
+    ko: isSoloRemaining ? "상대방" : "파트너",
+    ru: isSoloRemaining ? "Бывший партнёр" : "Партнёр",
+    th: isSoloRemaining ? "อีกฝ่าย" : "คู่ของคุณ",
+    "zh-Hans": isSoloRemaining ? "对方" : "伴侣",
+    "zh-Hant": isSoloRemaining ? "對方" : "伴侶",
+  };
+  const placeholderNames = new Set(["", "あなた", "パートナー", "お相手", "You", "Partner"]);
+  const rawMyName = (profiles ?? []).find((p) => p.id === uid)?.display_name?.trim() || "";
+  const rawPartnerName =
     (effectivePartnerId
       ? (profiles ?? []).find((p) => p.id === effectivePartnerId)?.display_name?.trim()
-      : "") || (isSoloRemaining ? "お相手" : "パートナー");
+      : "") || "";
+
+  const myName = placeholderNames.has(rawMyName)
+    ? (defaultSelfNames[requestedLocale] ?? "You")
+    : rawMyName;
+  const partnerName = placeholderNames.has(rawPartnerName)
+    ? (defaultPartnerNames[requestedLocale] ?? "Partner")
+    : rawPartnerName;
+  const targetLanguageLabel = localeOutputNames[requestedLocale] ?? "English (US, en-US)";
+  const isCompactLang =
+    requestedLocale === "ja" ||
+    requestedLocale === "ko" ||
+    requestedLocale === "zh-Hans" ||
+    requestedLocale === "zh-Hant";
+  const lengthGuidance = isCompactLang
+    ? "各フィールドは簡潔で読みやすく、スマホ画面に収まる長さにまとめてください。"
+    : "Keep every string natural, warm, and concise enough to fit cleanly on mobile cards (roughly 1–2 short sentences per description, 2–4 words for short tags/titles).";
 
   const hasPartnerAnswers = analyzableEntries.some((e) => Boolean(e.partnerChoice));
   const bothAnsweredEntries = analyzableEntries.filter((e) => e.matched !== null);
@@ -831,10 +906,12 @@ Deno.serve(async (req: Request) => {
 いま「${myName}」は、${partnerName}との関係を見つめ直し、すれ違いや別れの原因を静かに振り返ろうとしています。
 ${situationNote}
 
-この実データだけに基づき、${myName}の心にそっと寄り添いながら、誰も責めずに「すれ違いの根本背景」と「次の恋愛やこれからの自分に活かせる優しい気づき」を日本語の JSON のみで返してください。
+この実データだけに基づき、${myName}の心にそっと寄り添いながら、誰も責めずに「すれ違いの根本背景」と「次の恋愛やこれからの自分に活かせる優しい気づき」を、**必ず ${targetLanguageLabel} で書いた JSON のみ** で返してください。
 
 【厳守するトーン＆ルール】
-※ 何よりもまず、これまで向き合ってきた${myName}の気持ちを労い、温かく寄り添う言葉づかい（敬語・やわらかい口調）にしてください。
+※ JSON のキー名は英語のまま厳守し、値の自然言語テキストはすべて自然な ${targetLanguageLabel} で記述してください。
+※ ${lengthGuidance}
+※ 何よりもまず、これまで向き合ってきた${myName}の気持ちを労い、温かく寄り添う言葉づかいにしてください。
 ※ ${myName}も${partnerName}も絶対に責めないでください。「悪い」「欠点」「失敗」「ダメ」などの否定語は使わず、「どちらも悪くなく、安心できるかたちやペースが少しずつ違っていた」という中立で思いやりのある視点で整理してください。
 ※ すれ違いだけでなく、回答の一致や丁寧な向き合い方から見える「二人が大切にできていた素敵だった点（または${myName}の誠実さ）」も必ず温かく認めてください。
 ※ ${rhythmInstruction}
@@ -846,25 +923,27 @@ ${behaviorRhythmSummary}
 【回答履歴（日付付き）】
 ${summaryLines}
 
-【出力JSONスキーマ（キー名厳守）】
+【出力JSONスキーマ（キー名厳守・値はすべて ${targetLanguageLabel}）】
 {
-  "warmMessage": "まず心にそっと寄り添い労う温かいメッセージ（95文字以内）",
-  "goodMemoriesSummary": "二人が大切にできていた共通点・素敵だった点（85文字以内）",
+  "warmMessage": "まず心にそっと寄り添い労う温かいメッセージ（1〜2文）",
+  "goodMemoriesSummary": "二人が大切にできていた共通点・素敵だった点（1〜2文）",
   "rootCauses": [
     {
-      "title": "すれ違いの背景テーマ（18文字以内・責めない表現）",
-      "background": "回答データから見える価値観や心地よいペースの違い（75文字以内・中立で優しく）",
-      "takeaway": "次の恋愛やこれからの自分に活かせる優しい気づき（80文字以内）"
+      "title": "すれ違いの背景テーマ（簡潔な見出し・責めない表現）",
+      "background": "回答データから見える価値観や心地よいペースの違い（1〜2文・中立で優しく）",
+      "takeaway": "次の恋愛やこれからの自分に活かせる優しい気づき（1〜2文）"
     }
   ],
-  "myStrengthForNextLove": "回答から見える${myName}の恋愛における素敵な強み・魅力（75文字以内）",
-  "gentleNextStep": "自分のペースで前を向くための優しいエール（80文字以内）"
+  "myStrengthForNextLove": "回答から見える${myName}の恋愛における素敵な強み・魅力（1〜2文）",
+  "gentleNextStep": "自分のペースで前を向くための優しいエール（1〜2文）"
 }
 ※ rootCauses は 2〜3件にしてください。`;
   } else {
     prompt = `あなたはカップル専門の優しく的確な関係性アナリストです。
 以下は「${myName}」と「${partnerName}」が回答したスワイプ診断の履歴（計${totalAnalyzedDays}日分：双方完了${revealedDaysCount}日＋未回答を含む過去日${pastPartialDaysCount}日・計${analyzableEntries.length}問・${matchRateText}）です。
-この実データだけに基づき、二人の相性・性格傾向・将来のすれ違い予防アドバイスを日本語の JSON のみで返してください。
+この実データだけに基づき、二人の相性・性格傾向・将来のすれ違い予防アドバイスを、**必ず ${targetLanguageLabel} で書いた JSON のみ** で返してください。
+※ JSON のキー名と riskPoints[].level の値（"low" | "medium" | "high"）は必ず英語固定とし、それ以外の説明文・タグ・タイトルはすべて自然な ${targetLanguageLabel} で記述してください。
+※ ${lengthGuidance}
 ※「過去日・未回答」と付いた設問の回答も、その本人の性格傾向・価値観の分析およびすれ違い予測にしっかり反映してください。
 ※ ${rhythmInstruction}
 ※ 細かい時刻（例：「23時42分」など分単位）には触れず、「朝型・夜型」「マイペース派」など自然な表現にしてください。また、後日回答や未回答が多い側を責める表現は厳禁とし、「自分の落ち着いたタイミングで丁寧に向き合うタイプ」など肯定的に表現してください。
@@ -875,21 +954,21 @@ ${behaviorRhythmSummary}
 【回答履歴（日付付き）】
 ${summaryLines}
 
-【出力JSONスキーマ（キー名厳守）】
+【出力JSONスキーマ（キー名厳守・自然言語の値はすべて ${targetLanguageLabel}）】
 {
   "overallScore": 0から100の整数,
-  "myType": { "tag": "12文字以内の性格タイプ名", "desc": "45文字以内の特徴説明" },
-  "partnerType": { "tag": "12文字以内の性格タイプ名", "desc": "45文字以内の特徴説明" },
-  "chemistrySummary": "100文字以内の二人の相性サマリー",
+  "myType": { "tag": "短い性格タイプ名（2〜4語程度）", "desc": "簡潔な特徴説明（1文）" },
+  "partnerType": { "tag": "短い性格タイプ名（2〜4語程度）", "desc": "簡潔な特徴説明（1文）" },
+  "chemistrySummary": "二人の相性サマリー（1〜2文）",
   "riskPoints": [
     {
-      "title": "すれ違いやすいテーマ名（18文字以内）",
-      "level": "低" | "中" | "高",
-      "desc": "回答データに基づく理由（70文字以内）",
-      "advice": "今日からできる具体的な対策（80文字以内）"
+      "title": "すれ違いやすいテーマ名（簡潔な見出し）",
+      "level": "low" | "medium" | "high",
+      "desc": "回答データに基づく理由（1〜2文）",
+      "advice": "今日からできる具体的な対策（1〜2文）"
     }
   ],
-  "nextActionTip": "二人の仲をさらに深めるおすすめのアクション（70文字以内）"
+  "nextActionTip": "二人の仲をさらに深めるおすすめのアクション（1文）"
 }
 ※ riskPoints は 2〜3件にしてください。`;
   }
@@ -932,20 +1011,42 @@ ${summaryLines}
   }
 
   // 7. DB に保存してペアで共有（1人残ったペアでも後から閲覧可能）
-  const { data: saved, error: saveError } = await admin
+  let saved: Record<string, unknown> | null = null;
+  const insertWithLocale = await admin
     .from("pair_ai_reports")
     .insert({
       pair_id: pairId,
       generated_by: uid,
+      locale: requestedLocale,
       analyzed_days: totalAnalyzedDays,
       analyzed_answers: analyzableEntries.length,
       report_json: parsedReport,
       model_used: model,
     })
-    .select("id, analyzed_days, analyzed_answers, model_used, created_at, report_json")
+    .select("id, locale, analyzed_days, analyzed_answers, model_used, created_at, report_json")
     .single();
 
-  if (saveError || !saved) {
+  if (!insertWithLocale.error && insertWithLocale.data) {
+    saved = insertWithLocale.data as Record<string, unknown>;
+  } else {
+    const insertLegacy = await admin
+      .from("pair_ai_reports")
+      .insert({
+        pair_id: pairId,
+        generated_by: uid,
+        analyzed_days: totalAnalyzedDays,
+        analyzed_answers: analyzableEntries.length,
+        report_json: parsedReport,
+        model_used: model,
+      })
+      .select("id, analyzed_days, analyzed_answers, model_used, created_at, report_json")
+      .single();
+    if (!insertLegacy.error && insertLegacy.data) {
+      saved = insertLegacy.data as Record<string, unknown>;
+    }
+  }
+
+  if (!saved) {
     return jsonResponse({ error: "REPORT_SAVE_FAILED" }, 500);
   }
 
@@ -953,6 +1054,7 @@ ${summaryLines}
     cached: false,
     reportRecord: {
       id: saved.id,
+      locale: saved.locale ?? requestedLocale,
       analyzed_days: saved.analyzed_days,
       analyzed_answers: saved.analyzed_answers,
       model_used: saved.model_used,

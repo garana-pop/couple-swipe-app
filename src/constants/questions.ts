@@ -1,1428 +1,243 @@
-import { Question, RemoteQuestionRecord, SwipeDirection } from '../types';
+import i18n, { getCurrentLocale } from '../i18n';
+import type { SupportedLocale } from '../i18n/locale';
+import {
+  MatchRule,
+  Question,
+  QuestionCategoryKey,
+  RemoteQuestionRecord,
+  SwipeDirection,
+} from '../types';
+
+interface QuestionMeta {
+  id: string;
+  categoryKey: QuestionCategoryKey;
+  matchRule?: MatchRule;
+}
+
+interface QuestionTranslationBundle {
+  categories?: Partial<Record<QuestionCategoryKey, string>>;
+  items?: Record<
+    string,
+    {
+      title: string;
+      choices: Record<SwipeDirection, string>;
+    }
+  >;
+}
 
 /**
- * 質問データ（アプリ同梱・120問）
+ * 同梱120問の言語非依存メタデータ
+ * - 表示文言は src/i18n/locales/{lang}/questions.json で管理
  * - matchRule: 'mirror_up_down' は UP(自分) と DOWN(相手) の組み合わせを相互認識一致とみなす
  */
-export const BUNDLED_QUESTIONS: Question[] = [
-  // ============================================================================
-  // 暮らし・価値観 (q1 - q12)
-  // ============================================================================
-  {
-    id: 'q1',
-    category: '暮らし・価値観',
-    title: 'どっちが家事に厳しい？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '絶対に私',
-      DOWN: '確実に相手',
-      LEFT: 'どちらも同じくらい',
-      RIGHT: 'どちらもゆるい',
-    },
-  },
-  {
-    id: 'q2',
-    category: '休日の過ごし方',
-    title: '理想の休日はどう過ごしたい？',
-    choices: {
-      UP: 'アクティブにお出かけ',
-      DOWN: '家で一日中のんびり',
-      LEFT: '各自好きなことする',
-      RIGHT: '友達も交えてワイワイ',
-    },
-  },
-  {
-    id: 'q3',
-    category: '記念日・イベント',
-    title: '記念日や誕生日の過ごし方は？',
-    choices: {
-      UP: '全力でサプライズしたい',
-      DOWN: '事前に相談して決めたい',
-      LEFT: '美味しいご飯があれば十分',
-      RIGHT: '自然体でいつも通りがいい',
-    },
-  },
-  {
-    id: 'q4',
-    category: '暮らし・価値観',
-    title: '部屋の片付け・掃除の頻度は？',
-    choices: {
-      UP: '毎日こまめに綺麗にしたい',
-      DOWN: '週末にまとめて掃除派',
-      LEFT: '気になった時だけでOK',
-      RIGHT: 'ルンバや外注に頼りたい',
-    },
-  },
-  {
-    id: 'q5',
-    category: '暮らし・価値観',
-    title: '朝型と夜型、二人はどっち？',
-    choices: {
-      UP: '完全な朝型',
-      DOWN: '夜更かししがちな夜型',
-      LEFT: '平日は朝型・休日は夜型',
-      RIGHT: 'その日の気分次第',
-    },
-  },
-  {
-    id: 'q6',
-    category: '暮らし・価値観',
-    title: '寝るときの部屋の明るさと音は？',
-    choices: {
-      UP: '真っ暗・無音じゃないと無理',
-      DOWN: '豆電球くらいの明かりが安心',
-      LEFT: 'テレビや音楽を流しながら',
-      RIGHT: 'いつでもどこでも寝られる',
-    },
-  },
-  {
-    id: 'q7',
-    category: '暮らし・価値観',
-    title: 'エアコンの温度設定、理想は？',
-    choices: {
-      UP: '夏は涼しく・冬は暖かく快適重視',
-      DOWN: '少し控えめで節電意識',
-      LEFT: '季節の風をなるべく感じたい',
-      RIGHT: '相手に合わせるよ',
-    },
-  },
-  {
-    id: 'q8',
-    category: '暮らし・価値観',
-    title: 'どっちが準備に時間がかかる？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が時間がかかる',
-      DOWN: '相手の方が時間がかかる',
-      LEFT: '二人とも早い方',
-      RIGHT: '二人ともゆっくり派',
-    },
-  },
-  {
-    id: 'q9',
-    category: '暮らし・価値観',
-    title: '物の捨てやすさ（断捨離タイプ）は？',
-    choices: {
-      UP: '使わなければすぐ捨てる派',
-      DOWN: '思い出の品は取っておきたい派',
-      LEFT: '売れるならフリマに出す派',
-      RIGHT: '相手が決めてくれたら従う',
-    },
-  },
-  {
-    id: 'q10',
-    category: '暮らし・価値観',
-    title: 'ペットを飼うならどっち派？',
-    choices: {
-      UP: 'ワンちゃん派',
-      DOWN: 'ネコちゃん派',
-      LEFT: '小動物や魚など',
-      RIGHT: '飼わずに身軽でいたい',
-    },
-  },
-  {
-    id: 'q11',
-    category: '暮らし・価値観',
-    title: 'お風呂に入るタイミングは？',
-    choices: {
-      UP: '帰宅後すぐ入りたい',
-      DOWN: '寝る直前にゆっくり',
-      LEFT: '朝シャワー派',
-      RIGHT: '日によってバラバラ',
-    },
-  },
-  {
-    id: 'q12',
-    category: '暮らし・価値観',
-    title: '理想の住まいのエリアは？',
-    choices: {
-      UP: '駅チカ・利便性重視の都心',
-      DOWN: '自然が多く静かな郊外',
-      LEFT: '職場へのアクセス最優先',
-      RIGHT: 'おしゃれなカフェが多い街',
-    },
-  },
-
-  // ============================================================================
-  // コミュニケーション・愛情表現 (q13 - q24)
-  // ============================================================================
-  {
-    id: 'q13',
-    category: 'コミュニケーション',
-    title: 'ケンカした後の仲直りスタイルは？',
-    choices: {
-      UP: 'その日のうちに話し合って解決',
-      DOWN: '一晩寝て頭を冷やしてから',
-      LEFT: '美味しいものや差し入れで和解',
-      RIGHT: '気づいたら自然に戻っている',
-    },
-  },
-  {
-    id: 'q14',
-    category: 'コミュニケーション',
-    title: '連絡（LINE・メッセージ）の頻度は？',
-    choices: {
-      UP: '何気ないこともこまめに送りたい',
-      DOWN: '用事がある時だけで十分',
-      LEFT: '1日1回「おやすみ」くらい',
-      RIGHT: '電話でサクッと話す方が好き',
-    },
-  },
-  {
-    id: 'q15',
-    category: '愛情表現',
-    title: '嬉しい愛情表現はどれ？',
-    choices: {
-      UP: '「好き」「ありがとう」の言葉',
-      DOWN: 'ハグや手をつなぐスキンシップ',
-      LEFT: 'ちょっとしたプレゼントや差し入れ',
-      RIGHT: '家事や予定を気遣う行動',
-    },
-  },
-  {
-    id: 'q16',
-    category: 'コミュニケーション',
-    title: 'どっちが先に「ごめん」と言うことが多い？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私から謝ることが多い',
-      DOWN: '相手から謝ることが多い',
-      LEFT: 'お互いすぐ謝る方',
-      RIGHT: 'そもそもあまり揉めない',
-    },
-  },
-  {
-    id: 'q17',
-    category: 'コミュニケーション',
-    title: '相談したいとき、相手に求めるのは？',
-    choices: {
-      UP: 'まずは共感して話を聞いてほしい',
-      DOWN: '的確なアドバイスや解決策',
-      LEFT: 'おいしいものを一緒に食べて気分転換',
-      RIGHT: 'そっと見守ってほしい',
-    },
-  },
-  {
-    id: 'q18',
-    category: '愛情表現',
-    title: '外を歩くとき、手をつなぎたい？',
-    choices: {
-      UP: 'いつでもつなぎたい！',
-      DOWN: '人目が少ないところなら',
-      LEFT: '腕を組むくらいがちょうどいい',
-      RIGHT: '隣を歩くだけで十分',
-    },
-  },
-  {
-    id: 'q19',
-    category: 'コミュニケーション',
-    title: '一人の時間はどれくらい必要？',
-    choices: {
-      UP: '毎日少しでも一人の時間が欲しい',
-      DOWN: '週に数時間あれば十分',
-      LEFT: 'ずっと一緒でも全然平気',
-      RIGHT: '忙しい時期だけ一人になりたい',
-    },
-  },
-  {
-    id: 'q20',
-    category: 'コミュニケーション',
-    title: 'どっちがやきもち焼き？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方がやきもち焼き',
-      DOWN: '相手の方がやきもち焼き',
-      LEFT: '二人とも少し妬く方',
-      RIGHT: '二人ともおおらか',
-    },
-  },
-  {
-    id: 'q21',
-    category: '愛情表現',
-    title: '記念日以外のサプライズ、どう思う？',
-    choices: {
-      UP: 'するのもされるのも大好き！',
-      DOWN: 'ちょっと照れるけど嬉しい',
-      LEFT: '小さな差し入れくらいがベスト',
-      RIGHT: 'サプライズより普段の安定感',
-    },
-  },
-  {
-    id: 'q22',
-    category: 'コミュニケーション',
-    title: 'スマホのパスコード、お互いに共有する？',
-    choices: {
-      UP: '教えても全然問題ない',
-      DOWN: '緊急時用なら共有してもいい',
-      LEFT: 'プライバシーはそれぞれ守りたい',
-      RIGHT: '気にしたこともない',
-    },
-  },
-  {
-    id: 'q23',
-    category: 'コミュニケーション',
-    title: 'どっちが甘えん坊だと思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が甘えん坊',
-      DOWN: '相手の方が甘えん坊',
-      LEFT: '二人とも甘えたいタイプ',
-      RIGHT: '二人ともサバサバ系',
-    },
-  },
-  {
-    id: 'q24',
-    category: 'コミュニケーション',
-    title: '疲れているとき、パートナーにしてほしいことは？',
-    choices: {
-      UP: '話を聞いたりよしよししてほしい',
-      DOWN: '美味しいご飯を用意してほしい',
-      LEFT: 'そっとしておいて寝かせてほしい',
-      RIGHT: '一緒に笑える動画や映画を観たい',
-    },
-  },
-
-  // ============================================================================
-  // お金・将来 (q25 - q34)
-  // ============================================================================
-  {
-    id: 'q25',
-    category: 'お金・将来',
-    title: 'お金の使い方のタイプは？',
-    choices: {
-      UP: '計画的にしっかり貯蓄派',
-      DOWN: '今の経験や楽しみに使う派',
-      LEFT: '投資や運用で増やしたい派',
-      RIGHT: '必要な時は惜しまず使う派',
-    },
-  },
-  {
-    id: 'q26',
-    category: 'お金・将来',
-    title: '二人の共通財布・お金の管理方法は？',
-    choices: {
-      UP: '共通口座を作ってそこから払う',
-      DOWN: '項目ごとに担当を決める',
-      LEFT: '立て替えて都度精算（アプリ等）',
-      RIGHT: 'おおよそで気にしない',
-    },
-  },
-  {
-    id: 'q27',
-    category: 'お金・将来',
-    title: '高い買い物をするとき、相手に相談する？',
-    choices: {
-      UP: '数万円以上なら必ず相談する',
-      DOWN: '自分のお小遣い範囲なら事後報告',
-      LEFT: '大きな家電や家具だけ相談',
-      RIGHT: '金額に関わらず何でも話す',
-    },
-  },
-  {
-    id: 'q28',
-    category: 'お金・将来',
-    title: '外食の予算感覚（普段のデート）は？',
-    choices: {
-      UP: '安くて美味しいお店を開拓したい',
-      DOWN: '雰囲気の良いお店で少し贅沢したい',
-      LEFT: '普段は節約・たまに高級店',
-      RIGHT: 'おうちご飯が一番',
-    },
-  },
-  {
-    id: 'q29',
-    category: 'お金・将来',
-    title: '5年後、どんな暮らしをしていたい？',
-    choices: {
-      UP: '今より広いお家でまったり',
-      DOWN: '仕事も趣味もアクティブに挑戦',
-      LEFT: '旅行にたくさん行ける余裕ある生活',
-      RIGHT: '変わらず笑顔で過ごせていればOK',
-    },
-  },
-  {
-    id: 'q30',
-    category: 'お金・将来',
-    title: 'どっちが衝動買いしやすい？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が衝動買いしがち',
-      DOWN: '相手の方が衝動買いしがち',
-      LEFT: '二人とも慎重派',
-      RIGHT: '二人とも気に入ったら即決派',
-    },
-  },
-  {
-    id: 'q31',
-    category: 'お金・将来',
-    title: 'プレゼントの選び方で嬉しいのは？',
-    choices: {
-      UP: '事前に欲しいものをリクエストする',
-      DOWN: '相手が考えて選んでくれたもの',
-      LEFT: '一緒に買い物に行って選ぶ',
-      RIGHT: 'モノより食事や旅行の体験',
-    },
-  },
-  {
-    id: 'q32',
-    category: 'お金・将来',
-    title: '老後はどこで過ごしたい？',
-    choices: {
-      UP: '便利な都会のマンション',
-      DOWN: '温泉地や自然豊かな場所',
-      LEFT: '海外移住や二拠点生活に憧れる',
-      RIGHT: '地元や今の街の近く',
-    },
-  },
-
-  // ============================================================================
-  // 食・好み (q33 - q44)
-  // ============================================================================
-  {
-    id: 'q33',
-    category: '食・好み',
-    title: '今夜のご飯、気分はどれ？',
-    choices: {
-      UP: 'ほっこり和食',
-      DOWN: 'がっつりお肉・洋食',
-      LEFT: 'イタリアン・おしゃれ系',
-      RIGHT: 'ラーメン・中華・エスニック',
-    },
-  },
-  {
-    id: 'q34',
-    category: '食・好み',
-    title: '自炊と外食・デリバリーのバランスは？',
-    choices: {
-      UP: 'なるべく毎日自炊したい',
-      DOWN: '平日は自炊・週末は外食',
-      LEFT: '無理せずデリバリーも活用',
-      RIGHT: '美味しいお店に食べに行きたい',
-    },
-  },
-  {
-    id: 'q35',
-    category: '食・好み',
-    title: '朝ごはんは食べる派？',
-    choices: {
-      UP: '和食（ご飯・味噌汁）派',
-      DOWN: 'パン・コーヒー派',
-      LEFT: '軽くフルーツやヨーグルト',
-      RIGHT: '朝は食べない・飲まない派',
-    },
-  },
-  {
-    id: 'q36',
-    category: '食・好み',
-    title: '辛い料理は得意？',
-    choices: {
-      UP: '激辛も大歓迎！',
-      DOWN: 'ピリ辛くらいがちょうどいい',
-      LEFT: 'ちょっと苦手かも',
-      RIGHT: '全く食べられない',
-    },
-  },
-  {
-    id: 'q37',
-    category: '食・好み',
-    title: '食後のデザートは？',
-    choices: {
-      UP: '甘いものは別腹！毎日でもOK',
-      DOWN: '週末やご褒美のときだけ',
-      LEFT: 'フルーツくらいがちょうどいい',
-      RIGHT: '甘いものよりしょっぱいおつまみ派',
-    },
-  },
-  {
-    id: 'q38',
-    category: '食・好み',
-    title: 'コーヒーとお茶、よく飲むのは？',
-    choices: {
-      UP: '断然コーヒー派',
-      DOWN: '緑茶・ほうじ茶など日本茶派',
-      LEFT: '紅茶・ハーブティー派',
-      RIGHT: 'お水や炭酸水が多い',
-    },
-  },
-  {
-    id: 'q39',
-    category: '食・好み',
-    title: 'お酒との付き合い方は？',
-    choices: {
-      UP: '家でも外でも飲むのが好き',
-      DOWN: '外食や特別な日だけ飲む',
-      LEFT: 'ほぼ飲まない・ソフトドリンク派',
-      RIGHT: 'おつまみだけ一緒に楽しみたい',
-    },
-  },
-  {
-    id: 'q40',
-    category: '食・好み',
-    title: 'メニューを決めるとき、どっちが早い？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が即決する',
-      DOWN: '相手の方が即決する',
-      LEFT: '二人ともすぐ決まる',
-      RIGHT: '二人とも優柔不断で迷う',
-    },
-  },
-
-  // ============================================================================
-  // 旅行・お出かけ・休日 (q41 - q52)
-  // ============================================================================
-  {
-    id: 'q41',
-    category: '旅行・お出かけ',
-    title: '旅行の計画スタイルは？',
-    choices: {
-      UP: '分単位できっちりスケジュール派',
-      DOWN: '大まかな行き先だけ決めてノープラン',
-      LEFT: '食べたいお店だけリストアップ',
-      RIGHT: '相手にお任せして楽しむ派',
-    },
-  },
-  {
-    id: 'q42',
-    category: '旅行・お出かけ',
-    title: '次の連休に行くならどこがいい？',
-    choices: {
-      UP: '温泉旅館でひたすら癒やされる',
-      DOWN: 'テーマパークや観光地を満喫',
-      LEFT: '海外や南国リゾートへ',
-      RIGHT: 'グルメ目的の食べ歩き旅',
-    },
-  },
-  {
-    id: 'q43',
-    category: '旅行・お出かけ',
-    title: '旅行の荷造りはいつやる？',
-    choices: {
-      UP: '数日前から完璧に準備',
-      DOWN: '前日の夜にパパッと',
-      LEFT: '当日の朝バタバタと',
-      RIGHT: '最小限の荷物で現地調達派',
-    },
-  },
-  {
-    id: 'q44',
-    category: '休日の過ごし方',
-    title: '二人で映画を観るならどのジャンル？',
-    choices: {
-      UP: 'アクション・SF・スリラー',
-      DOWN: 'コメディ・ハートフル系',
-      LEFT: '恋愛・ヒューマンドラマ',
-      RIGHT: 'アニメ・ドキュメンタリー',
-    },
-  },
-  {
-    id: 'q45',
-    category: '休日の過ごし方',
-    title: '雨の日のデート、何したい？',
-    choices: {
-      UP: 'おうちで映画・ゲーム三昧',
-      DOWN: '美術館や水族館へ',
-      LEFT: '大型ショッピングモールでぶらぶら',
-      RIGHT: 'スーパー銭湯や岩盤浴でリフレッシュ',
-    },
-  },
-  {
-    id: 'q46',
-    category: '旅行・お出かけ',
-    title: '移動手段で一番好きなのは？',
-    choices: {
-      UP: 'ドライブ（車）で自由に',
-      DOWN: '新幹線・電車で駅弁を楽しみながら',
-      LEFT: '飛行機で一気に遠くへ',
-      RIGHT: '近場を自転車や散歩で',
-    },
-  },
-  {
-    id: 'q47',
-    category: '休日の過ごし方',
-    title: '写真や動画、お出かけ先でよく撮る？',
-    choices: {
-      UP: '思い出に残したいからたくさん撮る',
-      DOWN: '景色や料理だけ少し撮る',
-      LEFT: '二人の自撮りもよく撮る',
-      RIGHT: '撮るより目に焼き付けたい派',
-    },
-  },
-  {
-    id: 'q48',
-    category: '旅行・お出かけ',
-    title: '宿泊先を選ぶとき一番重視するのは？',
-    choices: {
-      UP: 'お風呂・温泉の充実度',
-      DOWN: 'ご飯（朝食・夕食）の美味しさ',
-      LEFT: '立地の良さとコスパ',
-      RIGHT: 'お部屋の雰囲気・おしゃれさ',
-    },
-  },
-
-  // ============================================================================
-  // 二人の関係・性格 (q49 - q60)
-  // ============================================================================
-  {
-    id: 'q49',
-    category: '二人の関係',
-    title: 'どっちがインドア派だと思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方がインドア派',
-      DOWN: '相手の方がインドア派',
-      LEFT: '二人ともおうち好き',
-      RIGHT: '二人ともアウトドア好き',
-    },
-  },
-  {
-    id: 'q50',
-    category: '二人の関係',
-    title: 'どっちがロマンチストだと思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方がロマンチスト',
-      DOWN: '相手の方がロマンチスト',
-      LEFT: '二人ともロマンチスト',
-      RIGHT: '二人とも現実派',
-    },
-  },
-  {
-    id: 'q51',
-    category: '記念日・イベント',
-    title: 'クリスマスや年末年始の理想は？',
-    choices: {
-      UP: 'イルミネーションや外食で特別感',
-      DOWN: 'おうちで手料理とケーキでまったり',
-      LEFT: '旅行に出かけて非日常を味わう',
-      RIGHT: '家族や友人も交えて賑やかに',
-    },
-  },
-  {
-    id: 'q52',
-    category: '二人の関係',
-    title: '二人の共通の趣味、これから増やしたいのは？',
-    choices: {
-      UP: '料理・お菓子作り・カフェ巡り',
-      DOWN: 'スポーツ・ジム・キャンプ',
-      LEFT: 'ゲーム・ボードゲーム・映画',
-      RIGHT: '旅行・カメラ・街歩き',
-    },
-  },
-  {
-    id: 'q53',
-    category: '二人の関係',
-    title: 'どっちが方向音痴？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が方向音痴かも',
-      DOWN: '相手の方が方向音痴かも',
-      LEFT: '二人とも地図が得意',
-      RIGHT: '二人ともよく迷う',
-    },
-  },
-  {
-    id: 'q54',
-    category: '二人の関係',
-    title: '相手のどんなところに一番安心感を感じる？',
-    choices: {
-      UP: '笑顔や優しい空気感',
-      DOWN: '頼りになる行動力・決断力',
-      LEFT: '素直に気持ちを話してくれるところ',
-      RIGHT: '一緒にいて無言でも気まずくないところ',
-    },
-  },
-  {
-    id: 'q55',
-    category: '暮らし・価値観',
-    title: '体調を崩したとき、どうしてほしい？',
-    choices: {
-      UP: '買い出しや看病をお願いしたい',
-      DOWN: 'うつらないよう別室でそっとしておいて',
-      LEFT: 'ポカリとゼリーだけ買ってきてほしい',
-      RIGHT: '病院に付き添ってくれると心強い',
-    },
-  },
-  {
-    id: 'q56',
-    category: '二人の関係',
-    title: 'SNSに二人の写真やエピソードを載せるのは？',
-    choices: {
-      UP: 'オープンに載せてもOK',
-      DOWN: '顔が映らない雰囲気写真ならOK',
-      LEFT: '親しい友達限定のアカウントなら',
-      RIGHT: 'SNSには載せず二人だけの思い出にしたい',
-    },
-  },
-  {
-    id: 'q57',
-    category: '暮らし・価値観',
-    title: '休日の目覚まし時計はどうしてる？',
-    choices: {
-      UP: '平日と同じ時間にセットする',
-      DOWN: '目覚ましなしで自然に起きる',
-      LEFT: 'お昼前には起きるようにセット',
-      RIGHT: '用事があるときだけセット',
-    },
-  },
-  {
-    id: 'q58',
-    category: 'コミュニケーション',
-    title: '相手の服装や髪型が変わったとき、どうする？',
-    choices: {
-      UP: '気づいたらすぐ褒めて伝える！',
-      DOWN: '心の中で「いいな」と思うことが多い',
-      LEFT: '似合ってると思ったら素直に言う',
-      RIGHT: '正直あまり気づかないかも…',
-    },
-  },
-  {
-    id: 'q59',
-    category: '二人の関係',
-    title: '二人の関係を一言で表すと？',
-    choices: {
-      UP: '親友みたいに何でも話せる相棒',
-      DOWN: 'ドキドキやときめきがある恋人',
-      LEFT: '家族みたいに安心できる存在',
-      RIGHT: 'お互いを高め合えるパートナー',
-    },
-  },
-  {
-    id: 'q60',
-    category: '記念日・イベント',
-    title: '次に二人で叶えたい「小さな目標」は？',
-    choices: {
-      UP: '行ったことない街への小旅行',
-      DOWN: 'おうちでちょっと豪華な手料理パーティー',
-      LEFT: '新しい共通の趣味を始めること',
-      RIGHT: '毎日「ありがとう」を伝え合うこと',
-    },
-  },
-
-  // ============================================================================
-  // 暮らし・家事・生活リズム (q61 - q70)
-  // ============================================================================
-  {
-    id: 'q61',
-    category: '暮らし・価値観',
-    title: '食後の食器洗い、いつ片付けたい？',
-    choices: {
-      UP: '食べ終わったらすぐ洗う',
-      DOWN: '少し休んでからまとめて',
-      LEFT: '寝る前までに洗えばOK',
-      RIGHT: '食洗機にお任せしたい',
-    },
-  },
-  {
-    id: 'q62',
-    category: '暮らし・価値観',
-    title: '洗濯物の干し方・たたみ方にこだわりはある？',
-    choices: {
-      UP: 'シワ伸ばし・たたみ方まで丁寧派',
-      DOWN: '乾いていればだいたいOK',
-      LEFT: '乾燥機で一気に終わらせたい',
-      RIGHT: 'ハンガーのまま収納派',
-    },
-  },
-  {
-    id: 'q63',
-    category: '暮らし・価値観',
-    title: '理想のインテリア・お部屋の雰囲気は？',
-    choices: {
-      UP: '木の温もりがあるナチュラル系',
-      DOWN: 'シンプル・ミニマルなホテル風',
-      LEFT: 'カフェっぽいヴィンテージ系',
-      RIGHT: '好きなものに囲まれたにぎやか系',
-    },
-  },
-  {
-    id: 'q64',
-    category: '暮らし・価値観',
-    title: 'どっちが忘れ物・落とし物をしやすい？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が忘れやすい',
-      DOWN: '相手の方が忘れやすい',
-      LEFT: '二人ともしっかり管理派',
-      RIGHT: '二人ともうっかりしがち',
-    },
-  },
-  {
-    id: 'q65',
-    category: '暮らし・価値観',
-    title: '寝る前のリラックスタイム、何をしてる？',
-    choices: {
-      UP: 'スマホや動画を見ながらゴロゴロ',
-      DOWN: '本やマンガを読んでまったり',
-      LEFT: '今日あったことを二人で話す',
-      RIGHT: 'ベッドに入ったら即就寝',
-    },
-  },
-  {
-    id: 'q66',
-    category: '暮らし・価値観',
-    title: '冷蔵庫の中身・食材の管理タイプは？',
-    choices: {
-      UP: '献立を決めて計画的にまとめ買い',
-      DOWN: 'その日に食べたいものを都度買う',
-      LEFT: '冷凍食品や作り置きを常備',
-      RIGHT: 'ネットスーパーや宅配を活用',
-    },
-  },
-  {
-    id: 'q67',
-    category: '暮らし・価値観',
-    title: '家電や日用品を買うとき、重視するのは？',
-    choices: {
-      UP: '長く使える高品質・定番モデル',
-      DOWN: '最新機能や時短できる便利さ',
-      LEFT: 'コスパと口コミ評価の良さ',
-      RIGHT: '見た目・デザインの統一感',
-    },
-  },
-  {
-    id: 'q68',
-    category: '暮らし・価値観',
-    title: '休日の洗濯や掃除、何時ごろに始めたい？',
-    choices: {
-      UP: '午前中にサッと済ませたい',
-      DOWN: 'お昼ごはんの後にゆっくり',
-      LEFT: '夕方までに終わればOK',
-      RIGHT: '休日は家事もお休みしたい',
-    },
-  },
-  {
-    id: 'q69',
-    category: '暮らし・価値観',
-    title: 'テレビやBGM、家にいる時はつけておく？',
-    choices: {
-      UP: '常にテレビや動画を流しておきたい',
-      DOWN: 'おしゃれな音楽やラジオを流す',
-      LEFT: '静かな空間が落ち着く',
-      RIGHT: '観たい番組がある時だけつける',
-    },
-  },
-  {
-    id: 'q70',
-    category: '暮らし・価値観',
-    title: 'どっちが寒がり（または暑がり）だと思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が寒がり',
-      DOWN: '相手の方が寒がり',
-      LEFT: '二人とも寒さに弱い',
-      RIGHT: '二人とも暑さに弱い',
-    },
-  },
-
-  // ============================================================================
-  // コミュニケーション・性格・リアクション (q71 - q82)
-  // ============================================================================
-  {
-    id: 'q71',
-    category: 'コミュニケーション',
-    title: '嬉しいことがあった時、どう共有したい？',
-    choices: {
-      UP: 'すぐ電話やLINEで報告する！',
-      DOWN: '会った時に直接顔を見て話す',
-      LEFT: 'ケーキやお酒を買ってプチお祝い',
-      RIGHT: 'さらっと会話の中で伝える',
-    },
-  },
-  {
-    id: 'q72',
-    category: 'コミュニケーション',
-    title: '待ち合わせの遅刻、どれくらいまで平気？',
-    choices: {
-      UP: '5分でも連絡が欲しい・時間厳守派',
-      DOWN: '15分くらいなら全然気にしない',
-      LEFT: '連絡があれば30分でも待てる',
-      RIGHT: 'そもそも自分も遅れがち…',
-    },
-  },
-  {
-    id: 'q73',
-    category: 'コミュニケーション',
-    title: 'どっちが感動して涙もろい？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が涙もろい',
-      DOWN: '相手の方が涙もろい',
-      LEFT: '二人ともすぐ泣いちゃう',
-      RIGHT: '二人ともあまり泣かない',
-    },
-  },
-  {
-    id: 'q74',
-    category: 'コミュニケーション',
-    title: '二人の意見が割れたとき、どう決める？',
-    choices: {
-      UP: '納得いくまでじっくり話し合う',
-      DOWN: 'お互いの案の折衷案を探す',
-      LEFT: '交互に相手の希望を優先する',
-      RIGHT: 'じゃんけんや直感で楽しく決める',
-    },
-  },
-  {
-    id: 'q75',
-    category: 'コミュニケーション',
-    title: '相手からの返信が少し遅いとき、どう思う？',
-    choices: {
-      UP: '忙しいんだろうなと気長に待つ',
-      DOWN: 'ちょっとだけ心配になる',
-      LEFT: '自分のことをして忘れている',
-      RIGHT: 'スタンプで可愛く催促しちゃう',
-    },
-  },
-  {
-    id: 'q76',
-    category: 'コミュニケーション',
-    title: 'どっちがLINE・メッセージの返信が早い？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が返信が早い',
-      DOWN: '相手の方が返信が早い',
-      LEFT: '二人とも即レス派',
-      RIGHT: '二人ともマイペース派',
-    },
-  },
-  {
-    id: 'q77',
-    category: 'コミュニケーション',
-    title: '相手に褒められたとき、どんな反応になりがち？',
-    choices: {
-      UP: '「ありがとう！」と素直に喜ぶ',
-      DOWN: '照れて謙遜したりごまかす',
-      LEFT: '「そっちもだよ！」と褒め返す',
-      RIGHT: 'ニヤニヤが止まらなくなる',
-    },
-  },
-  {
-    id: 'q78',
-    category: 'コミュニケーション',
-    title: 'どっちが寝起きが良いと思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が寝起きが良い',
-      DOWN: '相手の方が寝起きが良い',
-      LEFT: '二人ともパッと起きられる',
-      RIGHT: '二人とも布団から出られない',
-    },
-  },
-  {
-    id: 'q79',
-    category: 'コミュニケーション',
-    title: '秘密のサプライズ、当日まで隠しきれる？',
-    choices: {
-      UP: 'ポーカーフェイスで完璧に隠せる',
-      DOWN: 'ニヤニヤしてバレてしまいがち',
-      LEFT: '嬉しくて途中でヒントを出しちゃう',
-      RIGHT: '隠すのが苦手で先に言っちゃう',
-    },
-  },
-  {
-    id: 'q80',
-    category: 'コミュニケーション',
-    title: '相手が落ち込んでいる時、どう励ますことが多い？',
-    choices: {
-      UP: 'ぎゅっとハグしてそばにいる',
-      DOWN: '好きな食べ物やおやつを差し入れ',
-      LEFT: '面白い話や動画で笑わせる',
-      RIGHT: 'ただ静かに話を最後まで聞く',
-    },
-  },
-  {
-    id: 'q81',
-    category: 'コミュニケーション',
-    title: 'どっちがツッコミ役・ボケ役になりがち？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私がツッコミ役になりがち',
-      DOWN: '相手がツッコミ役になりがち',
-      LEFT: '二人ともボケ倒すタイプ',
-      RIGHT: 'ほのぼの穏やかトーク派',
-    },
-  },
-  {
-    id: 'q82',
-    category: 'コミュニケーション',
-    title: '次のデートの約束、いつ頃決めたい？',
-    choices: {
-      UP: '1〜2週間前から予定を押さえる',
-      DOWN: '数日前に天気を見て決める',
-      LEFT: '前日や当日のノリでOK',
-      RIGHT: '毎回デート終わりに次を決める',
-    },
-  },
-
-  // ============================================================================
-  // 愛情表現・恋愛観 (q83 - q90)
-  // ============================================================================
-  {
-    id: 'q83',
-    category: '愛情表現',
-    title: 'お揃い（ペアルック・リンクコーデ）どう思う？',
-    choices: {
-      UP: '小物や靴くらいならさりげなく◎',
-      DOWN: '部屋着やパジャマでお揃いにしたい',
-      LEFT: '色味を合わせるリンクコーデが好き',
-      RIGHT: 'それぞれ好きな服を着るのが一番',
-    },
-  },
-  {
-    id: 'q84',
-    category: '愛情表現',
-    title: 'デート中のスマホの使い方、理想は？',
-    choices: {
-      UP: 'お店調べや写真以外は見ない',
-      DOWN: 'お互いに無理ない範囲で自由',
-      LEFT: '面白い記事や動画を一緒に見る',
-      RIGHT: '気づいたら触っちゃうので意識したい',
-    },
-  },
-  {
-    id: 'q85',
-    category: '愛情表現',
-    title: '二人の呼び方（名前・あだ名）でしっくりくるのは？',
-    choices: {
-      UP: '下の名前を呼び捨て・ちゃん付け',
-      DOWN: '二人だけのオリジナルあだ名',
-      LEFT: 'シンプルに「〇〇さん・くん」',
-      RIGHT: '気分や場所で自然に変わる',
-    },
-  },
-  {
-    id: 'q86',
-    category: '愛情表現',
-    title: 'どっちが先に相手を好きになったと思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が先に好きになった',
-      DOWN: '相手の方が先に好きになった',
-      LEFT: 'ほとんど同じタイミング！',
-      RIGHT: '気づいたら自然と惹かれていた',
-    },
-  },
-  {
-    id: 'q87',
-    category: '愛情表現',
-    title: '相手にしてもらうと一番キュンとする瞬間は？',
-    choices: {
-      UP: '何気なく車道側を歩いてくれた時',
-      DOWN: '好きだったものを覚えていてくれた時',
-      LEFT: '不意に頭をなでたり笑顔を向けられた時',
-      RIGHT: '自分の味方でいてくれると感じた時',
-    },
-  },
-  {
-    id: 'q88',
-    category: '記念日・イベント',
-    title: '二人の思い出写真、どうやって残したい？',
-    choices: {
-      UP: '共有アルバムにどんどんまとめる',
-      DOWN: '年に1回フォトブックに印刷したい',
-      LEFT: 'お気に入りだけ部屋に飾りたい',
-      RIGHT: 'スマホのカメラロールを見返す派',
-    },
-  },
-  {
-    id: 'q89',
-    category: '愛情表現',
-    title: 'デートの服装、相手に合わせて考える？',
-    choices: {
-      UP: '行き先や相手の好みをかなり意識する',
-      DOWN: '清潔感があれば自分らしさ重視',
-      LEFT: '事前に「何着ていく？」と相談する',
-      RIGHT: '動きやすさ・快適さが最優先',
-    },
-  },
-  {
-    id: 'q90',
-    category: '愛情表現',
-    title: '会えない期間が続いたとき、どう乗り切る？',
-    choices: {
-      UP: 'ビデオ通話や長電話で顔を見る',
-      DOWN: '次会う日の楽しい計画を立てる',
-      LEFT: '自分の趣味や仕事に集中する',
-      RIGHT: 'ちょっとした手紙やギフトを送る',
-    },
-  },
-
-  // ============================================================================
-  // 食・グルメ・おうち時間 (q91 - q98)
-  // ============================================================================
-  {
-    id: 'q91',
-    category: '食・好み',
-    title: 'ラーメンを食べるなら一番好きな味は？',
-    choices: {
-      UP: '王道の醤油・塩系',
-      DOWN: 'こってり豚骨・家系',
-      LEFT: 'コクのある味噌・担々麺',
-      RIGHT: 'つけ麺・まぜそば派',
-    },
-  },
-  {
-    id: 'q92',
-    category: '食・好み',
-    title: 'お寿司屋さんで最初に頼みたくなるネタは？',
-    choices: {
-      UP: 'マグロ・トロ系',
-      DOWN: 'サーモン・炙り系',
-      LEFT: '白身・イカ・貝類',
-      RIGHT: '玉子や茶碗蒸し・サイドから',
-    },
-  },
-  {
-    id: 'q93',
-    category: '食・好み',
-    title: '冬の鍋、シメに選ぶならどれ？',
-    choices: {
-      UP: '玉子とろとろ雑炊',
-      DOWN: 'もちもちうどん',
-      LEFT: 'ラーメン・中華麺',
-      RIGHT: 'チーズリゾット風',
-    },
-  },
-  {
-    id: 'q94',
-    category: '食・好み',
-    title: '焼肉に行ったらどっちが焼き奉行になる？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私が積極的に焼く係',
-      DOWN: '相手が積極的に焼く係',
-      LEFT: '自分の分は自分で焼くスタイル',
-      RIGHT: '気づいた方がどんどん焼く',
-    },
-  },
-  {
-    id: 'q95',
-    category: '食・好み',
-    title: 'カフェでの理想の過ごし方は？',
-    choices: {
-      UP: 'スイーツとドリンクでじっくりおしゃべり',
-      DOWN: 'それぞれ読書や作業をして静かに',
-      LEFT: 'テラス席で外の景色を眺める',
-      RIGHT: 'テイクアウトして公園で散歩',
-    },
-  },
-  {
-    id: 'q96',
-    category: '食・好み',
-    title: '夜中にちょっとお腹が空いたとき、どうする？',
-    choices: {
-      UP: '我慢して白湯やお茶でしのぐ',
-      DOWN: 'カップ麺やお菓子を解禁しちゃう',
-      LEFT: 'ヨーグルトやスープなど軽めに',
-      RIGHT: '二人で背徳の夜食パーティー！',
-    },
-  },
-  {
-    id: 'q97',
-    category: '食・好み',
-    title: '休日に一緒に料理を作るなら何がいい？',
-    choices: {
-      UP: '餃子やたこ焼きなどワイワイ系',
-      DOWN: 'パスタやカレーをスパイスから本格的に',
-      LEFT: 'お菓子やパン作りに挑戦',
-      RIGHT: '料理より片付け担当に徹したい',
-    },
-  },
-  {
-    id: 'q98',
-    category: '食・好み',
-    title: 'コンビニでつい買ってしまうご褒美は？',
-    choices: {
-      UP: '新作スイーツ・プリン・シュークリーム',
-      DOWN: 'アイスクリーム・チョコ系',
-      LEFT: 'ホットスナック（からあげ・肉まん）',
-      RIGHT: 'カフェラテや季節限定ドリンク',
-    },
-  },
-
-  // ============================================================================
-  // お金・仕事・将来 (q99 - q106)
-  // ============================================================================
-  {
-    id: 'q99',
-    category: 'お金・将来',
-    title: 'もし宝くじで1,000万円当たったら最初に何する？',
-    choices: {
-      UP: '豪華な海外旅行や高級宿へ行く',
-      DOWN: 'ほぼ全額を貯金・投資に回す',
-      LEFT: '引っ越しや家具家電を一新する',
-      RIGHT: '半分楽しんで半分は将来のために残す',
-    },
-  },
-  {
-    id: 'q100',
-    category: 'お金・将来',
-    title: 'ポイント活動や割引クーポン、活用する派？',
-    choices: {
-      UP: 'お得が大好き！しっかり貯めて使う',
-      DOWN: 'よく使うサービスだけゆるく活用',
-      LEFT: '手間がかかるなら気にしない派',
-      RIGHT: '相手が詳しければ全部お任せしたい',
-    },
-  },
-  {
-    id: 'q101',
-    category: 'お金・将来',
-    title: '仕事で大変なことがあった時、家に持ち込む？',
-    choices: {
-      UP: 'パートナーに話してスッキリしたい',
-      DOWN: 'オンオフを切り替えて家では話さない',
-      LEFT: '本当に辛い時だけ相談する',
-      RIGHT: '美味しいものを食べて忘れる',
-    },
-  },
-  {
-    id: 'q102',
-    category: 'お金・将来',
-    title: 'どっちの方が計画性があると思う？',
-    matchRule: 'mirror_up_down',
-    choices: {
-      UP: '私の方が計画的',
-      DOWN: '相手の方が計画的',
-      LEFT: '二人ともきっちり計画派',
-      RIGHT: '二人ともなんとかなるさ派',
-    },
-  },
-  {
-    id: 'q103',
-    category: 'お金・将来',
-    title: '誕生日プレゼントのちょうどいい予算感は？',
-    choices: {
-      UP: '1万円前後で気負わないギフト',
-      DOWN: '2〜3万円くらいでちょっと特別に',
-      LEFT: '欲しいものがあれば金額にこだわらない',
-      RIGHT: '予算を決めてお互いにリクエスト制',
-    },
-  },
-  {
-    id: 'q104',
-    category: 'お金・将来',
-    title: '理想のワークライフバランスは？',
-    choices: {
-      UP: '定時上がりで二人の時間を最優先',
-      DOWN: 'やりがい重視で仕事も全力で頑張る',
-      LEFT: 'リモートワーク中心で柔軟に働きたい',
-      RIGHT: 'メリハリをつけて長期休みをしっかり取る',
-    },
-  },
-  {
-    id: 'q105',
-    category: 'お金・将来',
-    title: '引っ越すなら一番妥協できない条件は？',
-    choices: {
-      UP: '日当たりと部屋の広さ・間取り',
-      DOWN: '駅からの距離と周辺のお店',
-      LEFT: 'バス・トイレ別や水回りの綺麗さ',
-      RIGHT: '静かな環境とセキュリティ',
-    },
-  },
-  {
-    id: 'q106',
-    category: 'お金・将来',
-    title: '二人でコツコツ貯めたお金、何に使いたい？',
-    choices: {
-      UP: 'いつか行きたい憧れの海外旅行',
-      DOWN: '理想のマイホームや引っ越し資金',
-      LEFT: 'マイカー購入や大きな家電',
-      RIGHT: '安心のための備えとして持っておく',
-    },
-  },
-
-  // ============================================================================
-  // 旅行・お出かけ・季節 (q107 - q114)
-  // ============================================================================
-  {
-    id: 'q107',
-    category: '旅行・お出かけ',
-    title: '一番好きな季節はどれ？',
-    choices: {
-      UP: '桜とポカポカ陽気の春',
-      DOWN: '海や花火が楽しい夏',
-      LEFT: '紅葉とグルメの秋',
-      RIGHT: '温泉とイルミネーションの冬',
-    },
-  },
-  {
-    id: 'q108',
-    category: '旅行・お出かけ',
-    title: 'テーマパークや遊園地での楽しみ方は？',
-    choices: {
-      UP: '絶叫系アトラクションを制覇したい！',
-      DOWN: 'ショーやパレード・世界観を満喫',
-      LEFT: '限定フードやグッズ巡り中心',
-      RIGHT: '並ぶのが苦手なのでのんびり回る',
-    },
-  },
-  {
-    id: 'q109',
-    category: '旅行・お出かけ',
-    title: 'ドライブ中の車内、どう過ごすのが好き？',
-    choices: {
-      UP: '好きな曲をかけて一緒に歌う',
-      DOWN: 'ラジオやポッドキャストを聴く',
-      LEFT: 'BGMは控えめにずっとおしゃべり',
-      RIGHT: 'サービスエリアのグルメを全制覇',
-    },
-  },
-  {
-    id: 'q110',
-    category: '旅行・お出かけ',
-    title: '旅行のお土産の買い方タイプは？',
-    choices: {
-      UP: '家族や職場・友達にしっかり配る',
-      DOWN: '自分たち用のご当地グルメ中心',
-      LEFT: 'キーホルダーや食器など形に残るもの',
-      RIGHT: '荷物を増やしたくないので最小限',
-    },
-  },
-  {
-    id: 'q111',
-    category: '休日の過ごし方',
-    title: 'キャンプやグランピング、やってみたい？',
-    choices: {
-      UP: 'テント設営から本格キャンプしたい！',
-      DOWN: '設備が整ったおしゃれグランピング派',
-      LEFT: '日帰りのBBQくらいがちょうどいい',
-      RIGHT: '虫が苦手なのでホテルが一番',
-    },
-  },
-  {
-    id: 'q112',
-    category: '旅行・お出かけ',
-    title: '温泉旅行に行ったら何回お風呂に入りたい？',
-    choices: {
-      UP: '到着・夜・翌朝の最低3回は入る！',
-      DOWN: '夜と朝の2回ゆっくり浸かる',
-      LEFT: '夜に1回入れれば十分満足',
-      RIGHT: '貸切風呂やサウナを重視したい',
-    },
-  },
-  {
-    id: 'q113',
-    category: '休日の過ごし方',
-    title: '夏休みの理想のイベントは？',
-    choices: {
-      UP: '浴衣で花火大会・夏祭り',
-      DOWN: '海やプールで思いっきり遊ぶ',
-      LEFT: '避暑地の高原や山で涼む',
-      RIGHT: '涼しい部屋でかき氷やスイカ',
-    },
-  },
-  {
-    id: 'q114',
-    category: '休日の過ごし方',
-    title: '動物とふれあうならどこに行きたい？',
-    choices: {
-      UP: '動物園でのんびり散策',
-      DOWN: '水族館で幻想的な空間に癒やされる',
-      LEFT: '牧場でソフトクリーム＆ふれあい',
-      RIGHT: '猫カフェや犬カフェでまったり',
-    },
-  },
-
-  // ============================================================================
-  // もしも・価値観深掘り・二人のこれから (q115 - q120)
-  // ============================================================================
-  {
-    id: 'q115',
-    category: '二人の関係',
-    title: 'もし急に1週間の連休がもらえたら？',
-    choices: {
-      UP: '思い切って海外旅行に飛び出す',
-      DOWN: '国内を巡るロードトリップへ',
-      LEFT: '毎日美味しいものを食べてのんびり',
-      RIGHT: '前半お出かけ・後半おうちでダラダラ',
-    },
-  },
-  {
-    id: 'q116',
-    category: '二人の関係',
-    title: 'もしタイムマシンに乗れるならどこへ行く？',
-    choices: {
-      UP: '二人が初めて出会った日をこっそり見る',
-      DOWN: '10年後の二人の暮らしをのぞき見する',
-      LEFT: 'お互いの子ども時代を見に行く',
-      RIGHT: '今が一番楽しいから乗らなくていい',
-    },
-  },
-  {
-    id: 'q117',
-    category: '二人の関係',
-    title: '相手の一番尊敬しているところは？',
-    choices: {
-      UP: '周りの人への優しさ・気配り',
-      DOWN: '目標に向かってコツコツ頑張る姿勢',
-      LEFT: 'いつも前向きで明るくなれるところ',
-      RIGHT: '自分の芯をしっかり持っているところ',
-    },
-  },
-  {
-    id: 'q118',
-    category: '二人の関係',
-    title: '二人が長く仲良くいるために一番大切だと思うのは？',
-    choices: {
-      UP: '「ありがとう」「ごめん」を言葉にする',
-      DOWN: 'お互いの一人の時間や趣味を尊重する',
-      LEFT: '定期的に二人だけのデート時間を作る',
-      RIGHT: '小さな不満を溜めずに早めに話す',
-    },
-  },
-  {
-    id: 'q119',
-    category: '記念日・イベント',
-    title: '10年後の二人に一言メッセージを送るなら？',
-    choices: {
-      UP: '変わらずたくさん笑っていようね',
-      DOWN: 'いろんな場所へ旅行できたかな？',
-      LEFT: 'これからもずっと一番の味方だよ',
-      RIGHT: '美味しいものを毎日食べてるといいね',
-    },
-  },
-  {
-    id: 'q120',
-    category: '二人の関係',
-    title: 'これから二人で新しく挑戦してみたいことは？',
-    choices: {
-      UP: '季節ごとの恒例イベントを作る',
-      DOWN: '一緒に筋トレやスポーツで健康づくり',
-      LEFT: '行ったことない都道府県を制覇する',
-      RIGHT: '資格や語学など一緒に学びを楽しむ',
-    },
-  },
+export const BUNDLED_QUESTION_META: readonly QuestionMeta[] = [
+  { id: 'q1', categoryKey: 'lifestyle', matchRule: 'mirror_up_down' },
+  { id: 'q2', categoryKey: 'holidays' },
+  { id: 'q3', categoryKey: 'anniversary' },
+  { id: 'q4', categoryKey: 'lifestyle' },
+  { id: 'q5', categoryKey: 'lifestyle' },
+  { id: 'q6', categoryKey: 'lifestyle' },
+  { id: 'q7', categoryKey: 'lifestyle' },
+  { id: 'q8', categoryKey: 'lifestyle', matchRule: 'mirror_up_down' },
+  { id: 'q9', categoryKey: 'lifestyle' },
+  { id: 'q10', categoryKey: 'lifestyle' },
+  { id: 'q11', categoryKey: 'lifestyle' },
+  { id: 'q12', categoryKey: 'lifestyle' },
+  { id: 'q13', categoryKey: 'communication' },
+  { id: 'q14', categoryKey: 'communication' },
+  { id: 'q15', categoryKey: 'affection' },
+  { id: 'q16', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q17', categoryKey: 'communication' },
+  { id: 'q18', categoryKey: 'affection' },
+  { id: 'q19', categoryKey: 'communication' },
+  { id: 'q20', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q21', categoryKey: 'affection' },
+  { id: 'q22', categoryKey: 'communication' },
+  { id: 'q23', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q24', categoryKey: 'communication' },
+  { id: 'q25', categoryKey: 'money_future' },
+  { id: 'q26', categoryKey: 'money_future' },
+  { id: 'q27', categoryKey: 'money_future' },
+  { id: 'q28', categoryKey: 'money_future' },
+  { id: 'q29', categoryKey: 'money_future' },
+  { id: 'q30', categoryKey: 'money_future', matchRule: 'mirror_up_down' },
+  { id: 'q31', categoryKey: 'money_future' },
+  { id: 'q32', categoryKey: 'money_future' },
+  { id: 'q33', categoryKey: 'food' },
+  { id: 'q34', categoryKey: 'food' },
+  { id: 'q35', categoryKey: 'food' },
+  { id: 'q36', categoryKey: 'food' },
+  { id: 'q37', categoryKey: 'food' },
+  { id: 'q38', categoryKey: 'food' },
+  { id: 'q39', categoryKey: 'food' },
+  { id: 'q40', categoryKey: 'food', matchRule: 'mirror_up_down' },
+  { id: 'q41', categoryKey: 'travel' },
+  { id: 'q42', categoryKey: 'travel' },
+  { id: 'q43', categoryKey: 'travel' },
+  { id: 'q44', categoryKey: 'holidays' },
+  { id: 'q45', categoryKey: 'holidays' },
+  { id: 'q46', categoryKey: 'travel' },
+  { id: 'q47', categoryKey: 'holidays' },
+  { id: 'q48', categoryKey: 'travel' },
+  { id: 'q49', categoryKey: 'relationship', matchRule: 'mirror_up_down' },
+  { id: 'q50', categoryKey: 'relationship', matchRule: 'mirror_up_down' },
+  { id: 'q51', categoryKey: 'anniversary' },
+  { id: 'q52', categoryKey: 'relationship' },
+  { id: 'q53', categoryKey: 'relationship', matchRule: 'mirror_up_down' },
+  { id: 'q54', categoryKey: 'relationship' },
+  { id: 'q55', categoryKey: 'lifestyle' },
+  { id: 'q56', categoryKey: 'relationship' },
+  { id: 'q57', categoryKey: 'lifestyle' },
+  { id: 'q58', categoryKey: 'communication' },
+  { id: 'q59', categoryKey: 'relationship' },
+  { id: 'q60', categoryKey: 'anniversary' },
+  { id: 'q61', categoryKey: 'lifestyle' },
+  { id: 'q62', categoryKey: 'lifestyle' },
+  { id: 'q63', categoryKey: 'lifestyle' },
+  { id: 'q64', categoryKey: 'lifestyle', matchRule: 'mirror_up_down' },
+  { id: 'q65', categoryKey: 'lifestyle' },
+  { id: 'q66', categoryKey: 'lifestyle' },
+  { id: 'q67', categoryKey: 'lifestyle' },
+  { id: 'q68', categoryKey: 'lifestyle' },
+  { id: 'q69', categoryKey: 'lifestyle' },
+  { id: 'q70', categoryKey: 'lifestyle', matchRule: 'mirror_up_down' },
+  { id: 'q71', categoryKey: 'communication' },
+  { id: 'q72', categoryKey: 'communication' },
+  { id: 'q73', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q74', categoryKey: 'communication' },
+  { id: 'q75', categoryKey: 'communication' },
+  { id: 'q76', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q77', categoryKey: 'communication' },
+  { id: 'q78', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q79', categoryKey: 'communication' },
+  { id: 'q80', categoryKey: 'communication' },
+  { id: 'q81', categoryKey: 'communication', matchRule: 'mirror_up_down' },
+  { id: 'q82', categoryKey: 'communication' },
+  { id: 'q83', categoryKey: 'affection' },
+  { id: 'q84', categoryKey: 'affection' },
+  { id: 'q85', categoryKey: 'affection' },
+  { id: 'q86', categoryKey: 'affection', matchRule: 'mirror_up_down' },
+  { id: 'q87', categoryKey: 'affection' },
+  { id: 'q88', categoryKey: 'anniversary' },
+  { id: 'q89', categoryKey: 'affection' },
+  { id: 'q90', categoryKey: 'affection' },
+  { id: 'q91', categoryKey: 'food' },
+  { id: 'q92', categoryKey: 'food' },
+  { id: 'q93', categoryKey: 'food' },
+  { id: 'q94', categoryKey: 'food', matchRule: 'mirror_up_down' },
+  { id: 'q95', categoryKey: 'food' },
+  { id: 'q96', categoryKey: 'food' },
+  { id: 'q97', categoryKey: 'food' },
+  { id: 'q98', categoryKey: 'food' },
+  { id: 'q99', categoryKey: 'money_future' },
+  { id: 'q100', categoryKey: 'money_future' },
+  { id: 'q101', categoryKey: 'money_future' },
+  { id: 'q102', categoryKey: 'money_future', matchRule: 'mirror_up_down' },
+  { id: 'q103', categoryKey: 'money_future' },
+  { id: 'q104', categoryKey: 'money_future' },
+  { id: 'q105', categoryKey: 'money_future' },
+  { id: 'q106', categoryKey: 'money_future' },
+  { id: 'q107', categoryKey: 'travel' },
+  { id: 'q108', categoryKey: 'travel' },
+  { id: 'q109', categoryKey: 'travel' },
+  { id: 'q110', categoryKey: 'travel' },
+  { id: 'q111', categoryKey: 'holidays' },
+  { id: 'q112', categoryKey: 'travel' },
+  { id: 'q113', categoryKey: 'holidays' },
+  { id: 'q114', categoryKey: 'holidays' },
+  { id: 'q115', categoryKey: 'relationship' },
+  { id: 'q116', categoryKey: 'relationship' },
+  { id: 'q117', categoryKey: 'relationship' },
+  { id: 'q118', categoryKey: 'relationship' },
+  { id: 'q119', categoryKey: 'anniversary' },
+  { id: 'q120', categoryKey: 'relationship' },
 ];
 
-export const QUESTIONS_BY_ID: Record<string, Question> = Object.fromEntries(
-  BUNDLED_QUESTIONS.map((q) => [q.id, q])
-);
+export const QUESTION_POOL_IDS: string[] = BUNDLED_QUESTION_META.map((q) => q.id);
 
-export const QUESTION_POOL_IDS: string[] = BUNDLED_QUESTIONS.map((q) => q.id);
+function getQuestionBundle(locale: string): QuestionTranslationBundle {
+  return (i18n.getResourceBundle(locale, 'questions') ?? {}) as QuestionTranslationBundle;
+}
 
-export const TODAY_QUESTIONS: Question[] = BUNDLED_QUESTIONS.slice(0, 3);
+function inferCategoryKeyFromLabel(rawCategory: string): QuestionCategoryKey {
+  if (rawCategory.includes('暮らし') || rawCategory.includes('価値観')) return 'lifestyle';
+  if (rawCategory.includes('休日')) return 'holidays';
+  if (rawCategory.includes('記念日') || rawCategory.includes('イベント')) return 'anniversary';
+  if (rawCategory.includes('食') || rawCategory.includes('好み')) return 'food';
+  if (rawCategory.includes('コミュニケーション') || rawCategory.includes('連絡')) return 'communication';
+  if (rawCategory.includes('愛情') || rawCategory.includes('恋愛')) return 'affection';
+  if (rawCategory.includes('お金') || rawCategory.includes('将来')) return 'money_future';
+  if (rawCategory.includes('旅行') || rawCategory.includes('お出かけ')) return 'travel';
+  if (rawCategory.includes('関係')) return 'relationship';
+  return 'other';
+}
+
+export function getBundledQuestions(locale: SupportedLocale = getCurrentLocale()): Question[] {
+  const primary = getQuestionBundle(locale);
+  const enFallback = getQuestionBundle('en');
+  const jaFallback = getQuestionBundle('ja');
+
+  return BUNDLED_QUESTION_META.map((meta) => {
+    const entry =
+      primary.items?.[meta.id] ??
+      enFallback.items?.[meta.id] ??
+      jaFallback.items?.[meta.id];
+    const categoryLabel =
+      primary.categories?.[meta.categoryKey] ??
+      enFallback.categories?.[meta.categoryKey] ??
+      jaFallback.categories?.[meta.categoryKey] ??
+      meta.categoryKey;
+
+    return {
+      id: meta.id,
+      categoryKey: meta.categoryKey,
+      category: categoryLabel,
+      title: entry?.title ?? meta.id,
+      choices: entry?.choices ?? { UP: '', DOWN: '', LEFT: '', RIGHT: '' },
+      matchRule: meta.matchRule,
+    };
+  });
+}
+
+export function getDefaultTodayQuestions(locale: SupportedLocale = getCurrentLocale()): Question[] {
+  return getBundledQuestions(locale).slice(0, 3);
+}
 
 /**
- * 同梱質問とリモート追加配信質問（キャッシュ済み）を統合したカタログを生成
- * - 非アクティブ化された追加質問も辞書には残し、過去履歴の表示が欠けないようにする
- * - 出題プール（activePoolIds）には同梱質問＋アクティブな追加質問のみを含める
+ * 同梱質問とリモート追加配信質問（キャッシュ済み）を指定ロケールで統合したカタログを生成
  */
-export function buildQuestionCatalog(extraQuestions: RemoteQuestionRecord[]): {
+export function buildQuestionCatalog(
+  extraQuestions: RemoteQuestionRecord[],
+  locale: SupportedLocale = getCurrentLocale()
+): {
   questionsById: Record<string, Question>;
   activePoolIds: string[];
 } {
-  const questionsById: Record<string, Question> = { ...QUESTIONS_BY_ID };
+  const bundled = getBundledQuestions(locale);
+  const questionsById: Record<string, Question> = Object.fromEntries(
+    bundled.map((q) => [q.id, q])
+  );
   const poolSet = new Set<string>(QUESTION_POOL_IDS);
 
+  const primaryBundle = getQuestionBundle(locale);
+  const enBundle = getQuestionBundle('en');
+
   for (const item of extraQuestions) {
+    const translated =
+      item.translations?.[locale] ??
+      (locale !== 'ja' ? item.translations?.en : undefined);
+    const categoryKey = item.categoryKey ?? inferCategoryKeyFromLabel(item.category);
+    const fallbackCategoryLabel =
+      primaryBundle.categories?.[categoryKey] ??
+      enBundle.categories?.[categoryKey] ??
+      item.category;
+
     const question: Question = {
       id: item.id,
-      category: item.category,
-      title: item.title,
-      choices: item.choices,
+      categoryKey,
+      category: translated?.category || fallbackCategoryLabel,
+      title: translated?.title || item.title,
+      choices: translated?.choices || item.choices,
       matchRule: item.matchRule ?? 'exact',
     };
     questionsById[item.id] = question;

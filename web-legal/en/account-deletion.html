@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account &amp; Data Deletion | Kotaeai</title>
+  <style>
+    :root { --bg: #FAF6F1; --card: #FFFFFF; --text: #3A322C; --muted: #6E635B; --primary: #D97559; --danger: #B84A39; --border: #EADFD4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.75; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px; margin-bottom: 18px; }
+    h1 { font-size: 23px; margin: 0 0 8px; }
+    h2 { font-size: 16px; margin: 22px 0 8px; padding-left: 10px; border-left: 4px solid var(--primary); }
+    p, li { font-size: 14px; }
+    ul, ol { padding-left: 20px; }
+    .back { display: inline-block; margin-bottom: 16px; font-size: 13px; color: #B8563A; text-decoration: none; }
+    .box { background: #FAF5EF; border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 12px; }
+    button { border: none; border-radius: 12px; padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-google { background: var(--primary); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-secondary { background: #EFE6DC; color: var(--text); margin-left: 8px; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    #status { margin-top: 12px; font-size: 13px; font-weight: 700; }
+    .ok { color: #3B6347; }
+    .err { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./index.html">← Back to Support Home</a>
+    <div class="card">
+      <h1>Account &amp; Data Deletion</h1>
+      <p>You can permanently delete your <strong>Kotaeai</strong> account and all associated data anytime using the methods below.</p>
+
+      <h2>What Gets Deleted</h2>
+      <ul>
+        <li><strong>Deleted Immediately</strong>: Authentication credentials, profile (display name, locale, push token), all of your quiz answers, pair membership, and—if you are the last member of a pair—the pair record, daily question sets, and AI reports.</li>
+        <li><strong>Subscriptions</strong>: If you have an active Couple Premium subscription, please cancel auto-renewal separately in <strong>Google Play Subscriptions</strong> or <strong>Apple App Store Subscriptions</strong>.</li>
+      </ul>
+
+      <h2>Option 1: Delete In-App (Recommended — Works for Anonymous Accounts Too)</h2>
+      <ol>
+        <li>Open the <strong>Kotaeai</strong> app.</li>
+        <li>Tap the <strong>Menu (≡)</strong> icon in the top-right corner of the Home screen.</li>
+        <li>Select <strong>"Delete Account"</strong> and confirm to permanently erase your data immediately.</li>
+      </ol>
+
+      <h2>Option 2: Delete via Web (For Google-Linked Accounts)</h2>
+      <p>Even if you already uninstalled the app, you can sign in with your linked Google account below to delete your data immediately.</p>
+      <div class="box">
+        <div id="signed-out-view">
+          <button id="btn-login" class="btn-google" type="button">Sign in with Google to Delete Account</button>
+        </div>
+        <div id="signed-in-view" style="display:none;">
+          <p id="user-info" style="margin-top:0;"></p>
+          <button id="btn-delete" class="btn-danger" type="button">Permanently Delete Account &amp; Data</button>
+          <button id="btn-logout" class="btn-secondary" type="button">Sign Out</button>
+        </div>
+        <div id="status"></div>
+      </div>
+
+      <h2>Option 3: Uninstalled Without Google Linking</h2>
+      <p>Anonymous accounts store no personally identifiable information (such as email addresses). Any inactive pair data is <strong>automatically and permanently deleted after 180 days</strong> of inactivity.</p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://zfnbyxntyxgmoebvvifu.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_ZJC-JNxuIha9NsSLhw5IGA_Vo_2_td9';
+
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { detectSessionInUrl: true, persistSession: true }
+    });
+
+    const signedOutView = document.getElementById('signed-out-view');
+    const signedInView = document.getElementById('signed-in-view');
+    const userInfo = document.getElementById('user-info');
+    const statusEl = document.getElementById('status');
+    const btnLogin = document.getElementById('btn-login');
+    const btnDelete = document.getElementById('btn-delete');
+    const btnLogout = document.getElementById('btn-logout');
+
+    function setStatus(msg, isError) {
+      statusEl.textContent = msg;
+      statusEl.className = isError ? 'err' : 'ok';
+    }
+
+    async function renderSession() {
+      const { data: { session } } = await client.auth.getSession();
+      if (session && session.user) {
+        signedOutView.style.display = 'none';
+        signedInView.style.display = 'block';
+        userInfo.textContent = `Signed in as: ${session.user.email || session.user.id}`;
+      } else {
+        signedOutView.style.display = 'block';
+        signedInView.style.display = 'none';
+      }
+    }
+
+    btnLogin.addEventListener('click', async () => {
+      setStatus('Redirecting to Google Sign-In...', false);
+      const { error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) setStatus('Failed to start sign-in: ' + error.message, true);
+    });
+
+    btnLogout.addEventListener('click', async () => {
+      await client.auth.signOut();
+      setStatus('Signed out.', false);
+      await renderSession();
+    });
+
+    btnDelete.addEventListener('click', async () => {
+      if (!window.confirm('Are you sure you want to permanently delete your account and all data? This cannot be undone.')) {
+        return;
+      }
+      btnDelete.disabled = true;
+      setStatus('Deleting account...', false);
+      const { error } = await client.rpc('delete_my_account');
+      if (error) {
+        btnDelete.disabled = false;
+        setStatus('Deletion failed: ' + error.message, true);
+        return;
+      }
+      await client.auth.signOut();
+      setStatus('Your account and all associated data have been permanently deleted. Thank you for using Kotaeai.', false);
+      await renderSession();
+    });
+
+    client.auth.onAuthStateChange(() => { void renderSession(); });
+    void renderSession();
+  </script>
+</body>
+</html>

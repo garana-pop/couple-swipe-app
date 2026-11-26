@@ -14,54 +14,20 @@ import {
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { AnswerCalendarModal } from '../components/AnswerCalendarModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { evaluateMatch } from '../constants/questions';
+import { getCurrentLocale } from '../i18n';
+import { formatIsoShortDate } from '../i18n/format';
 import { APP_DISPLAY_NAME, APP_SHORT_NAME } from '../lib/links';
 import { showAlert } from '../lib/alert';
-import { DayQuizData, SwipeDirection } from '../types';
-
-function formatShortDate(dateStr: string): string {
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  return `${Number(parts[1])}月${Number(parts[2])}日`;
-}
-
-function getOverallMatchComment(percentage: number, hasAnyBoth: boolean): string {
-  if (!hasAnyBoth) return 'お互いの回答が揃うのを楽しみに待ちましょう';
-  if (percentage === 100) return '息ぴったり！今日の感覚は完全にシンクロしています';
-  if (percentage >= 67) return 'いい感じの相性！ズレた1問を話すとさらに仲が深まります';
-  if (percentage >= 34) return '違いがあるから面白い！お互いの理由を聞いてみよう';
-  return '新しい発見のチャンス！それぞれの価値観をゆっくり語り合おう';
-}
-
-function getConversationStarter(category: string): string {
-  if (category.includes('暮らし') || category.includes('価値観')) {
-    return '「どのくらいならお互い心地よい？」と二人のちょうどいい基準を話してみよう';
-  }
-  if (category.includes('休日') || category.includes('旅行')) {
-    return '次の休みに「お互いの希望を半分ずつ叶えるプラン」を考えてみよう';
-  }
-  if (category.includes('記念日') || category.includes('イベント')) {
-    return '次の記念日はどんな雰囲気で過ごしたいか、さりげなく伝え合ってみよう';
-  }
-  if (category.includes('連絡') || category.includes('コミュニケーション')) {
-    return '普段のやり取りで「実はこうしてもらえると嬉しい」を1つずつ共有してみよう';
-  }
-  if (category.includes('食') || category.includes('デート')) {
-    return '次に行ってみたいお店や一緒に食べたいものを1つずつ挙げてみよう';
-  }
-  if (category.includes('お金') || category.includes('将来')) {
-    return '「ここには使いたい／ここは節約したい」を気軽にすり合わせてみよう';
-  }
-  if (category.includes('愛情') || category.includes('恋愛')) {
-    return '最近うれしかった相手の行動や言葉を1つだけ伝えてみよう';
-  }
-  return 'どうしてその選択肢を選んだのか、理由を聞いてみると新しい発見があるかも！';
-}
+import { DayQuizData, Question, SwipeDirection } from '../types';
 
 export default function ResultScreen() {
+  const { t } = useTranslation();
+  const locale = getCurrentLocale();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const rawDate = Array.isArray(dateParam) ? dateParam[0] : dateParam;
 
@@ -87,11 +53,45 @@ export default function ResultScreen() {
     rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && rawDate !== todayDate
   );
   const targetDate = isPastResult ? rawDate! : todayDate;
+  const shortTargetDate = formatIsoShortDate(targetDate, locale);
 
   const [pastData, setPastData] = useState<DayQuizData | null>(null);
   const [loadingPast, setLoadingPast] = useState(isPastResult);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+
+  const getOverallMatchComment = (percentage: number, hasAnyBoth: boolean): string => {
+    if (!hasAnyBoth) return t('result.comments.noBoth');
+    if (percentage === 100) return t('result.comments.perfect');
+    if (percentage >= 67) return t('result.comments.high');
+    if (percentage >= 34) return t('result.comments.mid');
+    return t('result.comments.low');
+  };
+
+  const getConversationStarter = (q: Question): string => {
+    switch (q.categoryKey) {
+      case 'lifestyle':
+        return t('result.starters.lifestyle');
+      case 'holidays':
+        return t('result.starters.holidays');
+      case 'travel':
+        return t('result.starters.travel');
+      case 'anniversary':
+        return t('result.starters.anniversary');
+      case 'communication':
+        return t('result.starters.communication');
+      case 'food':
+        return t('result.starters.food');
+      case 'money_future':
+        return t('result.starters.money_future');
+      case 'affection':
+        return t('result.starters.affection');
+      case 'relationship':
+        return t('result.starters.relationship');
+      default:
+        return t('result.starters.default');
+    }
+  };
 
   const handleOpenCalendar = () => {
     if (isSupabaseReady && hasPair) {
@@ -129,7 +129,6 @@ export default function ResultScreen() {
     router.push({ pathname: '/ai-report', params: { focus: 'plans' } });
   };
 
-  // 当日モード: 双方完了していない場合はロック画面へ
   useEffect(() => {
     if (isPastResult) return;
     if (!isMyCompleted || !isPartnerCompleted) {
@@ -137,7 +136,6 @@ export default function ResultScreen() {
     }
   }, [isPastResult, isMyCompleted, isPartnerCompleted]);
 
-  // 過去日モード: 完了した過去日の結果（双方回答・一致率）を取得
   useEffect(() => {
     if (!isPastResult) return;
 
@@ -199,78 +197,92 @@ export default function ResultScreen() {
     effectiveSummary.total > 0 && effectiveSummary.matchedCount === effectiveSummary.total;
 
   const handleShareText = async () => {
-    const dateHeading = formatShortDate(targetDate);
     const streakLine =
       !isPastResult && pairStats.currentStreak > 0
-        ? `\n🔥 連続 ${pairStats.currentStreak}日達成中`
+        ? `\n${t('result.share.textStreak', { count: pairStats.currentStreak })}`
         : '';
     const message =
-      `💕 ${APP_DISPLAY_NAME}（${dateHeading}）\n` +
-      `${myName} & ${partnerName} の一致率は ${effectiveSummary.percentage}%（${effectiveSummary.matchedCount}/${effectiveSummary.total}問一致）！` +
+      `${t('result.share.textHeader', { brand: APP_DISPLAY_NAME, date: shortTargetDate })}\n` +
+      `${t('result.share.textRate', {
+        me: myName,
+        partner: partnerName,
+        percentage: effectiveSummary.percentage,
+        matched: effectiveSummary.matchedCount,
+        total: effectiveSummary.total,
+      })}` +
       `${streakLine}\n` +
       `${overallComment}\n` +
-      `#${APP_SHORT_NAME} #カップル診断`;
+      `${t('result.share.textHashtags', { brand: APP_SHORT_NAME })}`;
 
     try {
       if (Platform.OS === 'web') {
         await Clipboard.setStringAsync(message);
-        showAlert('シェア文をコピーしました', 'SNS や LINE にそのまま貼り付けて共有できます。');
+        showAlert(t('result.share.copiedTitle'), t('result.share.copiedBody'));
         return;
       }
       await Share.share({ message });
     } catch {
-      showAlert('シェアエラー', '共有シートを開けませんでした。');
+      showAlert(t('result.share.errorTitle'), t('result.share.errorBody'));
     }
   };
 
-  // 方向の日本語ラベルと色を取得
   const getDirectionBadge = (dir?: SwipeDirection) => {
-    if (!dir) return { label: '未回答', color: '#B5AAA3', icon: 'help' as const };
+    if (!dir) return { color: '#B5AAA3', icon: 'help' as const };
     switch (dir) {
       case 'UP':
-        return { label: '上', color: COLORS.directions.UP.color, icon: 'arrow-up' as const };
+        return { color: COLORS.directions.UP.color, icon: 'arrow-up' as const };
       case 'DOWN':
-        return { label: '下', color: COLORS.directions.DOWN.color, icon: 'arrow-down' as const };
+        return { color: COLORS.directions.DOWN.color, icon: 'arrow-down' as const };
       case 'LEFT':
-        return { label: '左', color: COLORS.directions.LEFT.color, icon: 'arrow-back' as const };
+        return { color: COLORS.directions.LEFT.color, icon: 'arrow-back' as const };
       case 'RIGHT':
-        return { label: '右', color: COLORS.directions.RIGHT.color, icon: 'arrow-forward' as const };
+        return { color: COLORS.directions.RIGHT.color, icon: 'arrow-forward' as const };
     }
   };
+
+  const screenTitle = isPastResult
+    ? t('nav.resultPast', { date: shortTargetDate })
+    : t('nav.result');
 
   if (isPastResult && loadingPast) {
     return (
       <View style={styles.loadingContainer}>
-        <Stack.Screen options={{ title: `${formatShortDate(targetDate)}の診断結果` }} />
+        <Stack.Screen options={{ title: screenTitle }} />
         <ActivityIndicator color={COLORS.primary} size="large" />
-        <Text style={styles.loadingText}>結果を読み込んでいます...</Text>
+        <Text style={styles.loadingText}>{t('result.loading')}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Stack.Screen
-        options={{
-          title: isPastResult ? `${formatShortDate(targetDate)}の診断結果` : '診断結果',
-        }}
-      />
+      <Stack.Screen options={{ title: screenTitle }} />
 
       {/* 一致率メインサークル */}
       <View style={[styles.rateCard, SHADOWS.card]}>
         <Text style={styles.rateSubtitle}>
-          {isPastResult ? `${formatShortDate(targetDate)}の一致率` : '今日の一致率'}
+          {isPastResult
+            ? t('result.rateSubtitlePast', { date: shortTargetDate })
+            : t('result.rateSubtitleToday')}
         </Text>
         <View style={styles.percentageCircle}>
           <Text style={styles.percentageText}>{effectiveSummary.percentage}%</Text>
-          <Text style={styles.matchedFractionText}>
-            {effectiveSummary.matchedCount} / {effectiveSummary.total} 問一致
+          <Text
+            style={styles.matchedFractionText}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {t('result.matchedFraction', {
+              matched: effectiveSummary.matchedCount,
+              total: effectiveSummary.total,
+            })}
           </Text>
         </View>
         <Text style={styles.overallCommentText}>{overallComment}</Text>
         {isPastResult && effectiveSummary.total < effectiveSummary.details.length ? (
           <Text style={styles.partialNoteText}>
-            ※ 双方回答済みの {effectiveSummary.total} 問から算出しています
+            {t('result.partialNote', { count: effectiveSummary.total })}
           </Text>
         ) : null}
 
@@ -281,7 +293,7 @@ export default function ResultScreen() {
             onPress={() => setIsShareModalVisible(true)}
           >
             <Ionicons name="share-social-outline" size={16} color={COLORS.primaryDark} />
-            <Text style={styles.shareTriggerBtnText}>一致率カードをシェアする</Text>
+            <Text style={styles.shareTriggerBtnText}>{t('result.shareTrigger')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -290,16 +302,14 @@ export default function ResultScreen() {
       {isPerfectMatch && (
         <View style={styles.perfectTalkBanner}>
           <Ionicons name="sparkles" size={16} color="#4A7C59" />
-          <Text style={styles.perfectTalkText}>
-            全問一致の記念に「最近二人で一番笑った出来事」を1つずつ語り合ってみよう！
-          </Text>
+          <Text style={styles.perfectTalkText}>{t('result.perfectBanner')}</Text>
         </View>
       )}
 
       {/* 質問ごとの回答対比一覧 */}
       <View style={styles.sectionHeader}>
         <Ionicons name="chatbubbles" size={18} color={COLORS.primary} />
-        <Text style={styles.sectionTitle}>回答の内訳・対比</Text>
+        <Text style={styles.sectionTitle}>{t('result.breakdownTitle')}</Text>
       </View>
 
       <View style={styles.questionsList}>
@@ -335,19 +345,22 @@ export default function ResultScreen() {
                           ? styles.matchTextMatched
                           : styles.matchTextDiff,
                     ]}
+                    numberOfLines={1}
                   >
-                    {!hasBoth ? '片方回答' : item.isMatched ? '一致' : '不一致'}
+                    {!hasBoth
+                      ? t('result.badgeSingle')
+                      : item.isMatched
+                        ? t('result.badgeMatched')
+                        : t('result.badgeDiff')}
                   </Text>
                 </View>
               </View>
 
-              {/* 二人の回答比較 */}
               <View style={styles.answersCompareBox}>
-                {/* 自分の回答 */}
                 <View style={styles.answerRow}>
                   <View style={styles.userTag}>
                     <Text style={styles.userTagText} numberOfLines={1} ellipsizeMode="tail">
-                      {myName} (あなた)
+                      {t('common.youSuffix', { name: myName })}
                     </Text>
                   </View>
                   <View style={styles.answerContent}>
@@ -355,12 +368,11 @@ export default function ResultScreen() {
                       <Ionicons name={myBadge.icon} size={13} color="#FFFFFF" />
                     </View>
                     <Text style={styles.answerText}>
-                      {item.myAnswer ? item.question.choices[item.myAnswer] : '未回答'}
+                      {item.myAnswer ? item.question.choices[item.myAnswer] : t('common.unanswered')}
                     </Text>
                   </View>
                 </View>
 
-                {/* パートナーの回答 */}
                 <View style={styles.answerRow}>
                   <View style={[styles.userTag, { backgroundColor: '#F0F5F9' }]}>
                     <Text
@@ -378,50 +390,64 @@ export default function ResultScreen() {
                     <Text style={styles.answerText}>
                       {item.partnerAnswer
                         ? item.question.choices[item.partnerAnswer]
-                        : '未回答'}
+                        : t('common.unanswered')}
                     </Text>
                   </View>
                 </View>
               </View>
 
-              {/* 不一致時の会話きっかけの一言 */}
               {hasBoth && !item.isMatched && (
                 <View style={styles.talkStarterBox}>
                   <Ionicons name="chatbubble-ellipses-outline" size={14} color={COLORS.primaryDark} />
                   <View style={styles.talkStarterTextCol}>
-                    <Text style={styles.talkStarterLabel}>会話のきっかけ</Text>
+                    <Text style={styles.talkStarterLabel}>{t('result.talkStarterLabel')}</Text>
                     <Text style={styles.talkStarterText}>
-                      {getConversationStarter(item.question.category)}
+                      {getConversationStarter(item.question)}
                     </Text>
                   </View>
                 </View>
               )}
 
-              {/* 過去との回答比較セクション（過去出題歴がある場合） */}
               {history && (
                 <View style={styles.historyCompareContainer}>
                   <View style={styles.historyHeader}>
                     <Ionicons name="git-compare-outline" size={13} color={COLORS.primaryDark} />
                     <Text style={styles.historyHeaderText}>
-                      過去との比較（{history.date}）
+                      {t('result.historyCompareHeader', { date: history.date })}
                     </Text>
                   </View>
                   <View style={styles.historyBox}>
-                    <View style={styles.historyAnswerRow}>
-                      <Text style={styles.historyLabel}>前回：</Text>
-                      <Text style={styles.historyAnswerText}>
-                        あなた「{history.myAnswer ? item.question.choices[history.myAnswer] : '未回答'}」 / {partnerName}「{history.partnerAnswer ? item.question.choices[history.partnerAnswer] : '未回答'}」
+                    <Text style={styles.historyAnswerText}>
+                      <Text style={styles.historyLabelInline}>
+                        {t('result.historyPrevLabel')}:{' '}
                       </Text>
-                    </View>
-                    <View style={styles.historyAnswerRow}>
-                      <Text style={styles.historyLabel}>今回：</Text>
-                      <Text style={[styles.historyAnswerText, styles.historyAnswerTextCurrent]}>
-                        あなた「{item.myAnswer ? item.question.choices[item.myAnswer] : '未回答'}」 / {partnerName}「{item.partnerAnswer ? item.question.choices[item.partnerAnswer] : '未回答'}」
+                      {t('result.historyPairLine', {
+                        me: myName,
+                        myChoice: history.myAnswer
+                          ? item.question.choices[history.myAnswer]
+                          : t('common.unanswered'),
+                        partner: partnerName,
+                        partnerChoice: history.partnerAnswer
+                          ? item.question.choices[history.partnerAnswer]
+                          : t('common.unanswered'),
+                      })}
+                    </Text>
+                    <Text style={[styles.historyAnswerText, styles.historyAnswerTextCurrent]}>
+                      <Text style={styles.historyLabelInline}>
+                        {t('result.historyCurrLabel')}:{' '}
                       </Text>
-                    </View>
-                    {history.note && (
-                      <Text style={styles.historyNoteText}>{history.note}</Text>
-                    )}
+                      {t('result.historyPairLine', {
+                        me: myName,
+                        myChoice: item.myAnswer
+                          ? item.question.choices[item.myAnswer]
+                          : t('common.unanswered'),
+                        partner: partnerName,
+                        partnerChoice: item.partnerAnswer
+                          ? item.question.choices[item.partnerAnswer]
+                          : t('common.unanswered'),
+                      })}
+                    </Text>
+                    {history.note && <Text style={styles.historyNoteText}>{history.note}</Text>}
                   </View>
                 </View>
               )}
@@ -430,7 +456,7 @@ export default function ResultScreen() {
         })}
       </View>
 
-      {/* 過去の未回答日がある場合：結果確認直後の自然な遡り回答・プレミアム導線 */}
+      {/* 過去の未回答日がある場合 */}
       {!isPastResult && pairStats.myPastUnansweredDays > 0 && (
         <View style={[styles.catchUpBanner, SHADOWS.cardSmall]}>
           <View style={styles.catchUpHeader}>
@@ -440,15 +466,18 @@ export default function ResultScreen() {
               color="#9E6B24"
             />
             <Text style={styles.catchUpTitle}>
-              過去の未回答が {pairStats.myPastUnansweredDays}日分 残っています
+              {t('result.catchUp.title', { count: pairStats.myPastUnansweredDays })}
             </Text>
           </View>
           <Text style={styles.catchUpText}>
             {isPairPremium
-              ? '回答カレンダーから未回答の過去日をタップすると、続けて遡って回答できます。'
+              ? t('result.catchUp.descPremium')
               : pairStats.pastPartnerAnsweredUnansweredDays > 0
-                ? `うち ${pairStats.pastPartnerAnsweredUnansweredDays}日 は ${partnerName} さんが回答済み！プレミアムプランならカレンダーから遡って回答して、相手の答えと一致率を見られます。`
-                : '答え忘れた過去日も、プレミアムプランなら回答カレンダーからいつでも遡って回答できます（片方の課金で2人とも利用OK）。'}
+                ? t('result.catchUp.descFreePartnerAnswered', {
+                    count: pairStats.pastPartnerAnsweredUnansweredDays,
+                    partnerName,
+                  })
+                : t('result.catchUp.descFree')}
           </Text>
           {isPairPremium ? (
             <TouchableOpacity
@@ -457,7 +486,7 @@ export default function ResultScreen() {
               onPress={handleOpenCalendar}
             >
               <Ionicons name="calendar-outline" size={15} color="#FFFFFF" />
-              <Text style={styles.catchUpBtnText}>回答カレンダーから遡って回答する</Text>
+              <Text style={styles.catchUpBtnText}>{t('result.catchUp.ctaPremium')}</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.catchUpActionsRow}>
@@ -466,7 +495,9 @@ export default function ResultScreen() {
                 activeOpacity={0.8}
                 onPress={handleOpenCalendar}
               >
-                <Text style={styles.catchUpOutlineBtnText}>カレンダーを見る</Text>
+                <Text style={styles.catchUpOutlineBtnText} numberOfLines={2}>
+                  {t('result.catchUp.ctaCalendar')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.catchUpPremiumBtn}
@@ -476,7 +507,9 @@ export default function ResultScreen() {
                 }
               >
                 <Ionicons name="diamond" size={14} color="#FFFFFF" />
-                <Text style={styles.catchUpBtnText}>プレミアムで遡る</Text>
+                <Text style={styles.catchUpBtnText} numberOfLines={2}>
+                  {t('result.catchUp.ctaUpgrade')}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -490,11 +523,11 @@ export default function ResultScreen() {
           onPress={() => router.replace('/history')}
         >
           <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
-          <Text style={styles.historyBackButtonText}>過去の回答一覧へ戻る</Text>
+          <Text style={styles.historyBackButtonText}>{t('result.backToHistory')}</Text>
         </TouchableOpacity>
       )}
 
-      {/* 控えめな関連機能導線（AI相性診断・回答カレンダー） */}
+      {/* 関連機能導線 */}
       <View style={styles.subtleLinksRow}>
         <TouchableOpacity
           style={styles.subtleLinkBtn}
@@ -502,7 +535,9 @@ export default function ResultScreen() {
           onPress={() => router.push('/ai-report')}
         >
           <Ionicons name="sparkles-outline" size={15} color={COLORS.primaryDark} />
-          <Text style={styles.subtleLinkBtnText}>AI診断する</Text>
+          <Text style={styles.subtleLinkBtnText} numberOfLines={2}>
+            {t('result.linkAiReport')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.subtleLinkBtn}
@@ -510,21 +545,22 @@ export default function ResultScreen() {
           onPress={handleOpenCalendar}
         >
           <Ionicons name="calendar-outline" size={15} color={COLORS.primaryDark} />
-          <Text style={styles.subtleLinkBtnText}>回答カレンダー</Text>
+          <Text style={styles.subtleLinkBtnText} numberOfLines={2}>
+            {t('result.linkCalendar')}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* ホームに戻るボタン */}
       <TouchableOpacity
         style={styles.homeButton}
         activeOpacity={0.8}
         onPress={() => router.replace('/')}
       >
         <Ionicons name="home-outline" size={17} color={COLORS.text} />
-        <Text style={styles.homeButtonText}>ホームに戻る</Text>
+        <Text style={styles.homeButtonText}>{t('result.backHome')}</Text>
       </TouchableOpacity>
 
-      {/* シェア用「一致率カード」モーダル（個別回答を含めずスクショ＆テキスト共有対応） */}
+      {/* シェア用「一致率カード」モーダル */}
       <Modal
         visible={isShareModalVisible}
         transparent
@@ -537,71 +573,84 @@ export default function ResultScreen() {
             onPress={() => setIsShareModalVisible(false)}
           />
           <View style={styles.shareModalSheet}>
-            {/* SNS 映え専用シェアカード */}
-            <View style={[styles.shareCard, SHADOWS.darkCardFloating]}>
-              <View style={styles.shareCardAccent} />
-              <View style={styles.shareCardBody}>
-                <View style={styles.shareCardTopRow}>
-                  <View style={styles.shareBrandPill}>
-                    <Ionicons name="heart" size={11} color={COLORS.secondary} />
-                    <Text style={styles.shareBrandText}>{APP_SHORT_NAME}</Text>
+            <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+              <View style={[styles.shareCard, SHADOWS.darkCardFloating]}>
+                <View style={styles.shareCardAccent} />
+                <View style={styles.shareCardBody}>
+                  <View style={styles.shareCardTopRow}>
+                    <View style={styles.shareBrandPill}>
+                      <Ionicons name="heart" size={11} color={COLORS.secondary} />
+                      <Text style={styles.shareBrandText}>{APP_SHORT_NAME}</Text>
+                    </View>
+                    <Text style={styles.shareDateText}>{shortTargetDate}</Text>
                   </View>
-                  <Text style={styles.shareDateText}>{formatShortDate(targetDate)}</Text>
-                </View>
 
-                <Text style={styles.sharePairNames} numberOfLines={1}>
-                  {myName}  ♥  {partnerName}
-                </Text>
-
-                <View style={styles.shareRing}>
-                  <Text style={styles.shareRingLabel}>一致率</Text>
-                  <Text style={styles.shareRingPercent}>{effectiveSummary.percentage}%</Text>
-                  <Text style={styles.shareRingSub}>
-                    {effectiveSummary.matchedCount} / {effectiveSummary.total} 問一致
+                  <Text style={styles.sharePairNames} numberOfLines={1}>
+                    {myName}  ♥  {partnerName}
                   </Text>
-                </View>
 
-                {!isPastResult && pairStats.currentStreak > 0 && (
-                  <View style={styles.shareStreakChip}>
-                    <Ionicons name="flame" size={13} color={COLORS.secondary} />
-                    <Text style={styles.shareStreakText}>
-                      連続 {pairStats.currentStreak}日達成中
+                  <View style={styles.shareRing}>
+                    <Text
+                      style={styles.shareRingLabel}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      {t('result.share.ringLabel')}
+                    </Text>
+                    <Text style={styles.shareRingPercent}>{effectiveSummary.percentage}%</Text>
+                    <Text
+                      style={styles.shareRingSub}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.72}
+                    >
+                      {t('result.matchedFraction', {
+                        matched: effectiveSummary.matchedCount,
+                        total: effectiveSummary.total,
+                      })}
                     </Text>
                   </View>
-                )}
 
-                <Text style={styles.shareCardComment}>{overallComment}</Text>
-                <Text style={styles.shareCardFooterTag}>
-                  #{APP_SHORT_NAME} ・ ふたりの価値観診断
-                </Text>
+                  {!isPastResult && pairStats.currentStreak > 0 && (
+                    <View style={styles.shareStreakChip}>
+                      <Ionicons name="flame" size={13} color={COLORS.secondary} />
+                      <Text style={styles.shareStreakText}>
+                        {t('result.share.streak', { count: pairStats.currentStreak })}
+                      </Text>
+                    </View>
+                  )}
+
+                  <Text style={styles.shareCardComment}>{overallComment}</Text>
+                  <Text style={styles.shareCardFooterTag}>
+                    {t('result.share.footerTag', { brand: APP_SHORT_NAME })}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            <Text style={styles.sharePrivacyHint}>
-              ※ 個別の回答内容は含まれないため、このままスクショして SNS や LINE で綺麗に共有できます。
-            </Text>
+              <Text style={styles.sharePrivacyHint}>{t('result.share.privacyHint')}</Text>
 
-            <TouchableOpacity
-              style={styles.shareActionBtn}
-              activeOpacity={0.85}
-              onPress={() => void handleShareText()}
-            >
-              <Ionicons name="paper-plane-outline" size={17} color="#FFFFFF" />
-              <Text style={styles.shareActionBtnText}>LINE・SNS にテキストでシェア</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareActionBtn}
+                activeOpacity={0.85}
+                onPress={() => void handleShareText()}
+              >
+                <Ionicons name="paper-plane-outline" size={17} color="#FFFFFF" />
+                <Text style={styles.shareActionBtnText}>{t('result.share.actionBtn')}</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.shareCloseBtn}
-              activeOpacity={0.75}
-              onPress={() => setIsShareModalVisible(false)}
-            >
-              <Text style={styles.shareCloseBtnText}>閉じる</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareCloseBtn}
+                activeOpacity={0.75}
+                onPress={() => setIsShareModalVisible(false)}
+              >
+                <Text style={styles.shareCloseBtnText}>{t('common.close')}</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* 回答カレンダーモーダル（結果画面のまま直接開閉） */}
       <AnswerCalendarModal
         visible={isCalendarVisible}
         onClose={() => setIsCalendarVisible(false)}
@@ -635,6 +684,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     color: COLORS.textMuted,
+    lineHeight: 20,
   },
   container: {
     flex: 1,
@@ -657,17 +707,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.textMuted,
+    lineHeight: 19,
     marginBottom: 14,
   },
   percentageCircle: {
-    width: 124,
-    height: 124,
-    borderRadius: 62,
+    width: 132,
+    height: 132,
+    borderRadius: 66,
     backgroundColor: COLORS.surface,
     borderWidth: 5,
     borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
   },
   percentageText: {
     fontSize: 36,
@@ -676,10 +728,12 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   matchedFractionText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: COLORS.textMuted,
     marginTop: -2,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   overallCommentText: {
     marginTop: 14,
@@ -687,12 +741,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   partialNoteText: {
     marginTop: 6,
     fontSize: 11,
     color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   shareTriggerBtn: {
     marginTop: 14,
@@ -711,6 +767,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 18,
   },
   perfectTalkBanner: {
     flexDirection: 'row',
@@ -728,7 +785,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#3B6347',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -740,6 +797,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 22,
   },
   questionsList: {
     gap: 14,
@@ -754,7 +812,7 @@ const styles = StyleSheet.create({
   },
   detailCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     marginBottom: 12,
   },
@@ -763,6 +821,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    flexShrink: 0,
   },
   qNumText: {
     fontSize: 12,
@@ -774,11 +833,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
     flex: 1,
+    minWidth: 0,
+    lineHeight: 20,
   },
   matchBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 10,
+    flexShrink: 0,
   },
   matchBadgeMatched: {
     backgroundColor: '#F0F6F2',
@@ -792,6 +854,7 @@ const styles = StyleSheet.create({
   matchBadgeText: {
     fontSize: 11,
     fontWeight: '800',
+    lineHeight: 15,
   },
   matchTextMatched: {
     color: '#4A7C59',
@@ -815,11 +878,11 @@ const styles = StyleSheet.create({
   },
   userTag: {
     backgroundColor: '#FDF1EC',
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 6,
-    minWidth: 72,
-    maxWidth: 132,
+    minWidth: 68,
+    maxWidth: 122,
     flexShrink: 0,
     alignItems: 'center',
   },
@@ -827,12 +890,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    lineHeight: 16,
   },
   answerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     flex: 1,
+    minWidth: 0,
   },
   dirIconBox: {
     width: 20,
@@ -840,12 +905,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   answerText: {
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.text,
     flex: 1,
+    lineHeight: 19,
   },
   talkStarterBox: {
     marginTop: 10,
@@ -866,11 +933,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 16,
   },
   talkStarterText: {
     fontSize: 11.5,
     color: COLORS.text,
-    lineHeight: 17,
+    lineHeight: 19,
   },
   historyCompareContainer: {
     marginTop: 12,
@@ -888,6 +956,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    flex: 1,
+    lineHeight: 16,
   },
   historyBox: {
     backgroundColor: '#FAF5EF',
@@ -895,33 +965,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#ECE0D2',
-    gap: 4,
+    gap: 5,
   },
-  historyAnswerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  historyLabel: {
-    fontSize: 11,
+  historyLabelInline: {
     fontWeight: '700',
     color: COLORS.textMuted,
-    width: 40,
   },
   historyAnswerText: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: COLORS.textMuted,
-    flex: 1,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   historyAnswerTextCurrent: {
     fontWeight: '700',
     color: COLORS.text,
   },
   historyNoteText: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: COLORS.textMuted,
     marginTop: 2,
     fontStyle: 'italic',
+    lineHeight: 16,
   },
   historyBackButton: {
     flexDirection: 'row',
@@ -929,6 +993,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 16,
     gap: 6,
     marginBottom: 10,
@@ -937,6 +1002,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   subtleLinksRow: {
     flexDirection: 'row',
@@ -960,6 +1028,9 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '700',
     color: COLORS.textMuted,
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   homeButton: {
     flexDirection: 'row',
@@ -967,6 +1038,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: COLORS.border,
@@ -976,10 +1048,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 20,
   },
-  // ----------------------------------------------------
-  // シェア用「一致率カード」モーダル
-  // ----------------------------------------------------
   shareModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(24, 18, 15, 0.65)',
@@ -996,7 +1066,8 @@ const styles = StyleSheet.create({
   },
   shareModalSheet: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 368,
+    maxHeight: '90%',
     backgroundColor: COLORS.background,
     borderRadius: 26,
     padding: 18,
@@ -1024,6 +1095,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 14,
   },
   shareBrandPill: {
@@ -1053,20 +1125,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   shareRing: {
-    width: 136,
-    height: 136,
-    borderRadius: 68,
+    width: 146,
+    height: 146,
+    borderRadius: 73,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 5,
     borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
     marginBottom: 14,
   },
   shareRingLabel: {
     fontSize: 10.5,
     fontWeight: '700',
     color: COLORS.darkCardMuted,
+    lineHeight: 15,
   },
   shareRingPercent: {
     fontSize: 38,
@@ -1079,6 +1153,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.darkCardText,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   shareStreakChip: {
     flexDirection: 'row',
@@ -1094,12 +1170,13 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: COLORS.secondary,
+    lineHeight: 17,
   },
   shareCardComment: {
     fontSize: 12,
     color: COLORS.darkCardText,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 19,
     marginBottom: 12,
     paddingHorizontal: 4,
   },
@@ -1108,12 +1185,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.darkCardMuted,
     letterSpacing: 0.4,
+    textAlign: 'center',
   },
   sharePrivacyHint: {
     fontSize: 11,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
     marginBottom: 12,
   },
   shareActionBtn: {
@@ -1123,6 +1201,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: COLORS.primary,
     paddingVertical: 13,
+    paddingHorizontal: 14,
     borderRadius: 15,
     marginBottom: 8,
   },
@@ -1130,6 +1209,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13.5,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   shareCloseBtn: {
     alignItems: 'center',
@@ -1139,6 +1221,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.textMuted,
+    lineHeight: 19,
   },
   catchUpBanner: {
     backgroundColor: '#FFFBF3',
@@ -1159,11 +1242,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#8C5A1B',
+    lineHeight: 19,
   },
   catchUpText: {
     fontSize: 11.5,
     color: '#7A5B32',
-    lineHeight: 17,
+    lineHeight: 19,
     marginBottom: 11,
   },
   catchUpActionsRow: {
@@ -1185,6 +1269,8 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#8C5A1B',
+    textAlign: 'center',
+    lineHeight: 16,
   },
   catchUpPremiumBtn: {
     flex: 1,
@@ -1211,5 +1297,8 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

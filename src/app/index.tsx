@@ -15,21 +15,21 @@ import { router, Stack } from 'expo-router';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { KotaeaiLogo } from '../components/KotaeaiLogo';
 import { TutorialModal } from '../components/TutorialModal';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { getCurrentLocale } from '../i18n';
+import { formatIsoShortDate } from '../i18n/format';
 import { showAlert, showConfirm } from '../lib/alert';
-
-function formatDisplayDate(dateStr: string): string {
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  const m = Number(parts[1]);
-  const d = Number(parts[2]);
-  return `${m}月${d}日 のお題`;
-}
+import { getStoreName } from '../lib/links';
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
+  const locale = getCurrentLocale();
+  const storeName = getStoreName();
+
   const {
     isInitialized,
     isLoading,
@@ -100,8 +100,8 @@ export default function HomeScreen() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     showAlert(
-      '招待コードをコピーしました',
-      `「${pairCode}」をパートナーに送ってアプリに招待しましょう。`
+      t('home.alerts.codeCopiedTitle'),
+      t('home.alerts.codeCopiedBody', { code: pairCode })
     );
   };
 
@@ -110,29 +110,29 @@ export default function HomeScreen() {
     const res = await createPair();
     setSubmitting(false);
     if (!res.ok) {
-      showAlert('作成エラー', res.error ?? 'ペアの作成に失敗しました。');
+      showAlert(t('home.alerts.createErrorTitle'), res.error ?? t('home.alerts.createErrorBody'));
     }
   };
 
   const handleConnect = async () => {
     if (!inputCode.trim()) {
-      showAlert('入力エラー', '招待コードを入力してください。');
+      showAlert(t('home.alerts.inputErrorTitle'), t('home.alerts.inputErrorBody'));
       return;
     }
     setSubmitting(true);
     const res = await joinPair(inputCode.trim());
     setSubmitting(false);
     if (!res.ok) {
-      showAlert('連携エラー', res.error ?? 'ペアリングに失敗しました。');
+      showAlert(
+        t('home.alerts.connectErrorTitle'),
+        res.error ?? t('home.alerts.connectErrorBody')
+      );
       return;
     }
     if (res.relinked) {
-      showAlert(
-        '再連携が完了しました',
-        'パートナーとのペアに再連携し、これまでの回答履歴と記録を引き継ぎました。'
-      );
+      showAlert(t('home.alerts.relinkedTitle'), t('home.alerts.relinkedBody'));
     } else {
-      showAlert('連携完了', 'パートナーと正常にペアリングされました。');
+      showAlert(t('home.alerts.connectedTitle'), t('home.alerts.connectedBody'));
     }
     setInputCode('');
   };
@@ -149,7 +149,7 @@ export default function HomeScreen() {
     try {
       const res = await issuePairRelinkCode();
       if (!res.ok || !res.code) {
-        showAlert('発行エラー', res.error ?? '再連携コードの発行に失敗しました。');
+        showAlert(t('home.alerts.issueErrorTitle'), res.error ?? t('errors.relinkIssueFailed'));
         return;
       }
       setRelinkCode(res.code);
@@ -167,8 +167,8 @@ export default function HomeScreen() {
     setRelinkCopied(true);
     setTimeout(() => setRelinkCopied(false), 2000);
     showAlert(
-      '再連携コードをコピーしました',
-      `「${relinkCode}」（5分間・1回限り有効）をパートナーへ送ってください。`
+      t('home.alerts.relinkCopiedTitle'),
+      t('home.alerts.relinkCopiedBody', { code: relinkCode })
     );
   };
 
@@ -183,7 +183,7 @@ export default function HomeScreen() {
       const res = await leavePair();
       setIsLeaveModalOpen(false);
       if (!res.ok) {
-        showAlert('エラー', res.error ?? 'ペア解除に失敗しました。');
+        showAlert(t('common.error'), res.error ?? t('home.alerts.leaveErrorBody'));
       }
     } finally {
       setLeavingPair(false);
@@ -197,16 +197,16 @@ export default function HomeScreen() {
 
   const handleDeleteAccount = () => {
     showConfirm(
-      'アカウントとデータを削除',
-      'あなたの回答データ・プロフィール・ペア情報がすべて削除されます。この操作は取り消せません。\n\n※有料プランをご契約中の場合、アカウント削除だけでは自動更新は停止されません。Google Play の「定期購入」から解約手続きを行ってください。',
-      '削除する',
+      t('home.alerts.deleteConfirmTitle'),
+      t('home.alerts.deleteConfirmBody', { storeName }),
+      t('home.alerts.deleteConfirmAction'),
       async () => {
         setIsMenuOpen(false);
         const res = await deleteAccount();
         if (res.ok) {
-          showAlert('削除完了', 'アカウントとデータを削除しました。');
+          showAlert(t('home.alerts.deletedTitle'), t('home.alerts.deletedBody'));
         } else {
-          showAlert('エラー', res.error ?? '削除に失敗しました。');
+          showAlert(t('common.error'), res.error ?? t('home.alerts.deleteFailedBody'));
         }
       }
     );
@@ -215,16 +215,15 @@ export default function HomeScreen() {
   const handleSaveName = async () => {
     const res = await updateMyName(nameInput);
     if (!res.ok) {
-      showAlert('エラー', res.error ?? '表示名の更新に失敗しました。');
+      showAlert(t('common.error'), res.error ?? t('errors.displayNameUpdateFailed'));
       return;
     }
     setIsEditingName(false);
   };
 
-  // 今日の質問ボタンの挙動
   const handleQuizAction = () => {
     if (isSupabaseReady && !hasPair) {
-      showAlert('ペア連携が必要です', 'まずは招待コードを発行するか、パートナーのコードを入力してペアを作成してください。');
+      showAlert(t('home.alerts.pairRequiredTitle'), t('home.alerts.pairRequiredBody'));
       return;
     }
     if (!isMyCompleted) {
@@ -238,21 +237,21 @@ export default function HomeScreen() {
 
   const getQuizButtonText = () => {
     if (!isMyCompleted) {
-      return `今日の質問へ進む（${questions.length}問）`;
+      return t('home.quizButton.start', { count: questions.length });
     } else if (!isPartnerCompleted) {
-      return '相手の回答待ち（待機画面へ）';
+      return t('home.quizButton.waiting');
     } else {
-      return `結果を見る（一致率 ${matchSummary.percentage}%）`;
+      return t('home.quizButton.result', { percentage: matchSummary.percentage });
     }
   };
 
   const getStatusBadge = () => {
     if (!isMyCompleted) {
-      return { text: '未回答', bg: '#FDF3E7', color: '#C97A2B' };
+      return { text: t('home.status.unanswered'), bg: '#FDF3E7', color: '#C97A2B' };
     } else if (!isPartnerCompleted) {
-      return { text: '相手の回答待ち', bg: '#EFF5F9', color: '#4D779E' };
+      return { text: t('home.status.waitingPartner'), bg: '#EFF5F9', color: '#4D779E' };
     } else {
-      return { text: '双方回答完了', bg: '#F0F6F2', color: '#4A7C59' };
+      return { text: t('home.status.bothCompleted'), bg: '#F0F6F2', color: '#4A7C59' };
     }
   };
 
@@ -261,12 +260,23 @@ export default function HomeScreen() {
   const renderActionCard = () => (
     <View style={[styles.card, SHADOWS.card]}>
       <View style={styles.actionHeader}>
-        <View>
-          <Text style={styles.actionTitle}>今日の{questions.length}問</Text>
-          <Text style={styles.actionDate}>{formatDisplayDate(todayDate)}</Text>
+        <View style={styles.actionHeaderLeft}>
+          <Text style={styles.actionTitle}>
+            {t('home.todayQuestionsTitle', { count: questions.length })}
+          </Text>
+          <Text style={styles.actionDate}>
+            {t('home.todayTopicDate', { date: formatIsoShortDate(todayDate, locale) })}
+          </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
+          <Text
+            style={[styles.statusBadgeText, { color: badge.color }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {badge.text}
+          </Text>
         </View>
       </View>
 
@@ -329,9 +339,7 @@ export default function HomeScreen() {
         {!isSupabaseReady && (
           <View style={styles.noticeBanner}>
             <Ionicons name="information-circle-outline" size={18} color="#9E6B24" />
-            <Text style={styles.noticeBannerText}>
-              Supabase 未設定のためローカル表示モードです。.env.local に接続情報を設定すると同期が有効になります。
-            </Text>
+            <Text style={styles.noticeBannerText}>{t('home.supabaseLocalNotice')}</Text>
           </View>
         )}
 
@@ -372,7 +380,7 @@ export default function HomeScreen() {
                     }}
                   >
                     <Ionicons name="create-outline" size={13} color={COLORS.primaryDark} />
-                    <Text style={styles.compactActionChipText}>名前</Text>
+                    <Text style={styles.compactActionChipText}>{t('home.editNameChip')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -381,13 +389,13 @@ export default function HomeScreen() {
                 <View style={styles.compactNameEditBox}>
                   <TextInput
                     style={styles.input}
-                    placeholder="あなたの表示名"
+                    placeholder={t('home.namePlaceholder')}
                     value={nameInput}
                     onChangeText={setNameInput}
                     maxLength={20}
                   />
                   <TouchableOpacity style={styles.connectButton} onPress={handleSaveName}>
-                    <Text style={styles.connectButtonText}>保存</Text>
+                    <Text style={styles.connectButtonText}>{t('common.save')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -410,7 +418,7 @@ export default function HomeScreen() {
                       pairStats.currentStreak > 0 && styles.streakPillTextActive,
                     ]}
                   >
-                    連続 {pairStats.currentStreak}日
+                    {t('home.streak', { count: pairStats.currentStreak })}
                   </Text>
                 </View>
 
@@ -421,13 +429,13 @@ export default function HomeScreen() {
                       pairStats.myUnansweredDays > 0 && styles.streakMetaUnanswered,
                     ]}
                   >
-                    未回答 {pairStats.myUnansweredDays}日
+                    {t('home.unansweredDays', { count: pairStats.myUnansweredDays })}
                   </Text>
                   {pairStats.overallMatchRate !== null ? (
                     <>
                       <Text style={styles.streakMetaDot}>•</Text>
                       <Text style={styles.streakMetaText}>
-                        一致率 {pairStats.overallMatchRate}%
+                        {t('home.matchRateShort', { percentage: pairStats.overallMatchRate })}
                       </Text>
                     </>
                   ) : null}
@@ -436,10 +444,9 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 今日の質問メインアクションカード（連携済み時は最上部に配置） */}
             {renderActionCard()}
 
-            {/* 過去の未回答日がある場合：カレンダー確認＆プレミアム遡り回答の自然な導線 */}
+            {/* 過去の未回答日がある場合 */}
             {pairStats.myPastUnansweredDays > 0 && (
               <View style={[styles.pastCatchUpCard, SHADOWS.cardSmall]}>
                 <View style={styles.pastCatchUpHeader}>
@@ -450,16 +457,19 @@ export default function HomeScreen() {
                       color="#9E6B24"
                     />
                     <Text style={styles.pastCatchUpTitle}>
-                      過去の未回答お題が {pairStats.myPastUnansweredDays}日分 あります
+                      {t('home.pastCatchUp.title', { count: pairStats.myPastUnansweredDays })}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.pastCatchUpDesc}>
                   {isPairPremium
-                    ? 'プレミアム特典として、回答カレンダーから未回答の過去日をタップすると遡って回答できます。'
+                    ? t('home.pastCatchUp.descPremium')
                     : pairStats.pastPartnerAnsweredUnansweredDays > 0
-                      ? `${partnerName}さんが回答済みの日が ${pairStats.pastPartnerAnsweredUnansweredDays}日 あります。プレミアムプランならカレンダーから遡って回答して、相手の答えと一致率を見られます。`
-                      : '答え忘れた日も、プレミアムプランなら回答カレンダーからいつでも遡って回答できます（片方の課金で2人とも利用OK）。'}
+                      ? t('home.pastCatchUp.descPartnerAnswered', {
+                          partnerName,
+                          count: pairStats.pastPartnerAnsweredUnansweredDays,
+                        })
+                      : t('home.pastCatchUp.descFree')}
                 </Text>
 
                 {isPairPremium ? (
@@ -472,7 +482,7 @@ export default function HomeScreen() {
                   >
                     <Ionicons name="calendar-outline" size={15} color="#FFFFFF" />
                     <Text style={styles.pastCatchUpPrimaryBtnText}>
-                      回答カレンダーから遡って回答する
+                      {t('home.pastCatchUp.ctaPremium')}
                     </Text>
                     <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
                   </TouchableOpacity>
@@ -486,7 +496,9 @@ export default function HomeScreen() {
                       }
                     >
                       <Ionicons name="calendar-outline" size={14} color="#8C5A1B" />
-                      <Text style={styles.pastCatchUpOutlineBtnText}>カレンダーで確認</Text>
+                      <Text style={styles.pastCatchUpOutlineBtnText} numberOfLines={2}>
+                        {t('home.pastCatchUp.ctaCalendar')}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.pastCatchUpPremiumBtn}
@@ -496,7 +508,9 @@ export default function HomeScreen() {
                       }
                     >
                       <Ionicons name="diamond" size={14} color="#FFFFFF" />
-                      <Text style={styles.pastCatchUpPrimaryBtnText}>プレミアムで遡る</Text>
+                      <Text style={styles.pastCatchUpPrimaryBtnText} numberOfLines={2}>
+                        {t('home.pastCatchUp.ctaUpgrade')}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -505,15 +519,13 @@ export default function HomeScreen() {
           </>
         ) : (
           <>
-            {/* ウェルカムバナー（ヘッダーとのタイトル重複を解消） */}
+            {/* ウェルカムバナー */}
             <View style={styles.heroSection}>
               <View style={styles.heroBadge}>
                 <Ionicons name="heart" size={13} color={COLORS.primary} />
-                <Text style={styles.heroBadgeText}>二人同時4択スワイプ診断</Text>
+                <Text style={styles.heroBadgeText}>{t('home.hero.badge')}</Text>
               </View>
-              <Text style={styles.heroSubtitle}>
-                1日3問、4方向スワイプで答える。{'\n'}お互いが回答を終えて初めて結果がひらく。
-              </Text>
+              <Text style={styles.heroSubtitle}>{t('home.hero.subtitle')}</Text>
             </View>
 
             {/* ペア連携ステータスカード */}
@@ -521,7 +533,7 @@ export default function HomeScreen() {
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardHeader}>
                   <Ionicons name="people" size={20} color={COLORS.primary} />
-                  <Text style={styles.cardTitle}>ペア連携状況</Text>
+                  <Text style={styles.cardTitle}>{t('home.pairCard.title')}</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.editNameTrigger}
@@ -531,7 +543,9 @@ export default function HomeScreen() {
                   }}
                 >
                   <Ionicons name="create-outline" size={14} color={COLORS.primaryDark} />
-                  <Text style={styles.editNameTriggerText}>名前: {myName}</Text>
+                  <Text style={styles.editNameTriggerText} numberOfLines={1}>
+                    {t('home.editNameTrigger', { name: myName })}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -539,13 +553,13 @@ export default function HomeScreen() {
                 <View style={styles.nameEditBox}>
                   <TextInput
                     style={styles.input}
-                    placeholder="あなたの表示名"
+                    placeholder={t('home.namePlaceholder')}
                     value={nameInput}
                     onChangeText={setNameInput}
                     maxLength={20}
                   />
                   <TouchableOpacity style={styles.connectButton} onPress={handleSaveName}>
-                    <Text style={styles.connectButtonText}>保存</Text>
+                    <Text style={styles.connectButtonText}>{t('common.save')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -553,21 +567,19 @@ export default function HomeScreen() {
               {!isInitialized ? (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator color={COLORS.primary} />
-                  <Text style={styles.loadingText}>接続状態を確認中...</Text>
+                  <Text style={styles.loadingText}>{t('home.pairCard.checking')}</Text>
                 </View>
               ) : hasPair ? (
                 <View style={styles.unpairedContainer}>
-                  <Text style={styles.unpairedDesc}>
-                    招待コードを発行しました！パートナーがこのコードを入力するとペア連携が完了します。
-                  </Text>
+                  <Text style={styles.unpairedDesc}>{t('home.pairCard.codeIssuedDesc')}</Text>
 
                   <View style={styles.myCodeBox}>
-                    <Text style={styles.inputLabel}>あなたの招待コード（有効期限7日間）：</Text>
+                    <Text style={styles.inputLabel}>{t('home.pairCard.yourInviteCode')}</Text>
                     <View style={styles.codeRow}>
                       <Text style={styles.myCodeText}>{pairCode}</Text>
                       <TouchableOpacity style={styles.codeCopyBtn} onPress={handleCopyCode}>
                         <Text style={styles.codeCopyBtnText}>
-                          {copied ? 'コピー済み' : 'コピー'}
+                          {copied ? t('home.pairCard.copied') : t('home.pairCard.copy')}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -576,29 +588,48 @@ export default function HomeScreen() {
                   <View style={styles.pendingActionsRow}>
                     <TouchableOpacity style={styles.secondaryBtn} onPress={refreshState}>
                       <Ionicons name="refresh-outline" size={15} color={COLORS.primaryDark} />
-                      <Text style={styles.secondaryBtnText}>参加を確認</Text>
+                      <Text
+                        style={styles.secondaryBtnText}
+                        numberOfLines={2}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                      >
+                        {t('home.pairCard.checkJoin')}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.secondaryBtn}
                       onPress={async () => {
                         const res = await regenerateInviteCode();
-                        if (!res.ok) showAlert('エラー', res.error);
+                        if (!res.ok) showAlert(t('common.error'), res.error);
                       }}
                     >
                       <Ionicons name="key-outline" size={15} color={COLORS.primaryDark} />
-                      <Text style={styles.secondaryBtnText}>コード再発行</Text>
+                      <Text
+                        style={styles.secondaryBtnText}
+                        numberOfLines={2}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                      >
+                        {t('home.pairCard.regenerateCode')}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.secondaryBtn} onPress={handleLeavePair}>
                       <Ionicons name="close-circle-outline" size={15} color="#B84A39" />
-                      <Text style={[styles.secondaryBtnText, { color: '#B84A39' }]}>解除</Text>
+                      <Text
+                        style={[styles.secondaryBtnText, { color: '#B84A39' }]}
+                        numberOfLines={2}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                      >
+                        {t('home.pairCard.leave')}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ) : (
                 <View style={styles.unpairedContainer}>
-                  <Text style={styles.unpairedDesc}>
-                    どちらか1人が「招待コードを発行」し、もう1人がコードを入力してペアリングしましょう。
-                  </Text>
+                  <Text style={styles.unpairedDesc}>{t('home.pairCard.unpairedDesc')}</Text>
 
                   <TouchableOpacity
                     style={styles.createPairBtn}
@@ -611,19 +642,19 @@ export default function HomeScreen() {
                     ) : (
                       <>
                         <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-                        <Text style={styles.createPairBtnText}>新しいペアを作る（招待コード発行）</Text>
+                        <Text style={styles.createPairBtnText}>
+                          {t('home.pairCard.createPairBtn')}
+                        </Text>
                       </>
                     )}
                   </TouchableOpacity>
 
                   <View style={styles.inputSection}>
-                    <Text style={styles.inputLabel}>
-                      パートナーの招待コード／再連携コードを入力して参加：
-                    </Text>
+                    <Text style={styles.inputLabel}>{t('home.pairCard.enterCodeLabel')}</Text>
                     <View style={styles.inputRow}>
                       <TextInput
                         style={styles.input}
-                        placeholder="例: K7M9P2X4"
+                        placeholder={t('home.pairCard.codePlaceholder')}
                         value={inputCode}
                         onChangeText={setInputCode}
                         autoCapitalize="characters"
@@ -634,7 +665,9 @@ export default function HomeScreen() {
                         disabled={submitting}
                         onPress={handleConnect}
                       >
-                        <Text style={styles.connectButtonText}>連携する</Text>
+                        <Text style={styles.connectButtonText}>
+                          {t('home.pairCard.connectBtn')}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -642,13 +675,12 @@ export default function HomeScreen() {
               )}
             </View>
 
-            {/* 今日の質問メインアクションカード */}
             {renderActionCard()}
           </>
         )}
       </ScrollView>
 
-      {/* ハンバーガーメニュー（スライドモーダル） */}
+      {/* ハンバーガーメニュー（スクロール対応で多言語でも縦溢れ防止） */}
       <Modal
         visible={isMenuOpen}
         transparent
@@ -660,7 +692,7 @@ export default function HomeScreen() {
 
           <View style={[styles.menuDrawer, SHADOWS.cardFloating]}>
             <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>メニュー</Text>
+              <Text style={styles.drawerTitle}>{t('home.menu.title')}</Text>
               <TouchableOpacity
                 onPress={() => setIsMenuOpen(false)}
                 style={styles.closeButton}
@@ -670,11 +702,13 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.drawerContent}>
+            <ScrollView style={styles.drawerContent} showsVerticalScrollIndicator={false}>
               <View style={styles.drawerUserBanner}>
                 <Ionicons name="heart" size={16} color={COLORS.primary} />
-                <Text style={styles.drawerUserText}>
-                  {isPairConnected ? `${myName} & ${partnerName}` : `${myName}（ペア未連携）`}
+                <Text style={styles.drawerUserText} numberOfLines={2}>
+                  {isPairConnected
+                    ? `${myName} & ${partnerName}`
+                    : t('home.menu.unpairedUser', { name: myName })}
                 </Text>
               </View>
 
@@ -692,13 +726,13 @@ export default function HomeScreen() {
                   <Ionicons name="git-compare-outline" size={20} color="#4D779E" />
                 </View>
                 <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>過去の回答との比較</Text>
-                  <Text style={styles.menuItemSubtext}>回答カレンダー・出題履歴・過去お題に回答</Text>
+                  <Text style={styles.menuItemTitle}>{t('home.menu.historyTitle')}</Text>
+                  <Text style={styles.menuItemSubtext}>{t('home.menu.historySub')}</Text>
                 </View>
                 {pairStats.myUnansweredDays > 0 && (
                   <View style={styles.menuUnansweredBadge}>
                     <Text style={styles.menuUnansweredBadgeText}>
-                      未回答 {pairStats.myUnansweredDays}日
+                      {t('home.unansweredDays', { count: pairStats.myUnansweredDays })}
                     </Text>
                   </View>
                 )}
@@ -717,8 +751,8 @@ export default function HomeScreen() {
                   <Ionicons name="analytics-outline" size={20} color={COLORS.primary} />
                 </View>
                 <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>AI相性診断・プレミアム</Text>
-                  <Text style={styles.menuItemSubtext}>過去日への遡り回答＆AI相性診断を解放</Text>
+                  <Text style={styles.menuItemTitle}>{t('home.menu.aiTitle')}</Text>
+                  <Text style={styles.menuItemSubtext}>{t('home.menu.aiSub')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
@@ -735,11 +769,11 @@ export default function HomeScreen() {
                   <Ionicons name="notifications-outline" size={20} color="#C97A2B" />
                 </View>
                 <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>通知・アカウント引き継ぎ</Text>
+                  <Text style={styles.menuItemTitle}>{t('home.menu.settingsTitle')}</Text>
                   <Text style={styles.menuItemSubtext}>
                     {accountAuth.isAnonymous
-                      ? 'リマインダー設定・Google連携（未連携）'
-                      : 'リマインダー設定・Google連携済み'}
+                      ? t('home.menu.settingsSubAnon')
+                      : t('home.menu.settingsSubLinked')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
@@ -757,8 +791,8 @@ export default function HomeScreen() {
                   <Ionicons name="help-circle-outline" size={20} color="#4A7C59" />
                 </View>
                 <View style={styles.menuItemTextBox}>
-                  <Text style={styles.menuItemTitle}>アプリの使い方を見る</Text>
-                  <Text style={styles.menuItemSubtext}>4択スワイプの操作ガイド</Text>
+                  <Text style={styles.menuItemTitle}>{t('home.menu.tutorialTitle')}</Text>
+                  <Text style={styles.menuItemSubtext}>{t('home.menu.tutorialSub')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
               </TouchableOpacity>
@@ -773,10 +807,8 @@ export default function HomeScreen() {
                     <Ionicons name="key-outline" size={20} color={COLORS.primaryDark} />
                   </View>
                   <View style={styles.menuItemTextBox}>
-                    <Text style={styles.menuItemTitle}>パートナー再連携コードを発行</Text>
-                    <Text style={styles.menuItemSubtext}>
-                      再インストール・機種変更時の引き継ぎ（5分・1回限り）
-                    </Text>
+                    <Text style={styles.menuItemTitle}>{t('home.menu.relinkTitle')}</Text>
+                    <Text style={styles.menuItemSubtext}>{t('home.menu.relinkSub')}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
                 </TouchableOpacity>
@@ -790,7 +822,7 @@ export default function HomeScreen() {
                     <Ionicons name="share-social-outline" size={20} color={COLORS.textMuted} />
                   </View>
                   <View style={styles.menuItemTextBox}>
-                    <Text style={styles.menuItemTitle}>招待コードを共有</Text>
+                    <Text style={styles.menuItemTitle}>{t('home.menu.shareCodeTitle')}</Text>
                     <Text style={styles.menuItemSubtext}>{pairCode}</Text>
                   </View>
                   <Ionicons name="copy-outline" size={16} color={COLORS.textLight} />
@@ -807,8 +839,10 @@ export default function HomeScreen() {
                     <Ionicons name="unlink-outline" size={20} color="#B84A39" />
                   </View>
                   <View style={styles.menuItemTextBox}>
-                    <Text style={[styles.menuItemTitle, { color: '#B84A39' }]}>ペアを解除する</Text>
-                    <Text style={styles.menuItemSubtext}>別の相手とペアを組み直す</Text>
+                    <Text style={[styles.menuItemTitle, { color: '#B84A39' }]}>
+                      {t('home.menu.leaveTitle')}
+                    </Text>
+                    <Text style={styles.menuItemSubtext}>{t('home.menu.leaveSub')}</Text>
                   </View>
                 </TouchableOpacity>
               )}
@@ -823,23 +857,25 @@ export default function HomeScreen() {
                     <Ionicons name="trash-outline" size={20} color="#B84A39" />
                   </View>
                   <View style={styles.menuItemTextBox}>
-                    <Text style={[styles.menuItemTitle, { color: '#B84A39' }]}>アカウント削除</Text>
-                    <Text style={styles.menuItemSubtext}>すべてのデータを削除</Text>
+                    <Text style={[styles.menuItemTitle, { color: '#B84A39' }]}>
+                      {t('home.menu.deleteTitle')}
+                    </Text>
+                    <Text style={styles.menuItemSubtext}>{t('home.menu.deleteSub')}</Text>
                   </View>
                 </TouchableOpacity>
               )}
-            </View>
+            </ScrollView>
 
             <View style={styles.drawerFooter}>
               <Text style={styles.drawerVersionText}>
-                Kotaeai v{Constants.expoConfig?.version ?? '1.0.0'}
+                {t('app.version', { version: Constants.expoConfig?.version ?? '1.0.0' })}
               </Text>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* ペア解除確認モーダル（解除前の優しいAI振り返り導線付き） */}
+      {/* ペア解除確認モーダル */}
       <Modal
         visible={isLeaveModalOpen}
         transparent
@@ -856,57 +892,57 @@ export default function HomeScreen() {
             }}
           />
           <View style={[styles.confirmDialog, SHADOWS.cardFloating]}>
-            <View style={styles.confirmIconCircle}>
-              <Ionicons name="unlink-outline" size={22} color="#B84A39" />
-            </View>
-            <Text style={styles.confirmTitle}>ペアを解除しますか？</Text>
-            <Text style={styles.confirmMessage}>
-              解除すると、このペアから抜けます。お互いが解除すると、これまでの回答履歴も削除されます。
-              {'\n\n'}
-              関係の見直しやお別れの整理をしたいときは、解除する前に二人の回答履歴からすれ違い・別れの原因を AI で優しく振り返ることもできます。
-            </Text>
-
-            <TouchableOpacity
-              style={styles.reflectionGuideBtn}
-              activeOpacity={0.85}
-              disabled={leavingPair}
-              onPress={handleOpenReflectionBeforeLeave}
-            >
-              <Ionicons name="heart-half-outline" size={16} color="#6F5A6B" />
-              <Text style={styles.reflectionGuideBtnText}>
-                解除前に、二人の回答履歴からすれ違い・別れの原因を AI で振り返る
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color="#6F5A6B" />
-            </TouchableOpacity>
-
-            <View style={styles.confirmActionsRow}>
-              <TouchableOpacity
-                style={styles.confirmCancelBtn}
-                activeOpacity={0.8}
-                disabled={leavingPair}
-                onPress={() => setIsLeaveModalOpen(false)}
-              >
-                <Text style={styles.confirmCancelBtnText}>キャンセル</Text>
-              </TouchableOpacity>
+            <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+              <View style={styles.confirmIconCircle}>
+                <Ionicons name="unlink-outline" size={22} color="#B84A39" />
+              </View>
+              <Text style={styles.confirmTitle}>{t('home.leaveModal.title')}</Text>
+              <Text style={styles.confirmMessage}>{t('home.leaveModal.message')}</Text>
 
               <TouchableOpacity
-                style={styles.confirmDangerBtn}
+                style={styles.reflectionGuideBtn}
                 activeOpacity={0.85}
                 disabled={leavingPair}
-                onPress={() => void handleConfirmLeavePair()}
+                onPress={handleOpenReflectionBeforeLeave}
               >
-                {leavingPair ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.confirmDangerBtnText}>このまま解除する</Text>
-                )}
+                <Ionicons name="heart-half-outline" size={16} color="#6F5A6B" />
+                <Text style={styles.reflectionGuideBtnText}>
+                  {t('home.leaveModal.reflectionGuide')}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color="#6F5A6B" />
               </TouchableOpacity>
-            </View>
+
+              <View style={styles.confirmActionsRow}>
+                <TouchableOpacity
+                  style={styles.confirmCancelBtn}
+                  activeOpacity={0.8}
+                  disabled={leavingPair}
+                  onPress={() => setIsLeaveModalOpen(false)}
+                >
+                  <Text style={styles.confirmCancelBtnText}>{t('common.cancel')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.confirmDangerBtn}
+                  activeOpacity={0.85}
+                  disabled={leavingPair}
+                  onPress={() => void handleConfirmLeavePair()}
+                >
+                  {leavingPair ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.confirmDangerBtnText}>
+                      {t('home.leaveModal.confirmBtn')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* パートナー再連携ワンタイムコード発行・再発行モーダル */}
+      {/* パートナー再連携ワンタイムコードモーダル */}
       <Modal
         visible={isRelinkModalOpen}
         transparent
@@ -923,120 +959,132 @@ export default function HomeScreen() {
             }}
           />
           <View style={[styles.confirmDialog, SHADOWS.cardFloating]}>
-            <View style={[styles.confirmIconCircle, { backgroundColor: '#F5ECE3' }]}>
-              <Ionicons name="key-outline" size={22} color={COLORS.primaryDark} />
-            </View>
-            <Text style={styles.confirmTitle}>パートナー再連携コード</Text>
-            <Text style={styles.confirmMessage}>
-              {partnerName}さんがアプリを再インストール・機種変更して連携が切れた場合に使用します。
-              {'\n'}
-              コードは <Text style={styles.relinkBold}>5分間・1回限り有効</Text> で、再発行すると前のコードは自動で無効になります。
-              {'\n'}
-              ※相手が Google 連携済みの場合は、先に相手端末の「設定 ＞ Google ログインで復元」をお試しください。
-            </Text>
+            <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+              <View style={[styles.confirmIconCircle, { backgroundColor: '#F5ECE3' }]}>
+                <Ionicons name="key-outline" size={22} color={COLORS.primaryDark} />
+              </View>
+              <Text style={styles.confirmTitle}>{t('home.relinkModal.title')}</Text>
+              <Text style={styles.confirmMessage}>
+                {t('home.relinkModal.messageIntro', { partnerName })}
+                {'\n'}
+                {t('home.relinkModal.messageValidityPrefix')}
+                <Text style={styles.relinkBold}>{t('home.relinkModal.messageValidityBold')}</Text>
+                {t('home.relinkModal.messageValiditySuffix')}
+                {'\n'}
+                {t('home.relinkModal.messageGoogleNote')}
+              </Text>
 
-            {relinkCode ? (
-              <View style={styles.relinkCodeBox}>
-                <Text
-                  style={[
-                    styles.relinkCodeValue,
-                    isRelinkExpired && styles.relinkCodeValueExpired,
-                  ]}
-                  selectable
-                >
-                  {relinkCode}
-                </Text>
-                <View
-                  style={[
-                    styles.relinkTimerPill,
-                    isRelinkExpired && styles.relinkTimerPillExpired,
-                  ]}
-                >
-                  <Ionicons
-                    name={isRelinkExpired ? 'alert-circle-outline' : 'time-outline'}
-                    size={13}
-                    color={isRelinkExpired ? '#B84A39' : '#4A7C59'}
-                  />
+              {relinkCode ? (
+                <View style={styles.relinkCodeBox}>
                   <Text
                     style={[
-                      styles.relinkTimerText,
-                      isRelinkExpired && styles.relinkTimerTextExpired,
+                      styles.relinkCodeValue,
+                      isRelinkExpired && styles.relinkCodeValueExpired,
                     ]}
+                    selectable
                   >
-                    {isRelinkExpired
-                      ? '有効期限切れ（下のボタンから再発行できます）'
-                      : `残り ${formatCountdown(relinkRemainingSec)} ・ 1回限り有効`}
+                    {relinkCode}
                   </Text>
-                </View>
-
-                <View style={styles.relinkActionStack}>
-                  <TouchableOpacity
+                  <View
                     style={[
-                      styles.relinkPrimaryBtn,
-                      isRelinkExpired && styles.relinkPrimaryBtnDisabled,
+                      styles.relinkTimerPill,
+                      isRelinkExpired && styles.relinkTimerPillExpired,
                     ]}
-                    activeOpacity={0.85}
-                    disabled={isRelinkExpired || issuingRelink}
-                    onPress={() => void handleCopyRelinkCode()}
                   >
                     <Ionicons
-                      name={relinkCopied ? 'checkmark-circle' : 'copy-outline'}
-                      size={16}
-                      color="#FFFFFF"
+                      name={isRelinkExpired ? 'alert-circle-outline' : 'time-outline'}
+                      size={13}
+                      color={isRelinkExpired ? '#B84A39' : '#4A7C59'}
                     />
-                    <Text style={styles.relinkPrimaryBtnText}>
-                      {relinkCopied ? 'コピーしました' : 'コードをコピーして送る'}
+                    <Text
+                      style={[
+                        styles.relinkTimerText,
+                        isRelinkExpired && styles.relinkTimerTextExpired,
+                      ]}
+                    >
+                      {isRelinkExpired
+                        ? t('home.relinkModal.expired')
+                        : t('home.relinkModal.remaining', {
+                            time: formatCountdown(relinkRemainingSec),
+                          })}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
 
-                  <View style={styles.confirmActionsRow}>
+                  <View style={styles.relinkActionStack}>
                     <TouchableOpacity
-                      style={styles.confirmCancelBtn}
-                      activeOpacity={0.8}
-                      disabled={issuingRelink}
-                      onPress={() => void handleIssueRelinkCode()}
+                      style={[
+                        styles.relinkPrimaryBtn,
+                        isRelinkExpired && styles.relinkPrimaryBtnDisabled,
+                      ]}
+                      activeOpacity={0.85}
+                      disabled={isRelinkExpired || issuingRelink}
+                      onPress={() => void handleCopyRelinkCode()}
                     >
-                      {issuingRelink ? (
-                        <ActivityIndicator size="small" color={COLORS.primaryDark} />
-                      ) : (
-                        <Text style={styles.confirmCancelBtnText}>コードを再発行</Text>
-                      )}
+                      <Ionicons
+                        name={relinkCopied ? 'checkmark-circle' : 'copy-outline'}
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.relinkPrimaryBtnText}>
+                        {relinkCopied
+                          ? t('home.relinkModal.copiedBtn')
+                          : t('home.relinkModal.copyBtn')}
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.confirmCancelBtn}
-                      activeOpacity={0.8}
-                      disabled={issuingRelink}
-                      onPress={() => setIsRelinkModalOpen(false)}
-                    >
-                      <Text style={styles.confirmCancelBtnText}>閉じる</Text>
-                    </TouchableOpacity>
+
+                    <View style={styles.confirmActionsRow}>
+                      <TouchableOpacity
+                        style={styles.confirmCancelBtn}
+                        activeOpacity={0.8}
+                        disabled={issuingRelink}
+                        onPress={() => void handleIssueRelinkCode()}
+                      >
+                        {issuingRelink ? (
+                          <ActivityIndicator size="small" color={COLORS.primaryDark} />
+                        ) : (
+                          <Text style={styles.confirmCancelBtnText}>
+                            {t('home.relinkModal.reissueBtn')}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.confirmCancelBtn}
+                        activeOpacity={0.8}
+                        disabled={issuingRelink}
+                        onPress={() => setIsRelinkModalOpen(false)}
+                      >
+                        <Text style={styles.confirmCancelBtnText}>{t('common.close')}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.confirmActionsRow}>
-                <TouchableOpacity
-                  style={styles.confirmCancelBtn}
-                  activeOpacity={0.8}
-                  disabled={issuingRelink}
-                  onPress={() => setIsRelinkModalOpen(false)}
-                >
-                  <Text style={styles.confirmCancelBtnText}>キャンセル</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.relinkIssueBtn}
-                  activeOpacity={0.85}
-                  disabled={issuingRelink}
-                  onPress={() => void handleIssueRelinkCode()}
-                >
-                  {issuingRelink ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.relinkPrimaryBtnText}>発行する（5分）</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
+              ) : (
+                <View style={styles.confirmActionsRow}>
+                  <TouchableOpacity
+                    style={styles.confirmCancelBtn}
+                    activeOpacity={0.8}
+                    disabled={issuingRelink}
+                    onPress={() => setIsRelinkModalOpen(false)}
+                  >
+                    <Text style={styles.confirmCancelBtnText}>{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.relinkIssueBtn}
+                    activeOpacity={0.85}
+                    disabled={issuingRelink}
+                    onPress={() => void handleIssueRelinkCode()}
+                  >
+                    {issuingRelink ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.relinkPrimaryBtnText}>
+                        {t('home.relinkModal.issueBtn')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1075,17 +1123,20 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     marginBottom: 8,
+    maxWidth: '100%',
   },
   heroBadgeText: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
+    flexShrink: 1,
+    lineHeight: 18,
   },
   heroSubtitle: {
     fontSize: 13,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 21,
   },
   compactPairBar: {
     backgroundColor: COLORS.card,
@@ -1113,6 +1164,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexShrink: 0,
   },
   compactAvatarCircle: {
     width: 26,
@@ -1133,11 +1185,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
     flexShrink: 1,
+    lineHeight: 19,
   },
   compactPairActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   compactActionChip: {
     flexDirection: 'row',
@@ -1152,12 +1206,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDark,
-  },
-  compactCodeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.primaryDark,
-    letterSpacing: 0.6,
+    lineHeight: 16,
   },
   compactNameEditBox: {
     flexDirection: 'row',
@@ -1169,8 +1218,10 @@ const styles = StyleSheet.create({
   },
   streakStatsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 9,
     paddingTop: 9,
     borderTopWidth: 1,
@@ -1189,6 +1240,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: COLORS.textMuted,
+    lineHeight: 16,
   },
   streakPillTextActive: {
     color: COLORS.primaryDark,
@@ -1197,12 +1249,15 @@ const styles = StyleSheet.create({
   streakMetaGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    flexWrap: 'wrap',
+    gap: 5,
+    flexShrink: 1,
   },
   streakMetaText: {
     fontSize: 11.5,
     fontWeight: '700',
     color: COLORS.textMuted,
+    lineHeight: 16,
   },
   streakMetaDot: {
     fontSize: 11,
@@ -1223,7 +1278,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     color: '#8C6226',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   card: {
     backgroundColor: COLORS.card,
@@ -1237,17 +1292,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 12,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+    flexShrink: 1,
+    lineHeight: 21,
   },
   editNameTrigger: {
     flexDirection: 'row',
@@ -1257,11 +1317,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    maxWidth: '48%',
+    flexShrink: 0,
   },
   editNameTriggerText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    flexShrink: 1,
+    lineHeight: 16,
   },
   nameEditBox: {
     flexDirection: 'row',
@@ -1276,12 +1340,13 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 12,
     color: COLORS.textMuted,
+    lineHeight: 18,
   },
   unpairedContainer: {},
   unpairedDesc: {
     fontSize: 13,
     color: COLORS.textMuted,
-    lineHeight: 18,
+    lineHeight: 20,
     marginBottom: 12,
   },
   createPairBtn: {
@@ -1291,6 +1356,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 12,
     marginBottom: 14,
   },
@@ -1298,6 +1364,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   myCodeBox: {
     backgroundColor: COLORS.surface,
@@ -1309,6 +1378,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 6,
   },
   myCodeText: {
@@ -1316,30 +1386,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.primaryDark,
     letterSpacing: 2,
+    flexShrink: 1,
   },
   codeCopyBtn: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    flexShrink: 0,
   },
   codeCopyBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+    lineHeight: 17,
   },
   pendingActionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     justifyContent: 'space-between',
   },
   secondaryBtn: {
     flex: 1,
+    minWidth: '30%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
     paddingVertical: 9,
+    paddingHorizontal: 8,
     borderRadius: 10,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -1349,6 +1425,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 15,
   },
   inputSection: {
     marginTop: 4,
@@ -1357,6 +1436,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.textMuted,
+    lineHeight: 18,
     marginBottom: 6,
   },
   inputRow: {
@@ -1365,7 +1445,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 42,
+    minHeight: 42,
     borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: 10,
@@ -1380,36 +1460,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     borderRadius: 10,
+    flexShrink: 0,
   },
   connectButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+    lineHeight: 19,
   },
   actionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 12,
+  },
+  actionHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
   },
   actionTitle: {
     fontSize: 17,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 24,
   },
   actionDate: {
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 2,
+    lineHeight: 18,
   },
   statusBadge: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 10,
+    maxWidth: '48%',
+    flexShrink: 0,
   },
   statusBadgeText: {
     fontSize: 11,
     fontWeight: '700',
+    lineHeight: 16,
   },
   questionPreviewList: {
     gap: 8,
@@ -1434,6 +1526,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 19,
   },
   mainButton: {
     backgroundColor: COLORS.primary,
@@ -1441,6 +1534,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 16,
     gap: 8,
   },
@@ -1448,6 +1542,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 21,
   },
   modalOverlay: {
     flex: 1,
@@ -1458,12 +1555,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuDrawer: {
-    width: '78%',
+    width: '80%',
+    maxWidth: 340,
     backgroundColor: COLORS.background,
     height: '100%',
     paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
     justifyContent: 'space-between',
     borderLeftWidth: 1,
     borderLeftColor: COLORS.border,
@@ -1472,8 +1570,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 14,
+    marginBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
@@ -1481,6 +1579,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 24,
   },
   closeButton: {
     padding: 4,
@@ -1498,25 +1597,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   drawerUserText: {
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
+    flex: 1,
+    lineHeight: 19,
   },
   drawerSectionDivider: {
     height: 1,
     backgroundColor: COLORS.border,
-    marginVertical: 8,
+    marginVertical: 6,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderBottomWidth: 1,
     borderBottomColor: '#F5ECE3',
-    gap: 12,
+    gap: 11,
   },
   menuItemIconBox: {
     width: 38,
@@ -1524,23 +1625,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   menuItemTextBox: {
     flex: 1,
+    minWidth: 0,
   },
   menuItemTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 19,
     marginBottom: 2,
   },
   menuItemSubtext: {
     fontSize: 11,
     color: COLORS.textMuted,
+    lineHeight: 16,
   },
   drawerFooter: {
     alignItems: 'center',
-    paddingTop: 16,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
@@ -1552,11 +1657,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 22,
+    padding: 20,
+    backgroundColor: 'rgba(24, 18, 15, 0.45)',
   },
   confirmDialog: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 368,
+    maxHeight: '88%',
     backgroundColor: '#FFFFFF',
     borderRadius: 22,
     padding: 22,
@@ -1579,12 +1686,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.text,
     textAlign: 'center',
+    lineHeight: 24,
     marginBottom: 10,
   },
   confirmMessage: {
     fontSize: 13,
     color: COLORS.textMuted,
-    lineHeight: 20,
+    lineHeight: 21,
     marginBottom: 16,
   },
   reflectionGuideBtn: {
@@ -1604,7 +1712,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#5E4B5B',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   confirmActionsRow: {
     flexDirection: 'row',
@@ -1615,6 +1723,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1624,12 +1733,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   confirmDangerBtn: {
     flex: 1,
     backgroundColor: '#B84A39',
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1637,6 +1749,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   relinkBold: {
     fontWeight: '800',
@@ -1670,6 +1784,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 10,
     marginBottom: 14,
+    maxWidth: '100%',
   },
   relinkTimerPillExpired: {
     backgroundColor: '#FDECEC',
@@ -1678,6 +1793,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#3B6347',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   relinkTimerTextExpired: {
     color: '#B84A39',
@@ -1694,6 +1812,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   relinkPrimaryBtnDisabled: {
     opacity: 0.45,
@@ -1702,12 +1821,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   relinkIssueBtn: {
     flex: 1,
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1737,14 +1860,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pastCatchUpTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '800',
     color: '#8C5A1B',
+    lineHeight: 19,
   },
   pastCatchUpDesc: {
     fontSize: 11.5,
     color: '#7A5B32',
-    lineHeight: 17,
+    lineHeight: 19,
     marginBottom: 12,
   },
   pastCatchUpActions: {
@@ -1768,6 +1893,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#8C5A1B',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   pastCatchUpPremiumBtn: {
     flex: 1,
@@ -1794,6 +1922,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   menuUnansweredBadge: {
     backgroundColor: '#FDF3E7',
@@ -1803,10 +1934,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
     marginRight: 4,
+    flexShrink: 0,
   },
   menuUnansweredBadgeText: {
     fontSize: 10,
     fontWeight: '800',
     color: '#9E6B24',
+    lineHeight: 14,
   },
 });

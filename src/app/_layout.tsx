@@ -4,10 +4,15 @@ import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import { useSyncDeviceLocale } from '../i18n';
 import { AppContextProvider } from '../context/AppContext';
 import { COLORS } from '../constants/theme';
 
 export default function RootLayout() {
+  useSyncDeviceLocale();
+  const { t } = useTranslation();
+
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
@@ -40,7 +45,7 @@ export default function RootLayout() {
         headerTintColor: COLORS.text,
         headerTitleStyle: {
           fontWeight: '700',
-          fontSize: 18,
+          fontSize: 17,
         },
         headerShadowVisible: false,
         contentStyle: {
@@ -51,56 +56,56 @@ export default function RootLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'Kotaeai',
+          title: t('nav.home'),
           headerShown: true,
         }}
       />
       <Stack.Screen
         name="quiz"
         options={{
-          title: '今日の質問',
-          headerBackTitle: '戻る',
+          title: t('nav.quiz'),
+          headerBackTitle: t('common.back'),
         }}
       />
       <Stack.Screen
         name="waiting"
         options={{
-          title: '回答待機中',
-          headerBackVisible: false, // 完了後は勝手に戻らないよう
+          title: t('nav.waiting'),
+          headerBackVisible: false,
         }}
       />
       <Stack.Screen
         name="result"
         options={{
-          title: '診断結果',
-          headerBackTitle: 'ホーム',
+          title: t('nav.result'),
+          headerBackTitle: t('common.home'),
         }}
       />
       <Stack.Screen
         name="ai-report"
         options={{
-          title: 'AI相性レポート',
-          headerBackTitle: '戻る',
+          title: t('nav.aiReport'),
+          headerBackTitle: t('common.back'),
         }}
       />
       <Stack.Screen
         name="history"
         options={{
-          title: '過去の回答比較',
-          headerBackTitle: '戻る',
+          title: t('nav.history'),
+          headerBackTitle: t('common.back'),
         }}
       />
       <Stack.Screen
         name="settings"
         options={{
-          title: '通知・アカウント設定',
-          headerBackTitle: '戻る',
+          title: t('nav.settings'),
+          headerBackTitle: t('common.back'),
         }}
       />
       <Stack.Screen
         name="auth/callback"
         options={{
-          title: '認証中',
+          title: t('nav.authCallback'),
           headerShown: false,
         }}
       />
@@ -126,8 +131,9 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   webOuter: {
     flex: 1,
-    backgroundColor: '#E9E0D6',
+    backgroundColor: '#E8E0D6',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   webPhoneFrame: {
     flex: 1,

@@ -9,7 +9,20 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.garanapop.coupleswipeapp"
+      "bundleIdentifier": "com.garanapop.coupleswipeapp",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      }
+    },
+    "locales": {
+      "ja": "./locales/native/ja.json",
+      "en": "./locales/native/en.json",
+      "fr": "./locales/native/fr.json",
+      "ko": "./locales/native/ko.json",
+      "ru": "./locales/native/ru.json",
+      "th": "./locales/native/th.json",
+      "zh-Hans": "./locales/native/zh-Hans.json",
+      "zh-Hant": "./locales/native/zh-Hant.json"
     },
     "android": {
       "package": "com.garanapop.coupleswipeapp",
@@ -27,6 +40,21 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": [
+            "ja",
+            "en",
+            "fr",
+            "ko",
+            "ru",
+            "th",
+            "zh-Hans",
+            "zh-Hant"
+          ]
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser",
       [

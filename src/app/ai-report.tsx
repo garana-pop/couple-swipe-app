@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,20 +6,26 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { getCurrentLocale } from '../i18n';
+import { formatDateOnlyFromIso, formatDateTimeFromIso } from '../i18n/format';
 import { showAlert } from '../lib/alert';
-import { LEGAL_URLS, openExternalLink } from '../lib/links';
+import { getLegalUrls, getStoreName, openExternalLink } from '../lib/links';
 import {
   BillingOfferingPrices,
   fetchPairAllAiReports,
   fetchPairEntitlement,
   generateServerAiReport,
   generateServerBreakupReflection,
+  getDefaultBillingOfferingPrices,
   initializeBilling,
+  normalizeRiskLevel,
   purchaseSubscriptionPlan,
   restoreSubscriptionPurchases,
   syncAndFetchPairEntitlement,
@@ -32,77 +38,14 @@ import type {
   PairEntitlement,
 } from '../types';
 
-const SAMPLE_REFLECTION: BreakupReflectionData = {
-  reportType: 'breakup_reflection',
-  warmMessage:
-    'ここまでお互いと向き合いながら日々の質問に答えてきた時間は、とても誠実で大切な記録です。どちらが悪いわけでもないので、まずはご自身を優しく労ってあげてくださいね。',
-  goodMemoriesSummary:
-    '休日の過ごし方や人への思いやりに関する回答では重なる部分も多く、お互いを大切にしたい気持ちはしっかり通じ合っていました。',
-  rootCauses: [
-    {
-      title: '安心できる連絡・距離感のペース差',
-      background:
-        'こまめに気持ちを確かめ合いたいペースと、自分の時間で整えてから向き合いたいペースに少しずつ違いがあったようです。',
-      takeaway:
-        '次の恋では「忙しいときは一言だけ送るね」など、お互いが安心できるリズムを早い段階で軽く共有しておくと心地よく続けられます。',
-    },
-  ],
-  myStrengthForNextLove:
-    '相手との違いを丁寧に受け止めようとする誠実さと、話し合いを大切にする温かさがあなたの素敵な強みです。',
-  gentleNextStep:
-    '今は無理に答えを急がず、深呼吸して自分のペースを取り戻してください。この経験はきっと、もっと穏やかで安心できるご縁につながっていきます。',
-};
-
-function formatPlanName(productId: string | null | undefined): string {
-  const raw = (productId ?? '').toLowerCase();
-  if (raw.includes('year') || raw.includes('annual')) return '年額プラン';
-  if (raw.includes('month')) return '月額プラン';
-  return 'ふたりプレミアムプラン';
-}
-
-const SAMPLE_REPORT: AiReportData = {
-  overallScore: 84,
-  myType: {
-    tag: 'しっかり計画派リーダー',
-    desc: '見通しを立てて安心したいタイプ。ルールや時間を大切にする傾向。',
-  },
-  partnerType: {
-    tag: '柔軟な癒やしマイペース',
-    desc: 'その場の空気や気分を大切にするタイプ。大らかで包容力がある。',
-  },
-  chemistrySummary:
-    '「計画性」と「柔軟性」という正反対の長所を持つ補完関係です。一方がリードし、もう一方が場を和ませる理想的な凸凹ペア！',
-  riskPoints: [
-    {
-      title: '家事・ルールの基準の違い',
-      level: '中',
-      desc: '「家事に厳しい度」の回答差から、掃除や片付けのタイミングで不満が溜まりやすい傾向があります。',
-      advice:
-        '「気づいた方がやる」ではなく、「ゴミ出しは相手、水回りは私」のように明確に分担を可視化しましょう。',
-    },
-    {
-      title: '休日の過ごし方の温度差',
-      level: '低',
-      desc: '外出派とのんびり派で適度な自由時間を尊重し合えているため、現在のところ良好です。',
-      advice: '月1回はお互いが主役の休日を交互に企画すると、さらに満足度が上がります。',
-    },
-  ],
-  nextActionTip: '週末にカフェで15分だけ、お互いが最近嬉しかったことを1つずつ共有してみましょう。',
-};
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-}
-
 export default function AiReportScreen() {
+  const { t, i18n } = useTranslation();
+  const locale = getCurrentLocale();
+  const legalUrls = getLegalUrls(locale);
+  const storeName = getStoreName();
+  const subscriptionsLabel =
+    Platform.OS === 'ios' ? t('links.subscriptionsIos') : t('links.subscriptionsAndroid');
+
   const { mode, focus } = useLocalSearchParams<{ mode?: string; focus?: string }>();
   const {
     userId,
@@ -134,15 +77,70 @@ export default function AiReportScreen() {
   const isReflectionOpen = reflectionExpandedOverride ?? mode === 'reflection';
   const [isSampleOpen, setIsSampleOpen] = useState(false);
   const [generatingReflection, setGeneratingReflection] = useState(false);
-  const [offering, setOffering] = useState<BillingOfferingPrices>({
-    isStoreReady: false,
-    yearlyPriceLabel: '¥3,000 / 年',
-    yearlyPerMonthLabel: '月250円相当・2人共有',
-    yearlyDiscountBadge: '月額比 50% OFF',
-    monthlyPriceLabel: '¥500 / 月',
-  });
+  const [offering, setOffering] = useState<BillingOfferingPrices>(() =>
+    getDefaultBillingOfferingPrices()
+  );
   const [generating, setGenerating] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+
+  const formatPlanName = useCallback(
+    (productId: string | null | undefined): string => {
+      const raw = (productId ?? '').toLowerCase();
+      if (raw.includes('year') || raw.includes('annual')) return t('aiReport.plans.yearly');
+      if (raw.includes('month')) return t('aiReport.plans.monthly');
+      return t('aiReport.plans.premium');
+    },
+    [t]
+  );
+
+  const sampleReport = useMemo<AiReportData>(
+    () => ({
+      overallScore: 84,
+      myType: {
+        tag: t('aiReport.sampleReport.myTag'),
+        desc: t('aiReport.sampleReport.myDesc'),
+      },
+      partnerType: {
+        tag: t('aiReport.sampleReport.partnerTag'),
+        desc: t('aiReport.sampleReport.partnerDesc'),
+      },
+      chemistrySummary: t('aiReport.sampleReport.chemistrySummary'),
+      riskPoints: [
+        {
+          title: t('aiReport.sampleReport.risk1Title'),
+          level: 'medium',
+          desc: t('aiReport.sampleReport.risk1Desc'),
+          advice: t('aiReport.sampleReport.risk1Advice'),
+        },
+        {
+          title: t('aiReport.sampleReport.risk2Title'),
+          level: 'low',
+          desc: t('aiReport.sampleReport.risk2Desc'),
+          advice: t('aiReport.sampleReport.risk2Advice'),
+        },
+      ],
+      nextActionTip: t('aiReport.sampleReport.nextActionTip'),
+    }),
+    [t]
+  );
+
+  const sampleReflection = useMemo<BreakupReflectionData>(
+    () => ({
+      reportType: 'breakup_reflection',
+      warmMessage: t('aiReport.sampleReflection.warmMessage'),
+      goodMemoriesSummary: t('aiReport.sampleReflection.goodMemoriesSummary'),
+      rootCauses: [
+        {
+          title: t('aiReport.sampleReflection.cause1Title'),
+          background: t('aiReport.sampleReflection.cause1Background'),
+          takeaway: t('aiReport.sampleReflection.cause1Takeaway'),
+        },
+      ],
+      myStrengthForNextLove: t('aiReport.sampleReflection.myStrengthForNextLove'),
+      gentleNextStep: t('aiReport.sampleReflection.gentleNextStep'),
+    }),
+    [t]
+  );
 
   useEffect(() => {
     if (
@@ -221,7 +219,7 @@ export default function AiReportScreen() {
   const refreshEntitlementAndBilling = useCallback(async () => {
     const [ent, offer] = await Promise.all([
       isSupabaseReady ? fetchPairEntitlement() : Promise.resolve(null),
-      userId ? initializeBilling(userId) : Promise.resolve(null),
+      userId ? initializeBilling(userId) : Promise.resolve(getDefaultBillingOfferingPrices()),
     ]);
     await applyEntitlement(ent);
     if (offer) {
@@ -241,7 +239,7 @@ export default function AiReportScreen() {
     return () => {
       active = false;
     };
-  }, [refreshEntitlementAndBilling]);
+  }, [refreshEntitlementAndBilling, i18n.language]);
 
   const isPremium = Boolean(entitlement?.isPremium);
   const latestReportRecord = reportHistory[0] ?? entitlement?.latestReport ?? null;
@@ -254,7 +252,7 @@ export default function AiReportScreen() {
       activeReportRecord.id !== latestReportRecord.id
   );
   const displayReport: AiReportData =
-    isPremium && activeReportRecord ? activeReportRecord.report : SAMPLE_REPORT;
+    isPremium && activeReportRecord ? activeReportRecord.report : sampleReport;
   const isShowingSample = !isPremium || !activeReportRecord;
 
   const latestReflectionRecord = reflectionHistory[0] ?? null;
@@ -273,18 +271,21 @@ export default function AiReportScreen() {
 
   const handleGenerateReflection = async (forceRefresh: boolean) => {
     if (!isSupabaseReady) {
-      showAlert('未接続', 'サーバーに接続してからお試しください。');
+      showAlert(t('aiReport.alerts.notConnectedTitle'), t('aiReport.alerts.notConnectedBody'));
       return;
     }
     if (!hasPair) {
-      showAlert('回答履歴がありません', 'ペアの回答履歴がある状態で振り返り診断をご利用いただけます。');
+      showAlert(t('aiReport.alerts.noHistoryTitle'), t('aiReport.alerts.noHistoryBody'));
       return;
     }
     setGeneratingReflection(true);
     try {
       const res = await generateServerBreakupReflection(getQuestionsById(), forceRefresh);
       if (!res.ok) {
-        showAlert('振り返り診断エラー', res.error ?? '振り返りレポートの作成に失敗しました。');
+        showAlert(
+          t('aiReport.alerts.reflectionErrorTitle'),
+          res.error ?? t('aiReport.alerts.reflectionErrorBody')
+        );
         return;
       }
       if (res.reflectionRecord) {
@@ -296,13 +297,13 @@ export default function AiReportScreen() {
       }
       if (res.cached) {
         showAlert(
-          '最新の振り返りを表示中',
-          '前回から新しい回答が増えていないため、最新の振り返りレポートを表示しています。'
+          t('aiReport.alerts.reflectionCachedTitle'),
+          t('aiReport.alerts.reflectionCachedBody')
         );
       } else {
         showAlert(
-          '振り返りレポートが完成しました',
-          'これまでの回答履歴から、優しく寄り添う振り返りレポートをまとめました。'
+          t('aiReport.alerts.reflectionDoneTitle'),
+          t('aiReport.alerts.reflectionDoneBody')
         );
       }
     } finally {
@@ -312,14 +313,17 @@ export default function AiReportScreen() {
 
   const handleGenerateReport = async (forceRefresh: boolean) => {
     if (!isSupabaseReady) {
-      showAlert('未接続', 'Supabase に接続してからお試しください。');
+      showAlert(t('aiReport.alerts.notConnectedTitle'), t('aiReport.alerts.notConnectedBody'));
       return;
     }
     setGenerating(true);
     try {
       const res = await generateServerAiReport(getQuestionsById(), forceRefresh);
       if (!res.ok) {
-        showAlert('AI診断エラー', res.error ?? 'レポートの生成に失敗しました。');
+        showAlert(
+          t('aiReport.alerts.reportErrorTitle'),
+          res.error ?? t('aiReport.alerts.reportErrorBody')
+        );
         return;
       }
       if (res.reportRecord) {
@@ -331,12 +335,9 @@ export default function AiReportScreen() {
         setSelectedReportId(nextRec.id);
       }
       if (res.cached) {
-        showAlert(
-          '最新レポートを表示中',
-          '前回の分析から新しい回答が増えていないため、最新の分析結果を表示しています。'
-        );
+        showAlert(t('aiReport.alerts.reportCachedTitle'), t('aiReport.alerts.reportCachedBody'));
       } else {
-        showAlert('AI診断が完了しました', '最新の回答データから二人の相性レポートを作成しました！');
+        showAlert(t('aiReport.alerts.reportDoneTitle'), t('aiReport.alerts.reportDoneBody'));
       }
     } finally {
       setGenerating(false);
@@ -346,9 +347,8 @@ export default function AiReportScreen() {
   const handleSubscribe = async () => {
     if (!offering.isStoreReady) {
       showAlert(
-        'ストア課金について',
-        offering.unavailableReason ??
-          '現在ストア課金の準備中です。公開までしばらくお待ちください。'
+        t('aiReport.alerts.storeBillingTitle'),
+        offering.unavailableReason ?? t('errors.billing.notReady')
       );
       return;
     }
@@ -358,23 +358,25 @@ export default function AiReportScreen() {
       const res = await purchaseSubscriptionPlan(selectedPlan);
       if (res.cancelled) return;
       if (!res.ok) {
-        showAlert('購入エラー', res.error ?? '購入処理に失敗しました。');
+        showAlert(
+          t('aiReport.alerts.purchaseErrorTitle'),
+          res.error ?? t('aiReport.alerts.purchaseErrorBody')
+        );
         return;
       }
 
-      // サーバー側で即時同期（sync-subscription ＋ Webhook 到着待ちリトライ）
       const syncedEnt = await syncAndFetchPairEntitlement(true);
       await applyEntitlement(syncedEnt);
       if (syncedEnt?.isPremium) {
         void fetchHistory();
         showAlert(
-          'ご加入ありがとうございます！',
-          `${myName}さんと${partnerName}さんのペアで「ふたりプレミアムプラン」が有効になりました。AI相性診断と、過去の未回答質問への回答・相手の結果閲覧が解放されています。`
+          t('aiReport.alerts.subscribedTitle'),
+          t('aiReport.alerts.subscribedBody', { me: myName, partner: partnerName })
         );
       } else {
         showAlert(
-          'ご購入ありがとうございます',
-          '決済が完了しました。ご契約状態の反映に数秒かかる場合があります。画面を切り替えても反映されない場合は「以前の購入を復元する」をお試しください。'
+          t('aiReport.alerts.subscribedPendingTitle'),
+          t('aiReport.alerts.subscribedPendingBody')
         );
       }
     } finally {
@@ -387,7 +389,10 @@ export default function AiReportScreen() {
     try {
       const res = await restoreSubscriptionPurchases();
       if (!res.ok) {
-        showAlert('復元エラー', res.error ?? '購入情報の復元に失敗しました。');
+        showAlert(
+          t('aiReport.alerts.restoreErrorTitle'),
+          res.error ?? t('aiReport.alerts.restoreErrorBody')
+        );
         return;
       }
 
@@ -395,19 +400,13 @@ export default function AiReportScreen() {
       await applyEntitlement(syncedEnt);
       if (syncedEnt?.isPremium) {
         void fetchHistory();
-        showAlert(
-          '購入を復元しました',
-          '「ふたりプレミアムプラン」のご契約を確認し、すべてのプレミアム機能を解放しました。'
-        );
+        showAlert(t('aiReport.alerts.restoredTitle'), t('aiReport.alerts.restoredBody'));
       } else if (!res.hasActiveEntitlement) {
-        showAlert(
-          '有効なご契約が見つかりませんでした',
-          'この Google アカウントに紐づく有効な定期購入が見つかりませんでした。購入時と同じ Google アカウントで Google Play にログインしているかご確認ください。'
-        );
+        showAlert(t('aiReport.alerts.noActiveSubTitle'), t('aiReport.alerts.noActiveSubBody'));
       } else {
         showAlert(
-          '復元処理を受け付けました',
-          '契約情報の反映に数秒かかる場合があります。少し時間をおいて画面を開き直してください。'
+          t('aiReport.alerts.restorePendingTitle'),
+          t('aiReport.alerts.restorePendingBody')
         );
       }
     } finally {
@@ -415,9 +414,36 @@ export default function AiReportScreen() {
     }
   };
 
+  const renderLegalLinks = () => (
+    <View style={styles.legalLinksRow}>
+      <TouchableOpacity
+        onPress={() => void openExternalLink(legalUrls.termsOfService, t('links.termsOfService'))}
+      >
+        <Text style={styles.legalLinkText}>{t('aiReport.paywall.linkTerms')}</Text>
+      </TouchableOpacity>
+      <Text style={styles.legalDot}>•</Text>
+      <TouchableOpacity
+        onPress={() => void openExternalLink(legalUrls.privacyPolicy, t('links.privacyPolicy'))}
+      >
+        <Text style={styles.legalLinkText}>{t('aiReport.paywall.linkPrivacy')}</Text>
+      </TouchableOpacity>
+      <Text style={styles.legalDot}>•</Text>
+      <TouchableOpacity
+        onPress={() => void openExternalLink(legalUrls.subscriptions, subscriptionsLabel)}
+      >
+        <Text style={styles.legalLinkText}>{t('aiReport.paywall.linkManage')}</Text>
+      </TouchableOpacity>
+      <Text style={styles.legalDot}>•</Text>
+      <TouchableOpacity
+        onPress={() => void openExternalLink(legalUrls.accountDeletion, t('links.accountDeletion'))}
+      >
+        <Text style={styles.legalLinkText}>{t('aiReport.paywall.linkDeletion')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderReportCards = () => (
     <>
-      {/* セクション1: AI性格タイプ分析 */}
       <View
         style={[styles.card, SHADOWS.card]}
         onLayout={(e) => {
@@ -427,18 +453,22 @@ export default function AiReportScreen() {
         <View style={styles.cardHeaderBetween}>
           <View style={styles.cardHeaderInline}>
             <Ionicons name="analytics" size={19} color={COLORS.primary} />
-            <Text style={styles.cardTitle}>AI性格タイプ・ケミストリー</Text>
+            <Text style={styles.cardTitle}>{t('aiReport.reportCard.title')}</Text>
           </View>
           <View style={styles.scoreBadge}>
-            <Text style={styles.scoreBadgeText}>
-              {isShowingSample ? 'サンプル' : `相性 ${displayReport.overallScore}点`}
+            <Text style={styles.scoreBadgeText} numberOfLines={1}>
+              {isShowingSample
+                ? t('aiReport.reportCard.sampleBadge')
+                : t('aiReport.reportCard.scoreBadge', { score: displayReport.overallScore })}
             </Text>
           </View>
         </View>
 
         <View style={styles.coupleTypes}>
           <View style={styles.typeBox}>
-            <Text style={styles.typeUser}>{myName}</Text>
+            <Text style={styles.typeUser} numberOfLines={1}>
+              {myName}
+            </Text>
             <Text style={styles.typeTag}>{displayReport.myType.tag}</Text>
             <Text style={styles.typeDesc}>{displayReport.myType.desc}</Text>
           </View>
@@ -446,51 +476,58 @@ export default function AiReportScreen() {
             <Text style={styles.plusText}>×</Text>
           </View>
           <View style={styles.typeBox}>
-            <Text style={styles.typeUser}>{partnerName}</Text>
+            <Text style={styles.typeUser} numberOfLines={1}>
+              {partnerName}
+            </Text>
             <Text style={styles.typeTag}>{displayReport.partnerType.tag}</Text>
             <Text style={styles.typeDesc}>{displayReport.partnerType.desc}</Text>
           </View>
         </View>
 
         <View style={styles.chemistryNote}>
-          <Text style={styles.chemistryTitle}>AI分析サマリー</Text>
+          <Text style={styles.chemistryTitle}>{t('aiReport.reportCard.summaryTitle')}</Text>
           <Text style={styles.chemistryText}>{displayReport.chemistrySummary}</Text>
         </View>
       </View>
 
-      {/* セクション2: すれ違い予防・別れの原因診断 */}
       <View style={[styles.card, SHADOWS.card, styles.riskCard]}>
         <View style={styles.riskHeader}>
           <View style={styles.riskBadge}>
             <Ionicons name="warning" size={13} color="#C85338" />
             <Text style={styles.riskBadgeText}>
-              {isShowingSample ? 'サンプルプレビュー' : '要注意ポイント'}
+              {isShowingSample
+                ? t('aiReport.reportCard.riskSampleBadge')
+                : t('aiReport.reportCard.riskCautionBadge')}
             </Text>
           </View>
-          <Text style={styles.riskTitle}>すれ違い予防診断（AI予測）</Text>
+          <Text style={styles.riskTitle}>{t('aiReport.reportCard.riskTitle')}</Text>
         </View>
 
-        <Text style={styles.riskLead}>
-          過去のスワイプ履歴から、将来ふたりが衝突しやすい「すれ違いトリガー」と対策を整理しました。
-        </Text>
+        <Text style={styles.riskLead}>{t('aiReport.reportCard.riskLead')}</Text>
 
-        {displayReport.riskPoints.map((risk, idx) => (
-          <View key={`${risk.title}-${idx}`} style={styles.riskItem}>
-            <View style={styles.riskMeterRow}>
-              <Text style={styles.riskItemTitle}>
-                {idx + 1}. {risk.title}
-              </Text>
-              <Text style={styles.riskItemLevel}>リスク度: {risk.level}</Text>
-            </View>
-            <Text style={styles.riskItemDesc}>{risk.desc}</Text>
-            {risk.advice ? (
-              <View style={styles.rxBox}>
-                <Text style={styles.rxTitle}>AIのアドバイス</Text>
-                <Text style={styles.rxText}>{risk.advice}</Text>
+        {displayReport.riskPoints.map((risk, idx) => {
+          const levelKey = normalizeRiskLevel(risk.level);
+          const levelLabel = t(`aiReport.riskLevels.${levelKey}`);
+          return (
+            <View key={`${risk.title}-${idx}`} style={styles.riskItem}>
+              <View style={styles.riskMeterRow}>
+                <Text style={styles.riskItemTitle}>
+                  {idx + 1}. {risk.title}
+                </Text>
+                <Text style={styles.riskItemLevel}>
+                  {t('aiReport.reportCard.riskLevel', { level: levelLabel })}
+                </Text>
               </View>
-            ) : null}
-          </View>
-        ))}
+              <Text style={styles.riskItemDesc}>{risk.desc}</Text>
+              {risk.advice ? (
+                <View style={styles.rxBox}>
+                  <Text style={styles.rxTitle}>{t('aiReport.reportCard.adviceTitle')}</Text>
+                  <Text style={styles.rxText}>{risk.advice}</Text>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
 
         {displayReport.nextActionTip ? (
           <View style={styles.nextActionBox}>
@@ -502,58 +539,78 @@ export default function AiReportScreen() {
     </>
   );
 
+  const selectedPriceLabel =
+    selectedPlan === 'yearly' ? offering.yearlyPriceLabel : offering.monthlyPriceLabel;
+
   return (
     <ScrollView
       ref={scrollViewRef}
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* 読み込み中 / 有料ペア管理カード / 未課金プランカード */}
       {loadingEntitlement ? (
         <View style={[styles.card, SHADOWS.card, styles.loadingBox]}>
           <ActivityIndicator color={COLORS.primary} />
-          <Text style={styles.loadingText}>課金状態と最新レポートを確認中...</Text>
+          <Text style={styles.loadingText}>{t('aiReport.loading')}</Text>
         </View>
       ) : isPremium ? (
         <View style={[styles.card, SHADOWS.card, styles.premiumControlCard]}>
           <View style={styles.cardHeader}>
             <Ionicons name="sparkles" size={18} color="#4A7C59" />
             <Text style={styles.cardTitle}>
-              {latestReportRecord ? '最新のAI診断レポート' : '最初のAIレポートを作成しましょう'}
+              {latestReportRecord
+                ? t('aiReport.premiumCard.titleHasReport')
+                : t('aiReport.premiumCard.titleNoReport')}
             </Text>
           </View>
           {entitlement && (
             <View style={styles.subStatusPill}>
               <Ionicons name="diamond" size={13} color="#4A7C59" />
               <Text style={styles.subStatusPillText}>
-                {formatPlanName(entitlement.productId)}（
+                {formatPlanName(entitlement.productId)} (
                 {entitlement.paidByPartner && !entitlement.paidByMe
-                  ? `${partnerName}さんの契約を共有`
-                  : 'ご契約中'}
-                ）
+                  ? t('aiReport.premiumCard.sharedPartner', { partnerName })
+                  : t('aiReport.premiumCard.activeSub')}
+                )
                 {entitlement.expiresAt
                   ? entitlement.status === 'grace_period'
-                    ? ` ・ お支払い確認中（${formatShortDate(entitlement.expiresAt)}まで）`
+                    ? t('aiReport.premiumCard.gracePeriod', {
+                        date: formatDateOnlyFromIso(entitlement.expiresAt, locale),
+                      })
                     : entitlement.willRenew
-                      ? ` ・ 次回更新 ${formatShortDate(entitlement.expiresAt)}`
-                      : ` ・ ${formatShortDate(entitlement.expiresAt)}まで利用可（自動更新停止）`
+                      ? t('aiReport.premiumCard.nextRenewal', {
+                          date: formatDateOnlyFromIso(entitlement.expiresAt, locale),
+                        })
+                      : t('aiReport.premiumCard.expiresUntil', {
+                          date: formatDateOnlyFromIso(entitlement.expiresAt, locale),
+                        })
                   : ''}
               </Text>
             </View>
           )}
           <Text style={styles.premiumMetaText}>
-            分析対象データ：計 {entitlement?.analyzableDaysCount ?? 0}日分（双方回答{' '}
-            {entitlement?.revealedDaysCount ?? 0}日
-            {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
-              ? ` ＋ 過去未回答日の相手回答 ${entitlement?.pastPartnerOnlyDaysCount}日`
-              : ''}
-            ）
+            {t('aiReport.premiumCard.metaAnalyzable', {
+              total: entitlement?.analyzableDaysCount ?? 0,
+              revealed: entitlement?.revealedDaysCount ?? 0,
+              partnerOnlyPart:
+                (entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
+                  ? t('aiReport.premiumCard.metaPartnerOnlyPart', {
+                      count: entitlement?.pastPartnerOnlyDaysCount ?? 0,
+                    })
+                  : '',
+            })}
             {latestReportRecord
-              ? `\n最終更新: ${formatDateTime(latestReportRecord.createdAt)}（${latestReportRecord.analyzedAnswers}問を分析）`
+              ? `\n${t('aiReport.premiumCard.metaUpdated', {
+                  datetime: formatDateTimeFromIso(latestReportRecord.createdAt, locale),
+                  answers: latestReportRecord.analyzedAnswers,
+                })}`
               : ''}
+            {'\n'}
             {(entitlement?.pastUnansweredDaysCount ?? 0) > 0
-              ? `\n※ 過去の未回答お題が ${entitlement?.pastUnansweredDaysCount}日分 あります。「過去の回答との比較」から後から回答して相手の結果を見られます。`
-              : '\n※ 過去の未回答お題は「過去の回答との比較」からいつでも回答できます。'}
+              ? t('aiReport.premiumCard.metaPastUnanswered', {
+                  count: entitlement?.pastUnansweredDaysCount ?? 0,
+                })
+              : t('aiReport.premiumCard.metaPastHint')}
           </Text>
 
           {(entitlement?.pastUnansweredDaysCount ?? 0) > 0 && (
@@ -566,7 +623,9 @@ export default function AiReportScreen() {
             >
               <Ionicons name="calendar-outline" size={16} color="#8C5A1B" />
               <Text style={styles.pastCatchUpBtnText}>
-                カレンダーから未回答お題（{entitlement?.pastUnansweredDaysCount}日分）に遡って回答
+                {t('aiReport.premiumCard.pastCatchUpBtn', {
+                  count: entitlement?.pastUnansweredDaysCount ?? 0,
+                })}
               </Text>
               <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
             </TouchableOpacity>
@@ -584,7 +643,9 @@ export default function AiReportScreen() {
               <>
                 <Ionicons name="sparkles-outline" size={17} color="#FFFFFF" />
                 <Text style={styles.generateBtnText}>
-                  {latestReportRecord ? '最新データでレポートを更新する' : 'AI相性レポートを生成する'}
+                  {latestReportRecord
+                    ? t('aiReport.premiumCard.updateReportBtn')
+                    : t('aiReport.premiumCard.generateReportBtn')}
                 </Text>
               </>
             )}
@@ -599,21 +660,23 @@ export default function AiReportScreen() {
         >
           <View style={styles.subHeader}>
             <Ionicons name="diamond" size={22} color="#C97A2B" />
-            <Text style={styles.subTitle}>ふたりプレミアムプラン</Text>
+            <Text style={styles.subTitle}>{t('aiReport.paywall.title')}</Text>
           </View>
-          <Text style={styles.subSubtitle}>
-            1人が加入すれば2人とも利用OK！カレンダーからの遡り回答と深層AI診断がすべて解放されます。
-          </Text>
+          <Text style={styles.subSubtitle}>{t('aiReport.paywall.subtitle')}</Text>
 
           {(entitlement?.pastUnansweredDaysCount ?? 0) > 0 && (
             <View style={styles.subUnansweredCallout}>
               <Ionicons name="calendar" size={15} color="#8C5A1B" />
               <Text style={styles.subUnansweredCalloutText}>
-                現在、未回答の過去日が {entitlement?.pastUnansweredDaysCount}日分 あります
-                {(entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
-                  ? `（うち ${entitlement?.pastPartnerOnlyDaysCount}日 はパートナー回答済み！）`
-                  : ''}
-                。加入後すぐ回答カレンダーから遡って回答できます。
+                {t('aiReport.paywall.unansweredCallout', {
+                  past: entitlement?.pastUnansweredDaysCount ?? 0,
+                  partnerPart:
+                    (entitlement?.pastPartnerOnlyDaysCount ?? 0) > 0
+                      ? t('aiReport.paywall.unansweredPartnerPart', {
+                          count: entitlement?.pastPartnerOnlyDaysCount ?? 0,
+                        })
+                      : '',
+                })}
               </Text>
             </View>
           )}
@@ -622,22 +685,22 @@ export default function AiReportScreen() {
             <View style={styles.perkRow}>
               <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
               <Text style={styles.perkText}>
-                <Text style={styles.perkBold}>回答カレンダーから過去の未回答日へ遡り回答＆結果解放</Text>
-                ：答え忘れた過去日をタップして遡って回答でき、回答すると相手の答えと一致率が見られます（※当日は双方回答まで秘密）
+                <Text style={styles.perkBold}>{t('aiReport.paywall.perk1Bold')}</Text>
+                {t('aiReport.paywall.perk1Rest')}
               </Text>
             </View>
             <View style={styles.perkRow}>
               <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
               <Text style={styles.perkText}>
-                <Text style={styles.perkBold}>未回答日も含めた深層AI相性診断＆過去アーカイブ</Text>
-                ：性格傾向やすれ違い予防策をAIが分析し、過去の診断レポートも並べて見返せます
+                <Text style={styles.perkBold}>{t('aiReport.paywall.perk2Bold')}</Text>
+                {t('aiReport.paywall.perk2Rest')}
               </Text>
             </View>
             <View style={styles.perkRow}>
               <Ionicons name="checkmark-circle" size={16} color="#4A7C59" />
               <Text style={styles.perkText}>
-                <Text style={styles.perkBold}>片方の課金で2人とも利用可能</Text>
-                ：どちらかが加入すればパートナーにも自動適用されます
+                <Text style={styles.perkBold}>{t('aiReport.paywall.perk3Bold')}</Text>
+                {t('aiReport.paywall.perk3Rest')}
               </Text>
             </View>
           </View>
@@ -651,11 +714,29 @@ export default function AiReportScreen() {
               onPress={() => setSelectedPlan('yearly')}
             >
               <View style={styles.planBestBadge}>
-                <Text style={styles.planBestText}>{offering.yearlyDiscountBadge}</Text>
+                <Text
+                  style={styles.planBestText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {offering.yearlyDiscountBadge}
+                </Text>
               </View>
-              <Text style={styles.planName}>年額プラン</Text>
-              <Text style={styles.planPrice}>{offering.yearlyPriceLabel}</Text>
-              <Text style={styles.planSubPrice}>({offering.yearlyPerMonthLabel})</Text>
+              <Text style={styles.planName} numberOfLines={2}>
+                {t('aiReport.plans.yearly')}
+              </Text>
+              <Text
+                style={styles.planPrice}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+              >
+                {offering.yearlyPriceLabel}
+              </Text>
+              <Text style={styles.planSubPrice} numberOfLines={2}>
+                ({offering.yearlyPerMonthLabel})
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -665,9 +746,20 @@ export default function AiReportScreen() {
               ]}
               onPress={() => setSelectedPlan('monthly')}
             >
-              <Text style={styles.planName}>月額プラン</Text>
-              <Text style={styles.planPrice}>{offering.monthlyPriceLabel}</Text>
-              <Text style={styles.planSubPrice}>(2人分・ペア共有)</Text>
+              <Text style={styles.planName} numberOfLines={2}>
+                {t('aiReport.plans.monthly')}
+              </Text>
+              <Text
+                style={styles.planPrice}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+              >
+                {offering.monthlyPriceLabel}
+              </Text>
+              <Text style={styles.planSubPrice} numberOfLines={2}>
+                {t('aiReport.plans.monthlySubLabel')}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -683,9 +775,9 @@ export default function AiReportScreen() {
               <>
                 <Ionicons name="lock-open" size={17} color="#FFFFFF" />
                 <Text style={styles.subscribeBtnText}>
-                  {selectedPlan === 'yearly'
-                    ? `${offering.yearlyPriceLabel} でプレミアムを解放`
-                    : `${offering.monthlyPriceLabel} でプレミアムを解放`}
+                  {offering.isStoreReady
+                    ? t('aiReport.paywall.subscribeBtn', { price: selectedPriceLabel })
+                    : t('aiReport.paywall.subscribeBtnGeneric')}
                 </Text>
               </>
             )}
@@ -696,56 +788,25 @@ export default function AiReportScreen() {
             disabled={purchasing}
             onPress={handleRestore}
           >
-            <Text style={styles.restoreBtnText}>以前の購入を復元する</Text>
+            <Text style={styles.restoreBtnText}>{t('aiReport.paywall.restoreBtn')}</Text>
           </TouchableOpacity>
 
           <Text style={styles.subNotes}>
-            お支払いは Google Play アカウントへ請求されます。定期購入は自動更新されますが、次回更新の24時間前までに Google Play の定期購入管理からいつでも解約できます。
+            {t('aiReport.paywall.notes', { storeName })}
           </Text>
 
-          <View style={styles.legalLinksRow}>
-            <TouchableOpacity
-              onPress={() => void openExternalLink(LEGAL_URLS.termsOfService, '利用規約')}
-            >
-              <Text style={styles.legalLinkText}>利用規約</Text>
-            </TouchableOpacity>
-            <Text style={styles.legalDot}>•</Text>
-            <TouchableOpacity
-              onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
-            >
-              <Text style={styles.legalLinkText}>プライバシーポリシー</Text>
-            </TouchableOpacity>
-            <Text style={styles.legalDot}>•</Text>
-            <TouchableOpacity
-              onPress={() =>
-                void openExternalLink(
-                  LEGAL_URLS.googlePlaySubscriptions,
-                  'Google Play 定期購入管理'
-                )
-              }
-            >
-              <Text style={styles.legalLinkText}>解約・サブスク管理</Text>
-            </TouchableOpacity>
-            <Text style={styles.legalDot}>•</Text>
-            <TouchableOpacity
-              onPress={() =>
-                void openExternalLink(LEGAL_URLS.accountDeletion, '退会・データ削除案内')
-              }
-            >
-              <Text style={styles.legalLinkText}>退会案内</Text>
-            </TouchableOpacity>
-          </View>
+          {renderLegalLinks()}
         </View>
       )}
 
-      {/* 有料ペア向け：過去のAI診断アーカイブ（横並びで見返し＆比較） */}
+      {/* 過去のAI診断アーカイブ */}
       {isPremium && reportHistory.length > 0 && (
         <View style={styles.archiveSection}>
           <View style={styles.archiveHeader}>
             <View style={styles.archiveTitleRow}>
               <Ionicons name="albums-outline" size={16} color={COLORS.primaryDark} />
               <Text style={styles.archiveTitle}>
-                AI診断アーカイブ（全 {reportHistory.length}件）
+                {t('aiReport.archive.title', { count: reportHistory.length })}
               </Text>
             </View>
             {isViewingOlderReport && latestReportRecord && (
@@ -753,13 +814,11 @@ export default function AiReportScreen() {
                 style={styles.backLatestBtn}
                 onPress={() => handleSelectArchiveReport(latestReportRecord.id)}
               >
-                <Text style={styles.backLatestBtnText}>最新へ戻す</Text>
+                <Text style={styles.backLatestBtnText}>{t('aiReport.archive.backToLatest')}</Text>
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.archiveHint}>
-            カードをタップすると、下の詳細レポートへ移動・切り替えできます
-          </Text>
+          <Text style={styles.archiveHint}>{t('aiReport.archive.hint')}</Text>
 
           <ScrollView
             horizontal
@@ -786,17 +845,21 @@ export default function AiReportScreen() {
                 >
                   <View style={styles.archiveCardTop}>
                     <Text style={[styles.archiveDate, isSelected && styles.archiveDateActive]}>
-                      {formatShortDate(item.createdAt)}
+                      {formatDateOnlyFromIso(item.createdAt, locale)}
                     </Text>
                     <View style={styles.archiveChipRow}>
                       {isSelected && (
                         <View style={styles.viewingChip}>
-                          <Text style={styles.viewingChipText}>表示中</Text>
+                          <Text style={styles.viewingChipText}>
+                            {t('aiReport.archive.viewing')}
+                          </Text>
                         </View>
                       )}
                       {idx === 0 && (
                         <View style={styles.latestChip}>
-                          <Text style={styles.latestChipText}>最新</Text>
+                          <Text style={styles.latestChipText}>
+                            {t('aiReport.archive.latest')}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -805,7 +868,9 @@ export default function AiReportScreen() {
                   <View style={styles.archiveScoreRow}>
                     <Text style={[styles.archiveScore, isSelected && styles.archiveScoreActive]}>
                       {item.report.overallScore}
-                      <Text style={styles.archiveScoreUnit}>点</Text>
+                      <Text style={styles.archiveScoreUnit}>
+                        {t('aiReport.archive.scoreUnit')}
+                      </Text>
                     </Text>
                     {delta !== null && (
                       <Text
@@ -823,7 +888,10 @@ export default function AiReportScreen() {
                   </View>
 
                   <Text style={styles.archiveMeta}>
-                    {item.analyzedDays}日・{item.analyzedAnswers}問
+                    {t('aiReport.archive.meta', {
+                      days: item.analyzedDays,
+                      answers: item.analyzedAnswers,
+                    })}
                   </Text>
                   <Text style={styles.archiveTags} numberOfLines={1}>
                     {item.report.myType.tag} × {item.report.partnerType.tag}
@@ -837,14 +905,16 @@ export default function AiReportScreen() {
             <View style={styles.olderViewingBanner}>
               <Ionicons name="time-outline" size={14} color={COLORS.primaryDark} />
               <Text style={styles.olderViewingText}>
-                {formatDateTime(activeReportRecord.createdAt)} に生成した過去レポートを表示中です
+                {t('aiReport.archive.olderBanner', {
+                  datetime: formatDateTimeFromIso(activeReportRecord.createdAt, locale),
+                })}
               </Text>
             </View>
           )}
         </View>
       )}
 
-      {/* 実レポート表示（有料＆生成済み） / サンプルプレビュー（初期折り畳み・プランカードのすぐ下） */}
+      {/* 実レポート / サンプルプレビュー */}
       {!loadingEntitlement &&
         (isShowingSample ? (
           <View style={styles.sampleAccordionOuter}>
@@ -854,9 +924,7 @@ export default function AiReportScreen() {
               onPress={() => setIsSampleOpen((prev) => !prev)}
             >
               <Ionicons name="eye-outline" size={16} color={COLORS.primaryDark} />
-              <Text style={styles.sampleToggleText}>
-                AI相性レポートのサンプルを見る
-              </Text>
+              <Text style={styles.sampleToggleText}>{t('aiReport.sampleToggle')}</Text>
               <Ionicons
                 name={isSampleOpen ? 'chevron-up' : 'chevron-down'}
                 size={16}
@@ -870,48 +938,16 @@ export default function AiReportScreen() {
           renderReportCards()
         ))}
 
-      {/* 課金済みユーザー向け：利用規約・プライバシーポリシー・解約管理リンク */}
       {isPremium && (
         <View style={styles.premiumLegalFooter}>
           <Text style={styles.subNotes}>
-            プランの確認・解約は Google Play の定期購入管理からいつでも行えます。
+            {t('aiReport.paywall.premiumNotes', { storeName })}
           </Text>
-          <View style={styles.legalLinksRow}>
-            <TouchableOpacity
-              onPress={() => void openExternalLink(LEGAL_URLS.termsOfService, '利用規約')}
-            >
-              <Text style={styles.legalLinkText}>利用規約</Text>
-            </TouchableOpacity>
-            <Text style={styles.legalDot}>•</Text>
-            <TouchableOpacity
-              onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
-            >
-              <Text style={styles.legalLinkText}>プライバシーポリシー</Text>
-            </TouchableOpacity>
-            <Text style={styles.legalDot}>•</Text>
-            <TouchableOpacity
-              onPress={() =>
-                void openExternalLink(
-                  LEGAL_URLS.googlePlaySubscriptions,
-                  'Google Play 定期購入管理'
-                )
-              }
-            >
-              <Text style={styles.legalLinkText}>解約・サブスク管理</Text>
-            </TouchableOpacity>
-            <Text style={styles.legalDot}>•</Text>
-            <TouchableOpacity
-              onPress={() =>
-                void openExternalLink(LEGAL_URLS.accountDeletion, '退会・データ削除案内')
-              }
-            >
-              <Text style={styles.legalLinkText}>退会案内</Text>
-            </TouchableOpacity>
-          </View>
+          {renderLegalLinks()}
         </View>
       )}
 
-      {/* 画面最下部の控えめな導線：すれ違い・別れの原因 AI 振り返り診断 */}
+      {/* すれ違い・別れの原因 AI 振り返り診断 */}
       <View
         style={styles.reflectionOuter}
         onLayout={(e) => {
@@ -924,9 +960,7 @@ export default function AiReportScreen() {
           onPress={() => setReflectionExpandedOverride(!isReflectionOpen)}
         >
           <Ionicons name="heart-half-outline" size={15} color="#7C6A77" />
-          <Text style={styles.reflectionToggleText}>
-            そっと振り返りたいとき：すれ違い・別れの原因を AI で振り返る
-          </Text>
+          <Text style={styles.reflectionToggleText}>{t('aiReport.reflection.toggle')}</Text>
           <Ionicons
             name={isReflectionOpen ? 'chevron-up' : 'chevron-down'}
             size={15}
@@ -939,26 +973,25 @@ export default function AiReportScreen() {
             <View style={styles.reflectionHeader}>
               <View style={styles.reflectionTitleRow}>
                 <Ionicons name="leaf-outline" size={17} color="#6F5A6B" />
-                <Text style={styles.reflectionTitle}>すれ違い・別れの原因 AI 振り返り</Text>
+                <Text style={styles.reflectionTitle}>{t('aiReport.reflection.title')}</Text>
               </View>
               {latestReflectionRecord && isPremium ? (
                 <Text style={styles.reflectionMeta}>
-                  {formatDateTime(latestReflectionRecord.createdAt)}（
-                  {latestReflectionRecord.analyzedDays}日・{latestReflectionRecord.analyzedAnswers}
-                  問を分析）
+                  {t('aiReport.reflection.meta', {
+                    datetime: formatDateTimeFromIso(latestReflectionRecord.createdAt, locale),
+                    days: latestReflectionRecord.analyzedDays,
+                    answers: latestReflectionRecord.analyzedAnswers,
+                  })}
                 </Text>
               ) : (
-                <Text style={styles.reflectionSubtitle}>
-                  誰も責めずに、これまでの記録から次につながる優しい気づきを整理します
-                </Text>
+                <Text style={styles.reflectionSubtitle}>{t('aiReport.reflection.subtitle')}</Text>
               )}
             </View>
 
             <Text style={styles.reflectionLead}>
-              関係を見つめ直したいときや、お別れの気持ちを整理したいときのための静かな振り返り診断です。
               {!isPairConnected && hasPair
-                ? '\n※ お相手がすでにペアを解除して1人だけ残っている状態でも、残っている回答履歴からそのまま診断できます。'
-                : '\n※ ペア解除の前でも、お相手がすでに解除した後でも、残っている回答履歴から振り返ることができます。'}
+                ? t('aiReport.reflection.leadSolo')
+                : t('aiReport.reflection.leadDefault')}
             </Text>
 
             {isPremium ? (
@@ -977,8 +1010,8 @@ export default function AiReportScreen() {
                     <Ionicons name="sparkles-outline" size={16} color="#FFFFFF" />
                     <Text style={styles.reflectionActionBtnText}>
                       {latestReflectionRecord
-                        ? '最新データで振り返りを更新する'
-                        : '回答履歴から優しく振り返る（AI診断）'}
+                        ? t('aiReport.reflection.updateBtn')
+                        : t('aiReport.reflection.generateBtn')}
                     </Text>
                   </>
                 )}
@@ -986,7 +1019,7 @@ export default function AiReportScreen() {
             ) : (
               <View style={styles.reflectionPremiumNotice}>
                 <Text style={styles.reflectionPremiumNoticeText}>
-                  以下はサンプル表示です。「ふたりプレミアムプラン」に加入すると、実際の回答履歴からあなたに寄り添う振り返りレポートを作成できます。
+                  {t('aiReport.reflection.freeNotice')}
                 </Text>
                 <TouchableOpacity
                   style={styles.reflectionScrollToSubBtn}
@@ -998,38 +1031,45 @@ export default function AiReportScreen() {
                     });
                   }}
                 >
-                  <Text style={styles.reflectionScrollToSubText}>プレミアムプランを確認する</Text>
+                  <Text style={styles.reflectionScrollToSubText}>
+                    {t('aiReport.reflection.checkPlansBtn')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* 振り返りレポート本体（有料＆生成済みなら実データ、それ以外は優しいサンプル） */}
             {(() => {
               const reflection =
                 isPremium && latestReflectionRecord
                   ? latestReflectionRecord.report
-                  : SAMPLE_REFLECTION;
+                  : sampleReflection;
               const isReflectionSample = !isPremium || !latestReflectionRecord;
 
               return (
                 <View style={styles.reflectionBody}>
                   {isReflectionSample && (
                     <View style={styles.reflectionSampleTag}>
-                      <Text style={styles.reflectionSampleTagText}>サンプルプレビュー</Text>
+                      <Text style={styles.reflectionSampleTagText}>
+                        {t('aiReport.reflection.sampleTag')}
+                      </Text>
                     </View>
                   )}
 
                   <View style={styles.warmMessageBox}>
                     <View style={styles.warmMessageHeader}>
                       <Ionicons name="heart-outline" size={15} color="#8E5D6D" />
-                      <Text style={styles.warmMessageLabel}>まず、ここまで向き合ってきたあなたへ</Text>
+                      <Text style={styles.warmMessageLabel}>
+                        {t('aiReport.reflection.warmMessageLabel')}
+                      </Text>
                     </View>
                     <Text style={styles.warmMessageText}>{reflection.warmMessage}</Text>
                   </View>
 
                   {reflection.goodMemoriesSummary ? (
                     <View style={styles.goodMemoriesBox}>
-                      <Text style={styles.goodMemoriesLabel}>大切にできていたこと・素敵だった点</Text>
+                      <Text style={styles.goodMemoriesLabel}>
+                        {t('aiReport.reflection.goodMemoriesLabel')}
+                      </Text>
                       <Text style={styles.goodMemoriesText}>{reflection.goodMemoriesSummary}</Text>
                     </View>
                   ) : null}
@@ -1037,7 +1077,7 @@ export default function AiReportScreen() {
                   {reflection.rootCauses.length > 0 && (
                     <View style={styles.causesList}>
                       <Text style={styles.causesHeading}>
-                        すれ違いが生まれた背景と、次の恋への気づき
+                        {t('aiReport.reflection.causesHeading')}
                       </Text>
                       {reflection.rootCauses.map((cause, idx) => (
                         <View key={`${cause.title}-${idx}`} style={styles.causeItem}>
@@ -1047,7 +1087,9 @@ export default function AiReportScreen() {
                           <Text style={styles.causeBackground}>{cause.background}</Text>
                           {cause.takeaway ? (
                             <View style={styles.takeawayBox}>
-                              <Text style={styles.takeawayLabel}>これからに活かせる優しいヒント</Text>
+                              <Text style={styles.takeawayLabel}>
+                                {t('aiReport.reflection.takeawayLabel')}
+                              </Text>
                               <Text style={styles.takeawayText}>{cause.takeaway}</Text>
                             </View>
                           ) : null}
@@ -1058,7 +1100,9 @@ export default function AiReportScreen() {
 
                   {reflection.myStrengthForNextLove ? (
                     <View style={styles.strengthBox}>
-                      <Text style={styles.strengthLabel}>回答から見えるあなたの素敵な強み</Text>
+                      <Text style={styles.strengthLabel}>
+                        {t('aiReport.reflection.strengthLabel')}
+                      </Text>
                       <Text style={styles.strengthText}>{reflection.myStrengthForNextLove}</Text>
                     </View>
                   ) : null}
@@ -1096,6 +1140,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 12,
     color: COLORS.textMuted,
+    lineHeight: 18,
   },
   premiumControlCard: {
     backgroundColor: '#F4FAF6',
@@ -1118,13 +1163,13 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#2F593C',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   premiumMetaText: {
     fontSize: 12,
     color: '#3B6347',
     marginBottom: 12,
-    lineHeight: 17,
+    lineHeight: 19,
   },
   pastCatchUpBtn: {
     flexDirection: 'row',
@@ -1144,6 +1189,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#8C5A1B',
+    lineHeight: 18,
   },
   generateBtn: {
     backgroundColor: '#4A7C59',
@@ -1151,6 +1197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 13,
+    paddingHorizontal: 14,
     borderRadius: 14,
     gap: 8,
   },
@@ -1158,6 +1205,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   sampleAccordionOuter: {
     marginBottom: 12,
@@ -1178,6 +1228,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    lineHeight: 19,
   },
   sampleAccordionBody: {
     marginTop: 12,
@@ -1208,26 +1259,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
+    minWidth: 0,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+    flexShrink: 1,
+    lineHeight: 21,
   },
   scoreBadge: {
     backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    flexShrink: 0,
   },
   scoreBadgeText: {
     fontSize: 11,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 16,
   },
   coupleTypes: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
@@ -1237,28 +1293,32 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   typeUser: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
     marginBottom: 4,
+    lineHeight: 17,
   },
   typeTag: {
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.primaryDark,
     textAlign: 'center',
+    lineHeight: 18,
     marginBottom: 6,
   },
   typeDesc: {
     fontSize: 11,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 15,
+    lineHeight: 17,
   },
   plusSign: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
   },
   plusText: {
     fontSize: 18,
@@ -1276,12 +1336,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#4A7C59',
+    lineHeight: 18,
     marginBottom: 4,
   },
   chemistryText: {
     fontSize: 12,
     color: '#3B6347',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   riskCard: {
     borderColor: '#F8CBD2',
@@ -1305,16 +1366,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#C85338',
+    lineHeight: 16,
   },
   riskTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 22,
   },
   riskLead: {
     fontSize: 13,
     color: COLORS.textMuted,
-    lineHeight: 18,
+    lineHeight: 20,
     marginBottom: 14,
   },
   riskItem: {
@@ -1325,26 +1388,31 @@ const styles = StyleSheet.create({
   },
   riskMeterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     marginBottom: 6,
   },
   riskItemTitle: {
     flex: 1,
+    minWidth: '60%',
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 19,
   },
   riskItemLevel: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#C85338',
+    flexShrink: 0,
+    lineHeight: 17,
   },
   riskItemDesc: {
     fontSize: 12,
     color: COLORS.textMuted,
-    lineHeight: 16,
+    lineHeight: 19,
     marginBottom: 8,
   },
   rxBox: {
@@ -1358,12 +1426,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 16,
     marginBottom: 2,
   },
   rxText: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: COLORS.text,
-    lineHeight: 15,
+    lineHeight: 18,
   },
   nextActionBox: {
     flexDirection: 'row',
@@ -1379,7 +1448,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.text,
-    lineHeight: 17,
+    lineHeight: 19,
   },
   subCard: {
     borderWidth: 1.5,
@@ -1396,12 +1465,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.text,
+    flex: 1,
+    lineHeight: 22,
   },
   subSubtitle: {
     fontSize: 12,
     color: COLORS.textMuted,
     marginBottom: 12,
-    lineHeight: 17,
+    lineHeight: 19,
   },
   subUnansweredCallout: {
     flexDirection: 'row',
@@ -1419,14 +1490,14 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#7A4E16',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   perksBox: {
     backgroundColor: '#FAF6EE',
     borderRadius: 14,
     padding: 12,
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: '#F0DEC0',
   },
@@ -1439,7 +1510,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     color: COLORS.text,
-    lineHeight: 17,
+    lineHeight: 19,
   },
   perkBold: {
     fontWeight: '800',
@@ -1448,6 +1519,7 @@ const styles = StyleSheet.create({
   planSelector: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 4,
     marginBottom: 16,
   },
   planCard: {
@@ -1456,8 +1528,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: 16,
-    padding: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
+    paddingHorizontal: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
   },
   planCardActive: {
@@ -1471,28 +1546,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    maxWidth: '94%',
   },
   planBestText: {
     fontSize: 9,
     fontWeight: '800',
     color: '#FFFFFF',
+    lineHeight: 13,
   },
   planName: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: COLORS.text,
-    marginTop: 6,
-    marginBottom: 2,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 3,
   },
   planPrice: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '900',
     color: COLORS.primaryDark,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   planSubPrice: {
     fontSize: 10,
     color: COLORS.textMuted,
-    marginTop: 2,
+    marginTop: 3,
+    textAlign: 'center',
+    lineHeight: 15,
   },
   subscribeBtn: {
     backgroundColor: COLORS.primary,
@@ -1500,6 +1582,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 16,
     gap: 8,
     marginBottom: 10,
@@ -1508,6 +1591,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   restoreBtn: {
     alignItems: 'center',
@@ -1519,12 +1605,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primaryDark,
     textDecorationLine: 'underline',
+    lineHeight: 18,
   },
   subNotes: {
     fontSize: 11,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   legalLinksRow: {
     flexDirection: 'row',
@@ -1539,6 +1626,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primaryDark,
     textDecorationLine: 'underline',
+    lineHeight: 17,
   },
   legalDot: {
     fontSize: 11,
@@ -1556,33 +1644,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 4,
   },
   archiveHint: {
     fontSize: 11,
     color: COLORS.textMuted,
+    lineHeight: 17,
     marginBottom: 9,
   },
   archiveTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flex: 1,
+    minWidth: 0,
   },
   archiveTitle: {
     fontSize: 13.5,
     fontWeight: '800',
     color: COLORS.text,
+    flexShrink: 1,
+    lineHeight: 19,
   },
   backLatestBtn: {
     backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    flexShrink: 0,
   },
   backLatestBtnText: {
     fontSize: 11,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 16,
   },
   archiveScrollContent: {
     gap: 10,
@@ -1590,7 +1686,7 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   archiveCard: {
-    width: 176,
+    width: 194,
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 12,
@@ -1603,6 +1699,7 @@ const styles = StyleSheet.create({
   },
   archiveCardTop: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 4,
@@ -1669,11 +1766,13 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     color: COLORS.textMuted,
     marginBottom: 4,
+    lineHeight: 15,
   },
   archiveTags: {
     fontSize: 10.5,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 15,
   },
   olderViewingBanner: {
     flexDirection: 'row',
@@ -1692,6 +1791,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    lineHeight: 17,
   },
   reflectionOuter: {
     marginTop: 18,
@@ -1716,6 +1816,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#756470',
+    lineHeight: 18,
   },
   reflectionCard: {
     marginTop: 12,
@@ -1733,23 +1834,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   reflectionTitle: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '800',
     color: '#4F3E4B',
+    lineHeight: 21,
   },
   reflectionSubtitle: {
     fontSize: 11.5,
     color: '#7E6E7A',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   reflectionMeta: {
     fontSize: 11,
     color: '#7E6E7A',
+    lineHeight: 17,
   },
   reflectionLead: {
     fontSize: 12,
     color: '#6C5D68',
-    lineHeight: 18,
+    lineHeight: 19,
     marginBottom: 14,
   },
   reflectionActionBtn: {
@@ -1759,6 +1863,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 13,
+    paddingHorizontal: 14,
     borderRadius: 14,
     marginBottom: 16,
   },
@@ -1769,6 +1874,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13.5,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   reflectionPremiumNotice: {
     backgroundColor: '#F3ECF1',
@@ -1782,7 +1890,7 @@ const styles = StyleSheet.create({
   reflectionPremiumNoticeText: {
     fontSize: 11.5,
     color: '#645260',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   reflectionScrollToSubBtn: {
     alignSelf: 'flex-start',
@@ -1797,6 +1905,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#6B5265',
+    lineHeight: 18,
   },
   reflectionBody: {
     gap: 12,
@@ -1812,6 +1921,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '700',
     color: '#725D6D',
+    lineHeight: 16,
   },
   warmMessageBox: {
     backgroundColor: '#FFF9FA',
@@ -1827,14 +1937,16 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   warmMessageLabel: {
+    flex: 1,
     fontSize: 12,
     fontWeight: '800',
     color: '#8E5D6D',
+    lineHeight: 18,
   },
   warmMessageText: {
     fontSize: 12.5,
     color: '#4C3D44',
-    lineHeight: 19,
+    lineHeight: 20,
   },
   goodMemoriesBox: {
     backgroundColor: '#F3F8F5',
@@ -1847,12 +1959,13 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#466F53',
+    lineHeight: 17,
     marginBottom: 5,
   },
   goodMemoriesText: {
     fontSize: 12,
     color: '#3B5844',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   causesList: {
     gap: 10,
@@ -1861,6 +1974,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: '#574653',
+    lineHeight: 19,
     marginBottom: 2,
   },
   causeItem: {
@@ -1874,12 +1988,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#463742',
+    lineHeight: 19,
     marginBottom: 5,
   },
   causeBackground: {
     fontSize: 12,
     color: '#6A5B66',
-    lineHeight: 18,
+    lineHeight: 19,
     marginBottom: 9,
   },
   takeawayBox: {
@@ -1893,12 +2008,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#6E5467',
+    lineHeight: 17,
     marginBottom: 3,
   },
   takeawayText: {
     fontSize: 11.5,
     color: '#483944',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   strengthBox: {
     backgroundColor: '#FDF8F2',
@@ -1911,12 +2027,13 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#8D6136',
+    lineHeight: 17,
     marginBottom: 5,
   },
   strengthText: {
     fontSize: 12,
     color: '#5A4532',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   gentleStepBox: {
     flexDirection: 'row',
@@ -1931,6 +2048,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#5B463B',
-    lineHeight: 18,
+    lineHeight: 19,
   },
 });

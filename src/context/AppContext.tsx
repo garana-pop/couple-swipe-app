@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   SwipeDirection,
   Question,
+  QuestionCategoryKey,
+  RemoteQuestionRecord,
   HistoryDayItem,
   CalendarDaySummary,
   DayQuizData,
@@ -9,10 +12,17 @@ import {
   PairStats,
 } from '../types';
 import {
-  TODAY_QUESTIONS,
   buildQuestionCatalog,
   evaluateMatch,
+  getDefaultTodayQuestions,
 } from '../constants/questions';
+import i18n, { getCurrentLocale } from '../i18n';
+import { formatIsoShortDate } from '../i18n/format';
+import {
+  SupportedLocale,
+  getDeviceTimeZone,
+  isDefaultDisplayName,
+} from '../i18n/locale';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { resetBillingSession } from '../lib/billing';
 import { syncExtraQuestions } from '../lib/extraQuestions';
@@ -27,6 +37,7 @@ import {
   cancelDailyReminder,
   configureNotificationHandler,
   notifyPartnerAnswered,
+  refreshNotificationsForLocale,
   registerForPushNotificationsAsync,
   scheduleDailyReminder,
 } from '../lib/notifications';
@@ -61,6 +72,8 @@ interface DayStatus {
   isPartnerCompleted: boolean;
   isRevealed: boolean;
 }
+
+export type PastAnswerErrorCode = 'PREMIUM_REQUIRED' | 'INVALID_PAST_DATE' | 'SERVER_ERROR';
 
 interface AppContextType {
   isInitialized: boolean;
@@ -100,7 +113,7 @@ interface AppContextType {
     questionId: string,
     direction: SwipeDirection,
     isFinalQuestion?: boolean
-  ) => Promise<{ ok: boolean; error?: string }>;
+  ) => Promise<{ ok: boolean; error?: string; errorCode?: PastAnswerErrorCode }>;
   createPair: (displayName?: string) => Promise<{ ok: boolean; error?: string }>;
   joinPair: (
     code: string,
@@ -135,39 +148,39 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 function formatJoinError(message: string): string {
   if (message.includes('TOO_MANY_ATTEMPTS')) {
-    return '試行回数が上限に達しました。15分ほど待ってから再度お試しください。';
+    return i18n.t('errors.join.tooManyAttempts');
   }
   if (message.includes('INVALID_INVITE_CODE')) {
-    return '招待コードの形式が正しくありません。';
+    return i18n.t('errors.join.invalidInviteCode');
   }
   if (message.includes('INVITE_CODE_NOT_FOUND')) {
-    return '招待コードが見つかりませんでした。文字をもう一度ご確認ください。';
+    return i18n.t('errors.join.inviteCodeNotFound');
   }
   if (message.includes('INVITE_CODE_EXPIRED')) {
-    return 'この招待コードは有効期限が切れています。パートナーに再発行を依頼してください。';
+    return i18n.t('errors.join.inviteCodeExpired');
   }
   if (message.includes('RELINK_CODE_USED')) {
-    return 'この再連携コードはすでに使用済みです。もう一度パートナーに再発行を依頼してください。';
+    return i18n.t('errors.join.relinkCodeUsed');
   }
   if (message.includes('RELINK_CODE_EXPIRED')) {
-    return 'この再連携コードは有効期限（5分）が切れています。パートナーに再発行を依頼してください。';
+    return i18n.t('errors.join.relinkCodeExpired');
   }
   if (message.includes('RELINK_PAIR_CHANGED')) {
-    return 'ペアの状態が変更されたため再連携できませんでした。最新の状態を確認してもう一度お試しください。';
+    return i18n.t('errors.join.relinkPairChanged');
   }
   if (message.includes('CANNOT_RELINK_SELF')) {
-    return '自分で発行した再連携コードは自分の端末では使えません。再インストールしたパートナー側の端末で入力してください。';
+    return i18n.t('errors.join.cannotRelinkSelf');
   }
   if (message.includes('PARTNER_NOT_CONNECTED')) {
-    return 'パートナーと2人で連携中の状態でのみ再連携コードを発行できます。';
+    return i18n.t('errors.join.partnerNotConnected');
   }
   if (message.includes('PAIR_IS_FULL')) {
-    return 'このペアはすでに2人が参加済みです。再インストールや機種変更による再連携の場合は、連携中のパートナー側メニューから「パートナー再連携コード」を発行して入力してください。';
+    return i18n.t('errors.join.pairIsFull');
   }
   if (message.includes('ALREADY_IN_PAIR')) {
-    return 'すでに別のペアに参加しています。先にペアを解除してください。';
+    return i18n.t('errors.join.alreadyInPair');
   }
-  return '連携処理に失敗しました。通信環境をご確認のうえ再度お試しください。';
+  return i18n.t('errors.join.generic');
 }
 
 function shiftIsoDate(dateStr: string, deltaDays: number): string {
@@ -177,15 +190,18 @@ function shiftIsoDate(dateStr: string, deltaDays: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatPastDateLabel(pastDateStr: string, currentDateStr: string): { badge: string; label: string } {
+function formatPastDateLabel(
+  pastDateStr: string,
+  currentDateStr: string,
+  locale: SupportedLocale
+): { badge: string; label: string } {
   const past = new Date(`${pastDateStr}T00:00:00Z`);
   const curr = new Date(`${currentDateStr}T00:00:00Z`);
   const diffDays = Math.max(1, Math.round((curr.getTime() - past.getTime()) / (1000 * 60 * 60 * 24)));
-  const month = past.getUTCMonth() + 1;
-  const day = past.getUTCDate();
+  const shortDate = formatIsoShortDate(pastDateStr, locale);
   return {
-    badge: `${diffDays}日ぶりの質問`,
-    label: `${diffDays}日前 (${month}月${day}日)`,
+    badge: i18n.t('repeat.badge', { count: diffDays }),
+    label: i18n.t('repeat.dateLabel', { count: diffDays, date: shortDate }),
   };
 }
 
@@ -210,7 +226,22 @@ function parseCalendarSummaryMap(rawDays: unknown): Record<string, CalendarDaySu
   return map;
 }
 
+async function syncProfileLocaleAndTimezone(locale: SupportedLocale): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase.rpc('upsert_profile_locale', {
+      p_locale: locale,
+      p_timezone: getDeviceTimeZone(),
+    });
+  } catch {
+    // マイグレーション未適用時でもアプリ動作に影響させない
+  }
+}
+
 export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { t, i18n: i18nInstance } = useTranslation();
+  const locale = getCurrentLocale();
+
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -225,17 +256,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [hasPair, setHasPair] = useState(false);
   const [isPairConnected, setIsPairConnected] = useState(false);
   const [pairCode, setPairCode] = useState('');
-  const [myName, setMyName] = useState('あなた');
-  const [partnerName, setPartnerName] = useState('パートナー');
+  const [rawMyName, setRawMyName] = useState<string | null>(null);
+  const [rawPartnerName, setRawPartnerName] = useState<string | null>(null);
   const [todayDate, setTodayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [pairStartDate, setPairStartDate] = useState<string | null>(null);
   const [isPairPremium, setIsPairPremium] = useState(false);
 
-  const [questions, setQuestions] = useState<Question[]>(TODAY_QUESTIONS);
+  const [questions, setQuestions] = useState<Question[]>(() => getDefaultTodayQuestions(locale));
   const [myAnswers, setMyAnswers] = useState<Record<string, SwipeDirection>>({});
   const [partnerAnswers, setPartnerAnswers] = useState<Record<string, SwipeDirection>>({});
   const [dayStatus, setDayStatus] = useState<DayStatus>({
-    totalQuestions: TODAY_QUESTIONS.length,
+    totalQuestions: 3,
     myAnsweredCount: 0,
     partnerAnsweredCount: 0,
     isMyCompleted: false,
@@ -252,17 +283,87 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [dailyReminder, setDailyReminder] = useState<DailyReminderSettings>(DEFAULT_DAILY_REMINDER);
   const [pushStatus, setPushStatus] = useState<PushRegistrationResult | null>(null);
 
-  const catalogRef = useRef(buildQuestionCatalog([]));
+  const extraQuestionsRef = useRef<RemoteQuestionRecord[]>([]);
+  const catalogRef = useRef(buildQuestionCatalog([], locale));
+  const lastSyncedLocaleRef = useRef<string | null>(null);
+  const dailyPastMetaRef = useRef<{
+    quizDate: string;
+    pastByQId: Record<string, { quiz_date: string; my_answer: SwipeDirection | null; partner_answer: SwipeDirection | null }>;
+  }>({ quizDate: '', pastByQId: {} });
+
+  const myName = useMemo(
+    () => (!isDefaultDisplayName(rawMyName) ? rawMyName!.trim() : t('common.you')),
+    [rawMyName, t]
+  );
+
+  const partnerName = useMemo(
+    () => (!isDefaultDisplayName(rawPartnerName) ? rawPartnerName!.trim() : t('common.partner')),
+    [rawPartnerName, t]
+  );
 
   const refreshQuestionCatalog = useCallback(
     async (options?: { force?: boolean; fullRefresh?: boolean }) => {
       const records = await syncExtraQuestions(options);
-      const nextCatalog = buildQuestionCatalog(records);
+      extraQuestionsRef.current = records;
+      const nextCatalog = buildQuestionCatalog(records, getCurrentLocale());
       catalogRef.current = nextCatalog;
       return nextCatalog;
     },
     []
   );
+
+  // OS 言語が切り替わった際に質問カタログ・表示中質問・履歴・通知・DBロケールを即時再同期する
+  useEffect(() => {
+    const activeLocale = getCurrentLocale();
+    const nextCatalog = buildQuestionCatalog(extraQuestionsRef.current, activeLocale);
+    catalogRef.current = nextCatalog;
+
+    setQuestions((prev) => {
+      if (prev.length === 0) return getDefaultTodayQuestions(activeLocale);
+      return prev.map((q) => {
+        const localized = nextCatalog.questionsById[q.id];
+        if (!localized) return q;
+        const past = dailyPastMetaRef.current.pastByQId[q.id];
+        if (past && dailyPastMetaRef.current.quizDate) {
+          const formatted = formatPastDateLabel(
+            past.quiz_date,
+            dailyPastMetaRef.current.quizDate,
+            activeLocale
+          );
+          return {
+            ...localized,
+            repeatBadge: formatted.badge,
+            pastHistory: {
+              date: formatted.label,
+              myAnswer: past.my_answer ?? undefined,
+              partnerAnswer: past.partner_answer ?? undefined,
+            },
+          };
+        }
+        return {
+          ...localized,
+          repeatBadge: q.repeatBadge,
+          pastHistory: q.pastHistory,
+        };
+      });
+    });
+
+    setHistoryDays((prev) =>
+      prev.map((day) => ({
+        ...day,
+        items: day.items.map((item) => {
+          const localized = nextCatalog.questionsById[item.question.id];
+          return localized ? { ...item, question: localized } : item;
+        }),
+      }))
+    );
+
+    if (userId && lastSyncedLocaleRef.current !== activeLocale) {
+      lastSyncedLocaleRef.current = activeLocale;
+      void syncProfileLocaleAndTimezone(activeLocale);
+      void refreshNotificationsForLocale();
+    }
+  }, [i18nInstance.language, userId]);
 
   const loadAnswersForDay = useCallback(
     async (targetPairId: string, quizDate: string, currentUserId: string) => {
@@ -293,6 +394,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const loadPairAndDailyData = useCallback(
     async (currentUserId: string) => {
       if (!supabase) return;
+      const activeLocale = getCurrentLocale();
 
       const { data: pairState, error: pairErr } = await supabase.rpc('get_pair_state');
       if (pairErr || !pairState) {
@@ -303,11 +405,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsPairConnected(Boolean(pairState.is_pair_connected));
       setPairId(pairState.pair_id ?? null);
       setPairCode(pairState.invite_code ?? '');
-      if (pairState.my_name) {
-        setMyName(pairState.my_name);
-        await setCachedDisplayName(pairState.my_name);
+      if (typeof pairState.my_name === 'string') {
+        setRawMyName(pairState.my_name);
+        if (!isDefaultDisplayName(pairState.my_name)) {
+          await setCachedDisplayName(pairState.my_name);
+        }
       }
-      setPartnerName(pairState.partner_name ?? 'パートナー');
+      setRawPartnerName(typeof pairState.partner_name === 'string' ? pairState.partner_name : null);
       if (pairState.today_date) {
         setTodayDate(pairState.today_date);
       }
@@ -317,14 +421,15 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsPairPremium(Boolean(pairState.is_premium));
 
       if (!pairState.has_pair || !pairState.pair_id) {
-        setQuestions(TODAY_QUESTIONS);
+        const defaultQs = getDefaultTodayQuestions(activeLocale);
+        setQuestions(defaultQs);
         setMyAnswers({});
         setPartnerAnswers({});
         setHistoryDays([]);
         setCalendarDays({});
         setPairStartDate(null);
         setDayStatus({
-          totalQuestions: TODAY_QUESTIONS.length,
+          totalQuestions: defaultQs.length,
           myAnsweredCount: 0,
           partnerAnsweredCount: 0,
           isMyCompleted: false,
@@ -346,12 +451,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const quizDate: string = dailySet.quiz_date;
       setTodayDate(quizDate);
 
-      // パートナー側で新しい追加配信質問が出題された場合、ローカル辞書に無ければ即時同期して補完
       if (qIds.some((id) => !catalogRef.current.questionsById[id])) {
         await refreshQuestionCatalog({ force: true, fullRefresh: true });
       }
 
-      // 過去に出題された質問があれば履歴を取得
       const { data: pastRows } = await supabase.rpc('get_past_question_history', {
         p_question_ids: qIds,
         p_before_date: quizDate,
@@ -361,11 +464,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         string,
         { quiz_date: string; my_answer: SwipeDirection | null; partner_answer: SwipeDirection | null }
       >();
+      const pastRecord: Record<
+        string,
+        { quiz_date: string; my_answer: SwipeDirection | null; partner_answer: SwipeDirection | null }
+      > = {};
       if (Array.isArray(pastRows)) {
         for (const r of pastRows) {
           pastMap.set(r.question_id, r);
+          pastRecord[r.question_id] = r;
         }
       }
+      dailyPastMetaRef.current = { quizDate, pastByQId: pastRecord };
 
       const questionsById = catalogRef.current.questionsById;
       const hydratedQuestions: Question[] = qIds
@@ -374,7 +483,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (!base) return null;
           const past = pastMap.get(id);
           if (!past) return base;
-          const formatted = formatPastDateLabel(past.quiz_date, quizDate);
+          const formatted = formatPastDateLabel(past.quiz_date, quizDate, activeLocale);
           return {
             ...base,
             repeatBadge: formatted.badge,
@@ -387,7 +496,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         })
         .filter((q): q is Question => q !== null);
 
-      setQuestions(hydratedQuestions.length > 0 ? hydratedQuestions : TODAY_QUESTIONS);
+      setQuestions(
+        hydratedQuestions.length > 0 ? hydratedQuestions : getDefaultTodayQuestions(activeLocale)
+      );
 
       const { data: statusData } = await supabase.rpc('get_day_status', {
         p_quiz_date: quizDate,
@@ -406,7 +517,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       await loadAnswersForDay(pairState.pair_id, quizDate, currentUserId);
 
-      // 履歴とカレンダーサマリーも初回ロード時に並列同期し、ストリーク・未回答日数・通算一致率を即時表示する
       const [histRes, calRes] = await Promise.all([
         supabase.rpc('get_pair_history', {
           p_limit: 60,
@@ -476,7 +586,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [loadAnswersForDay, refreshQuestionCatalog]
   );
 
-  // 初期化（チュートリアル状態復元 + キャッシュ読込 + 匿名ログイン + データ取得）
   useEffect(() => {
     let mounted = true;
 
@@ -491,12 +600,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ]);
 
       if (!mounted) return;
-      catalogRef.current = buildQuestionCatalog(cachedExtra);
+      extraQuestionsRef.current = cachedExtra;
+      catalogRef.current = buildQuestionCatalog(cachedExtra, getCurrentLocale());
       setDailyReminder(savedReminder);
       setHasSeenTutorial(seen);
       setIsTutorialVisible(!seen);
-      if (cachedName) {
-        setMyName(cachedName);
+      if (cachedName && !isDefaultDisplayName(cachedName)) {
+        setRawMyName(cachedName);
       }
 
       if (!isSupabaseConfigured || !supabase) {
@@ -516,7 +626,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
           if (anonError) {
             console.warn('[Supabase] signInAnonymously error:', anonError);
-            setAuthError(`認証に失敗しました（${anonError.message}）。しばらくしてから再起動してください。`);
+            setAuthError(i18n.t('errors.authFailedRestart', { detail: anonError.message }));
             setIsInitialized(true);
             setIsLoading(false);
             return;
@@ -532,12 +642,14 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setAccountAuth(extractAccountAuthInfo(activeUser));
 
         if (activeUserId) {
-          // 1日1回だけ追加質問の差分同期を実行（変更が無ければほぼ0バイト）
+          const currentLoc = getCurrentLocale();
+          lastSyncedLocaleRef.current = currentLoc;
+          void syncProfileLocaleAndTimezone(currentLoc);
+
           await refreshQuestionCatalog({ force: false });
           if (!mounted) return;
           await loadPairAndDailyData(activeUserId);
 
-          // 開発ビルド / 本番ビルドの実機なら Expo Push Token をバックグラウンド登録
           void registerForPushNotificationsAsync().then((res) => {
             if (mounted) setPushStatus(res);
           });
@@ -546,7 +658,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.warn('[Supabase] init error:', err);
         if (mounted) {
           const detail = err instanceof Error ? err.message : String(err);
-          setAuthError(`サーバーへの接続に失敗しました（${detail}）。`);
+          setAuthError(i18n.t('errors.serverConnectFailed', { detail }));
         }
       } finally {
         if (mounted) {
@@ -642,12 +754,11 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setMyAnswers(prevMyAnswers);
           return {
             ok: false,
-            error: '回答の保存に失敗しました。通信環境をご確認のうえ、もう一度お試しください。',
+            error: i18n.t('errors.answerSaveFailed'),
           };
         }
 
         await refreshDayStatus();
-        // 今日の全問に回答し終えたタイミングでパートナーへプッシュ通知を送信（サーバー側で重複防止）
         const completedAll =
           questions.length > 0 && questions.every((q) => Boolean(nextMyAnswers[q.id]));
         if (completedAll && isPairConnected) {
@@ -658,7 +769,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setMyAnswers(prevMyAnswers);
         return {
           ok: false,
-          error: '通信エラーのため回答を保存できませんでした。接続を確認してもう一度お試しください。',
+          error: i18n.t('errors.answerNetworkFailed'),
         };
       }
     },
@@ -668,6 +779,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const loadDayQuizData = useCallback(
     async (quizDate: string): Promise<DayQuizData | null> => {
       if (!supabase || !userId || !pairId) return null;
+      const activeLocale = getCurrentLocale();
 
       const { data: setRow, error: setErr } = await supabase
         .from('daily_sets')
@@ -680,7 +792,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!setErr && setRow && Array.isArray(setRow.question_ids) && setRow.question_ids.length > 0) {
         qIds = setRow.question_ids as string[];
       } else if (quizDate < todayDate) {
-        // 誰もアプリを開かなかった過去日の場合はプレミアム限定でオンデマンド生成
         const { data: createdSet, error: createErr } = await supabase.rpc(
           'get_or_create_past_daily_set',
           {
@@ -690,12 +801,18 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         );
         if (createErr) {
           if (createErr.message?.includes('PREMIUM_REQUIRED')) {
-            throw new Error(
-              '過去の未回答お題への回答には「ふたりプレミアムプラン」への加入が必要です。'
-            );
+            const err = new Error(i18n.t('errors.pastQuizPremiumRequired')) as Error & {
+              code?: PastAnswerErrorCode;
+            };
+            err.code = 'PREMIUM_REQUIRED';
+            throw err;
           }
           if (createErr.message?.includes('INVALID_PAST_DATE')) {
-            throw new Error('ペア開始日以前の日付や未来の日付には回答できません。');
+            const err = new Error(i18n.t('errors.invalidPastDate')) as Error & {
+              code?: PastAnswerErrorCode;
+            };
+            err.code = 'INVALID_PAST_DATE';
+            throw err;
           }
           return null;
         }
@@ -747,7 +864,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (!base) return null;
           const past = pastMap.get(id);
           if (!past) return base;
-          const formatted = formatPastDateLabel(past.quiz_date, quizDate);
+          const formatted = formatPastDateLabel(past.quiz_date, quizDate, activeLocale);
           return {
             ...base,
             repeatBadge: formatted.badge,
@@ -801,9 +918,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       questionId: string,
       direction: SwipeDirection,
       isFinalQuestion = false
-    ): Promise<{ ok: boolean; error?: string }> => {
+    ): Promise<{ ok: boolean; error?: string; errorCode?: PastAnswerErrorCode }> => {
       if (!supabase || !userId || !pairId) {
-        return { ok: false, error: 'サーバーに接続されていません。' };
+        return { ok: false, error: i18n.t('errors.notConnectedServer'), errorCode: 'SERVER_ERROR' };
       }
 
       const { error } = await supabase.from('answers').insert({
@@ -818,12 +935,14 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (error.code === '42501') {
           return {
             ok: false,
-            error: '過去の質問への回答には「ふたりプレミアムプラン」への加入が必要です。',
+            error: i18n.t('errors.pastAnswerPremiumRequired'),
+            errorCode: 'PREMIUM_REQUIRED',
           };
         }
         return {
           ok: false,
-          error: '回答の保存に失敗しました。通信環境をご確認のうえ再度お試しください。',
+          error: i18n.t('errors.answerSaveFailed'),
+          errorCode: 'SERVER_ERROR',
         };
       }
 
@@ -843,7 +962,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!supabase) {
       return {
         uid: null,
-        error: 'Supabase が未設定です。.env.local を確認し、npx expo start --clear で再起動してください。',
+        error: i18n.t('errors.supabaseNotConfiguredRestart'),
       };
     }
     if (userId) {
@@ -860,17 +979,19 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
       if (anonError || !anonData.user?.id) {
-        const msg = anonError?.message ?? '匿名認証に失敗しました';
-        setAuthError(`認証に失敗しました（${msg}）。`);
-        return { uid: null, error: `認証に失敗しました（${msg}）。` };
+        const msg = anonError?.message ?? i18n.t('errors.anonAuthFailed');
+        const errText = i18n.t('errors.authFailed', { detail: msg });
+        setAuthError(errText);
+        return { uid: null, error: errText };
       }
       setUserId(anonData.user.id);
       setAuthError(null);
       return { uid: anonData.user.id };
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      setAuthError(`サーバーへの接続に失敗しました（${detail}）。`);
-      return { uid: null, error: `サーバーへの接続に失敗しました（${detail}）。` };
+      const errText = i18n.t('errors.serverConnectFailed', { detail });
+      setAuthError(errText);
+      return { uid: null, error: errText };
     }
   }, [userId]);
 
@@ -879,28 +1000,37 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!supabase) {
         return {
           ok: false,
-          error: 'Supabase が未設定です。.env.local を確認し、npx expo start --clear で再起動してください。',
+          error: i18n.t('errors.supabaseNotConfiguredRestart'),
         };
       }
       setIsLoading(true);
       try {
         const auth = await ensureAuthenticatedUserId();
         if (!auth.uid) {
-          return { ok: false, error: auth.error ?? '認証が完了していません。' };
+          return { ok: false, error: auth.error ?? i18n.t('errors.authNotCompleted') };
         }
-        const { error } = await supabase.rpc('create_pair', {
-          p_display_name: displayName ?? myName,
+        const effectiveName = displayName ?? (!isDefaultDisplayName(rawMyName) ? rawMyName! : myName);
+        let res = await supabase.rpc('create_pair', {
+          p_display_name: effectiveName,
+          p_timezone: getDeviceTimeZone(),
         });
-        if (error) {
-          return { ok: false, error: formatJoinError(error.message) };
+        if (res.error && res.error.code === 'PGRST202') {
+          // マイグレーション適用前の1引数シグネチャへ後方互換フォールバック
+          res = await supabase.rpc('create_pair', {
+            p_display_name: effectiveName,
+          });
         }
+        if (res.error) {
+          return { ok: false, error: formatJoinError(res.error.message) };
+        }
+        void syncProfileLocaleAndTimezone(getCurrentLocale());
         await loadPairAndDailyData(auth.uid);
         return { ok: true };
       } finally {
         setIsLoading(false);
       }
     },
-    [ensureAuthenticatedUserId, myName, loadPairAndDailyData]
+    [ensureAuthenticatedUserId, rawMyName, myName, loadPairAndDailyData]
   );
 
   const joinPair = useCallback(
@@ -911,29 +1041,31 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!supabase) {
         return {
           ok: false,
-          error: 'Supabase が未設定です。.env.local を確認し、npx expo start --clear で再起動してください。',
+          error: i18n.t('errors.supabaseNotConfiguredRestart'),
         };
       }
       setIsLoading(true);
       try {
         const auth = await ensureAuthenticatedUserId();
         if (!auth.uid) {
-          return { ok: false, error: auth.error ?? '認証が完了していません。' };
+          return { ok: false, error: auth.error ?? i18n.t('errors.authNotCompleted') };
         }
+        const effectiveName = displayName ?? (!isDefaultDisplayName(rawMyName) ? rawMyName! : myName);
         const { data, error } = await supabase.rpc('join_pair', {
           p_invite_code: code,
-          p_display_name: displayName ?? myName,
+          p_display_name: effectiveName,
         });
         if (error) {
           return { ok: false, error: formatJoinError(error.message) };
         }
+        void syncProfileLocaleAndTimezone(getCurrentLocale());
         await loadPairAndDailyData(auth.uid);
         return { ok: true, relinked: Boolean(data?.relinked) };
       } finally {
         setIsLoading(false);
       }
     },
-    [ensureAuthenticatedUserId, myName, loadPairAndDailyData]
+    [ensureAuthenticatedUserId, rawMyName, myName, loadPairAndDailyData]
   );
 
   const issuePairRelinkCode = useCallback(async (): Promise<{
@@ -943,17 +1075,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     error?: string;
   }> => {
     if (!supabase) {
-      return { ok: false, error: 'Supabase が未設定です。' };
+      return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
     }
     const auth = await ensureAuthenticatedUserId();
     if (!auth.uid) {
-      return { ok: false, error: auth.error ?? '認証が完了していません。' };
+      return { ok: false, error: auth.error ?? i18n.t('errors.authNotCompleted') };
     }
     const { data, error } = await supabase.rpc('issue_pair_relink_code');
     if (error || !data?.relink_code) {
       return {
         ok: false,
-        error: error ? formatJoinError(error.message) : '再連携コードの発行に失敗しました。',
+        error: error ? formatJoinError(error.message) : i18n.t('errors.relinkIssueFailed'),
       };
     }
     return {
@@ -965,17 +1097,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const leavePair = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!supabase) {
-      return { ok: false, error: 'Supabase が未設定です。' };
+      return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
     }
     setIsLoading(true);
     try {
       const auth = await ensureAuthenticatedUserId();
       if (!auth.uid) {
-        return { ok: false, error: auth.error ?? '認証が完了していません。' };
+        return { ok: false, error: auth.error ?? i18n.t('errors.authNotCompleted') };
       }
       const { error } = await supabase.rpc('leave_pair');
       if (error) {
-        return { ok: false, error: 'ペアの解除に失敗しました。' };
+        return { ok: false, error: i18n.t('errors.leavePairFailed') };
       }
       await loadPairAndDailyData(auth.uid);
       return { ok: true };
@@ -986,15 +1118,15 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const regenerateInviteCode = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!supabase) {
-      return { ok: false, error: 'Supabase が未設定です。' };
+      return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
     }
     const auth = await ensureAuthenticatedUserId();
     if (!auth.uid) {
-      return { ok: false, error: auth.error ?? '認証が完了していません。' };
+      return { ok: false, error: auth.error ?? i18n.t('errors.authNotCompleted') };
     }
     const { data, error } = await supabase.rpc('regenerate_invite_code');
     if (error || !data) {
-      return { ok: false, error: '招待コードの再発行に失敗しました。' };
+      return { ok: false, error: i18n.t('errors.regenerateCodeFailed') };
     }
     setPairCode(data.invite_code);
     return { ok: true };
@@ -1004,9 +1136,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     async (name: string): Promise<{ ok: boolean; error?: string }> => {
       const trimmed = name.trim();
       if (!trimmed) {
-        return { ok: false, error: '表示名を入力してください。' };
+        return { ok: false, error: i18n.t('errors.displayNameEmpty') };
       }
-      setMyName(trimmed);
+      setRawMyName(trimmed);
       await setCachedDisplayName(trimmed);
 
       if (!supabase || !userId) {
@@ -1017,7 +1149,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         p_display_name: trimmed,
       });
       if (error) {
-        return { ok: false, error: '表示名の更新に失敗しました。' };
+        return { ok: false, error: i18n.t('errors.displayNameUpdateFailed') };
       }
       return { ok: true };
     },
@@ -1108,13 +1240,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteAccount = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!supabase || !userId) {
-      return { ok: false, error: 'Supabase が未設定です。' };
+      return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
     }
     setIsLoading(true);
     try {
       const { error } = await supabase.rpc('delete_my_account');
       if (error) {
-        return { ok: false, error: 'アカウント削除に失敗しました。' };
+        return { ok: false, error: i18n.t('errors.deleteAccountFailed') };
       }
       await supabase.auth.signOut();
       await resetBillingSession();
@@ -1122,13 +1254,14 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsPairConnected(false);
       setPairId(null);
       setPairCode('');
+      setRawMyName(null);
+      setRawPartnerName(null);
       setMyAnswers({});
       setPartnerAnswers({});
       setHistoryDays([]);
       setCalendarDays({});
       setPairStartDate(null);
       setIsPairPremium(false);
-      // 新しい匿名セッションを作成
       const { data: anonData } = await supabase.auth.signInAnonymously();
       setUserId(anonData.user?.id ?? null);
       setAccountAuth(extractAccountAuthInfo(anonData.user));
@@ -1163,13 +1296,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const linkGoogle = useCallback(async () => {
     if (!supabase) {
-      return { ok: false, error: 'Supabase が未設定です。' };
+      return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
     }
     setIsLoading(true);
     try {
       const auth = await ensureAuthenticatedUserId();
       if (!auth.uid) {
-        return { ok: false, error: auth.error ?? '認証が完了していません。' };
+        return { ok: false, error: auth.error ?? i18n.t('errors.authNotCompleted') };
       }
       const res = await linkGoogleIdentity();
       if (res.ok && !res.redirecting) {
@@ -1188,7 +1321,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const signInWithGoogle = useCallback(async () => {
     if (!supabase) {
-      return { ok: false, error: 'Supabase が未設定です。' };
+      return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
     }
     setIsLoading(true);
     try {
@@ -1313,9 +1446,29 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const pairStats = useMemo<PairStats>(() => {
     const revealedDates = new Set<string>();
     const historyDatesSet = new Set<string>();
-    const categoryAcc = new Map<string, { matched: number; total: number }>();
+    const categoryAcc = new Map<
+      string,
+      { categoryKey?: QuestionCategoryKey; label: string; matched: number; total: number }
+    >();
     let totalMatched = 0;
     let totalBoth = 0;
+
+    const addCategoryItem = (q: Question, matched: boolean) => {
+      const groupKey = q.categoryKey ?? (q.category || 'other');
+      const label = q.category || t('common.otherCategory');
+      const prev = categoryAcc.get(groupKey) ?? {
+        categoryKey: q.categoryKey,
+        label,
+        matched: 0,
+        total: 0,
+      };
+      categoryAcc.set(groupKey, {
+        categoryKey: q.categoryKey ?? prev.categoryKey,
+        label,
+        matched: prev.matched + (matched ? 1 : 0),
+        total: prev.total + 1,
+      });
+    };
 
     for (const rec of Object.values(effectiveCalendarDays)) {
       if (rec.isRevealed) {
@@ -1332,16 +1485,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!item.myAnswer || !item.partnerAnswer) continue;
         totalBoth++;
         if (item.isMatched) totalMatched++;
-        const cat = item.question.category || 'その他';
-        const prev = categoryAcc.get(cat) ?? { matched: 0, total: 0 };
-        categoryAcc.set(cat, {
-          matched: prev.matched + (item.isMatched ? 1 : 0),
-          total: prev.total + 1,
-        });
+        addCategoryItem(item.question, item.isMatched);
       }
     }
 
-    // 今日の双方回答が完了済みだがまだ historyDays に未反映の場合も即時合算
     if (
       isMyCompleted &&
       isPartnerCompleted &&
@@ -1353,12 +1500,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!item.myAnswer || !item.partnerAnswer) continue;
         totalBoth++;
         if (item.isMatched) totalMatched++;
-        const cat = item.question.category || 'その他';
-        const prev = categoryAcc.get(cat) ?? { matched: 0, total: 0 };
-        categoryAcc.set(cat, {
-          matched: prev.matched + (item.isMatched ? 1 : 0),
-          total: prev.total + 1,
-        });
+        addCategoryItem(item.question, item.isMatched);
       }
     }
 
@@ -1370,7 +1512,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       cursor = shiftIsoDate(cursor, -1);
     }
 
-    // 自身の未回答日数をペア開始日〜今日で算出（カレンダー表示と完全一致）
     let myUnansweredDays = 0;
     let myPastUnansweredDays = 0;
     let pastPartnerAnsweredUnansweredDays = 0;
@@ -1406,9 +1547,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    const categoryStats: CategoryMatchStat[] = [...categoryAcc.entries()]
-      .map(([category, stat]) => ({
-        category,
+    const categoryStats: CategoryMatchStat[] = [...categoryAcc.values()]
+      .map((stat) => ({
+        categoryKey: stat.categoryKey,
+        category: stat.label,
         matched: stat.matched,
         total: stat.total,
         percentage: stat.total > 0 ? Math.round((stat.matched / stat.total) * 100) : 0,
@@ -1435,6 +1577,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     isMyCompleted,
     isPartnerCompleted,
     matchSummary.details,
+    t,
   ]);
 
   return (

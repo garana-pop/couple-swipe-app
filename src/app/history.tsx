@@ -8,11 +8,13 @@ import {
 } from 'react-native';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { AnswerCalendarModal } from '../components/AnswerCalendarModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 export default function HistoryScreen() {
+  const { t } = useTranslation();
   const { openCalendar } = useLocalSearchParams<{ openCalendar?: string }>();
   const {
     questions,
@@ -84,28 +86,32 @@ export default function HistoryScreen() {
 
   const calendarSubtext = (() => {
     if (!hasPair) {
-      return 'ペア連携すると毎日の回答・未回答をカレンダーで確認できます';
+      return t('history.calendarSub.noPair');
     }
     if (pairStats.myPastUnansweredDays > 0) {
       if (isPairPremium) {
-        return `過去の未回答 ${pairStats.myPastUnansweredDays}日分をタップして遡って回答できます`;
+        return t('history.calendarSub.premiumHasPast', {
+          count: pairStats.myPastUnansweredDays,
+        });
       }
       if (pairStats.pastPartnerAnsweredUnansweredDays > 0) {
-        return `${partnerName}さん回答済みの過去日あり・プレミアムで遡って回答OK`;
+        return t('history.calendarSub.freePartnerAnswered', { partnerName });
       }
-      return `過去の未回答 ${pairStats.myPastUnansweredDays}日分・プレミアムで遡って回答できます`;
+      return t('history.calendarSub.freeHasPast', {
+        count: pairStats.myPastUnansweredDays,
+      });
     }
     if (pairStats.myUnansweredDays > 0) {
-      return '今日のお題が未回答です・カレンダーからすぐ回答できます';
+      return t('history.calendarSub.todayUnanswered');
     }
-    return '毎日の回答・未回答ステータスをカレンダーで一覧確認できます';
+    return t('history.calendarSub.allDone');
   })();
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: '過去の回答比較',
+          title: t('nav.history'),
           headerRight: () => (
             <TouchableOpacity
               onPress={handleOpenCalendar}
@@ -121,275 +127,314 @@ export default function HistoryScreen() {
       />
 
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.headerSection}>
-        <Text style={styles.headerTitle}>質問の比較とタイムライン</Text>
-        <Text style={styles.headerDesc}>
-          過去に出題された質問と、二人の回答の記録を一覧で確認できます。
-        </Text>
-      </View>
-
-      {/* 連続回答ストリーク ＆ 自身の未回答日数 ＆ カテゴリ別一致率カード */}
-      <View style={[styles.card, SHADOWS.cardSmall, styles.statsCard]}>
-        <View style={styles.statsKpiRow}>
-          <View style={styles.kpiItem}>
-            <View style={styles.kpiValueRow}>
-              <Ionicons
-                name={pairStats.currentStreak > 0 ? 'flame' : 'flame-outline'}
-                size={16}
-                color={pairStats.currentStreak > 0 ? '#D97559' : COLORS.textMuted}
-              />
-              <Text style={styles.kpiValue}>{pairStats.currentStreak}日</Text>
-            </View>
-            <Text style={styles.kpiLabel}>連続ストリーク</Text>
-          </View>
-
-          <View style={styles.kpiDivider} />
-
-          <TouchableOpacity
-            style={styles.kpiItem}
-            activeOpacity={0.7}
-            onPress={handleOpenCalendar}
-          >
-            <View style={styles.kpiValueRow}>
-              <Ionicons
-                name="calendar-outline"
-                size={15}
-                color={pairStats.myUnansweredDays > 0 ? '#C97A2B' : '#4A7C59'}
-              />
-              <Text
-                style={[
-                  styles.kpiValue,
-                  pairStats.myUnansweredDays > 0 && styles.kpiValueUnanswered,
-                ]}
-              >
-                {pairStats.myUnansweredDays}日
-              </Text>
-            </View>
-            <Text style={styles.kpiLabel}>未回答日数</Text>
-          </TouchableOpacity>
-
-          <View style={styles.kpiDivider} />
-
-          <View style={styles.kpiItem}>
-            <Text style={styles.kpiValue}>
-              {pairStats.overallMatchRate !== null ? `${pairStats.overallMatchRate}%` : '--'}
-            </Text>
-            <Text style={styles.kpiLabel}>通算一致率</Text>
-          </View>
+        <View style={styles.headerSection}>
+          <Text style={styles.headerTitle}>{t('history.headerTitle')}</Text>
+          <Text style={styles.headerDesc}>{t('history.headerDesc')}</Text>
         </View>
 
-        {pairStats.categoryStats.length > 0 ? (
-          <View style={styles.categoryStatsSection}>
-            <Text style={styles.categoryStatsHeading}>
-              カテゴリ別一致率（双方回答 {pairStats.totalBothAnsweredQuestions}問）
-            </Text>
-            <View style={styles.categoryBarsList}>
-              {pairStats.categoryStats.map((stat) => {
-                const barColor =
-                  stat.percentage >= 75
-                    ? '#4A7C59'
-                    : stat.percentage >= 50
-                      ? COLORS.primary
-                      : '#C97A2B';
-                return (
-                  <View key={stat.category} style={styles.categoryBarItem}>
-                    <View style={styles.categoryBarHeader}>
-                      <Text style={styles.categoryBarName} numberOfLines={1}>
-                        {stat.category}
-                      </Text>
-                      <Text style={[styles.categoryBarValue, { color: barColor }]}>
-                        {stat.percentage}%（{stat.matched}/{stat.total}）
-                      </Text>
-                    </View>
-                    <View style={styles.categoryBarTrack}>
-                      <View
-                        style={[
-                          styles.categoryBarFill,
-                          { width: `${stat.percentage}%`, backgroundColor: barColor },
-                        ]}
-                      />
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : (
-          <Text style={styles.categoryEmptyHint}>
-            二人とも回答を完了すると、カテゴリ別の一致率グラフが表示されます。
-          </Text>
-        )}
-      </View>
-
-      {/* 回答カレンダーボタン（「今日のお題（前回との比較）」の直上に配置） */}
-      <TouchableOpacity
-        style={[
-          styles.calendarTriggerCard,
-          SHADOWS.cardSmall,
-          pairStats.myPastUnansweredDays > 0 && styles.calendarTriggerCardHighlight,
-        ]}
-        activeOpacity={0.82}
-        onPress={handleOpenCalendar}
-      >
-        <View style={styles.calendarTriggerIconBox}>
-          <Ionicons name="calendar" size={20} color={COLORS.primary} />
-        </View>
-        <View style={styles.calendarTriggerBody}>
-          <View style={styles.calendarTriggerTopRow}>
-            <Text style={styles.calendarTriggerTitle}>回答カレンダーを開く</Text>
-            {pairStats.myUnansweredDays > 0 ? (
-              <View style={styles.calendarUnansweredPill}>
-                <Text style={styles.calendarUnansweredPillText}>
-                  未回答 {pairStats.myUnansweredDays}日
+        {/* 連続回答ストリーク ＆ 自身の未回答日数 ＆ カテゴリ別一致率カード */}
+        <View style={[styles.card, SHADOWS.cardSmall, styles.statsCard]}>
+          <View style={styles.statsKpiRow}>
+            <View style={styles.kpiItem}>
+              <View style={styles.kpiValueRow}>
+                <Ionicons
+                  name={pairStats.currentStreak > 0 ? 'flame' : 'flame-outline'}
+                  size={16}
+                  color={pairStats.currentStreak > 0 ? '#D97559' : COLORS.textMuted}
+                />
+                <Text
+                  style={styles.kpiValue}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {t('common.daysCount', { count: pairStats.currentStreak })}
                 </Text>
               </View>
-            ) : (
-              <View style={styles.calendarDonePill}>
-                <Text style={styles.calendarDonePillText}>全回答済</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.calendarTriggerSub}>{calendarSubtext}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-      </TouchableOpacity>
-
-      {/* 今日の再出題比較セクション */}
-      <Text style={styles.sectionLabel}>今日のお題（前回との比較）</Text>
-      <View style={styles.list}>
-        {questions.map((question, index) => {
-          const myCurrent = myAnswers[question.id];
-          const partnerCurrent = isPartnerCompleted ? partnerAnswers[question.id] : undefined;
-          const history = question.pastHistory;
-
-          return (
-            <View key={question.id} style={[styles.card, SHADOWS.cardSmall]}>
-              <View style={styles.cardTopRow}>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>{question.category}</Text>
-                </View>
-                {question.repeatBadge && (
-                  <View style={styles.repeatBadge}>
-                    <Ionicons name="time-outline" size={11} color={COLORS.primaryDark} />
-                    <Text style={styles.repeatBadgeText}>{question.repeatBadge}</Text>
-                  </View>
-                )}
-              </View>
-
-              <Text style={styles.questionTitle}>
-                Q{index + 1}. {question.title}
+              <Text style={styles.kpiLabel} numberOfLines={2}>
+                {t('history.kpiStreak')}
               </Text>
+            </View>
 
-              {history ? (
-                <View style={styles.compareContainer}>
-                  <View style={styles.timeBlock}>
-                    <Text style={styles.timeBlockLabel}>{history.date} の回答</Text>
-                    <View style={styles.answersRow}>
-                      <Text style={styles.userAnswerText}>
-                        {myName}: 「{history.myAnswer ? question.choices[history.myAnswer] : '未回答'}」
-                      </Text>
-                      <Text style={styles.userAnswerText}>
-                        {partnerName}: 「
-                        {history.partnerAnswer ? question.choices[history.partnerAnswer] : '未回答'}」
-                      </Text>
+            <View style={styles.kpiDivider} />
+
+            <TouchableOpacity
+              style={styles.kpiItem}
+              activeOpacity={0.7}
+              onPress={handleOpenCalendar}
+            >
+              <View style={styles.kpiValueRow}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={15}
+                  color={pairStats.myUnansweredDays > 0 ? '#C97A2B' : '#4A7C59'}
+                />
+                <Text
+                  style={[
+                    styles.kpiValue,
+                    pairStats.myUnansweredDays > 0 && styles.kpiValueUnanswered,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {t('common.daysCount', { count: pairStats.myUnansweredDays })}
+                </Text>
+              </View>
+              <Text style={styles.kpiLabel} numberOfLines={2}>
+                {t('history.kpiUnanswered')}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.kpiDivider} />
+
+            <View style={styles.kpiItem}>
+              <Text
+                style={styles.kpiValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {pairStats.overallMatchRate !== null ? `${pairStats.overallMatchRate}%` : '--'}
+              </Text>
+              <Text style={styles.kpiLabel} numberOfLines={2}>
+                {t('history.kpiOverallRate')}
+              </Text>
+            </View>
+          </View>
+
+          {pairStats.categoryStats.length > 0 ? (
+            <View style={styles.categoryStatsSection}>
+              <Text style={styles.categoryStatsHeading}>
+                {t('history.categoryHeading', {
+                  count: pairStats.totalBothAnsweredQuestions,
+                })}
+              </Text>
+              <View style={styles.categoryBarsList}>
+                {pairStats.categoryStats.map((stat) => {
+                  const barColor =
+                    stat.percentage >= 75
+                      ? '#4A7C59'
+                      : stat.percentage >= 50
+                        ? COLORS.primary
+                        : '#C97A2B';
+                  return (
+                    <View key={stat.categoryKey ?? stat.category} style={styles.categoryBarItem}>
+                      <View style={styles.categoryBarHeader}>
+                        <Text style={styles.categoryBarName} numberOfLines={1}>
+                          {stat.category}
+                        </Text>
+                        <Text style={[styles.categoryBarValue, { color: barColor }]}>
+                          {stat.percentage}% ({stat.matched}/{stat.total})
+                        </Text>
+                      </View>
+                      <View style={styles.categoryBarTrack}>
+                        <View
+                          style={[
+                            styles.categoryBarFill,
+                            { width: `${stat.percentage}%`, backgroundColor: barColor },
+                          ]}
+                        />
+                      </View>
                     </View>
-                  </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.categoryEmptyHint}>{t('history.categoryEmptyHint')}</Text>
+          )}
+        </View>
 
-                  <View style={styles.arrowRow}>
-                    <Ionicons name="arrow-down" size={14} color={COLORS.primary} />
-                  </View>
-
-                  <View style={[styles.timeBlock, styles.timeBlockCurrent]}>
-                    <Text style={[styles.timeBlockLabel, styles.timeBlockLabelCurrent]}>
-                      今回の最新回答
-                    </Text>
-                    <View style={styles.answersRow}>
-                      <Text style={[styles.userAnswerText, styles.userAnswerCurrent]}>
-                        {myName}: 「{myCurrent ? question.choices[myCurrent] : '未回答'}」
-                      </Text>
-                      <Text style={[styles.userAnswerText, styles.userAnswerCurrent]}>
-                        {partnerName}: 「
-                        {partnerCurrent
-                          ? question.choices[partnerCurrent]
-                          : isPartnerCompleted
-                            ? '未回答'
-                            : '公開待ち'}
-                        」
-                      </Text>
-                    </View>
-                  </View>
+        {/* 回答カレンダーボタン */}
+        <TouchableOpacity
+          style={[
+            styles.calendarTriggerCard,
+            SHADOWS.cardSmall,
+            pairStats.myPastUnansweredDays > 0 && styles.calendarTriggerCardHighlight,
+          ]}
+          activeOpacity={0.82}
+          onPress={handleOpenCalendar}
+        >
+          <View style={styles.calendarTriggerIconBox}>
+            <Ionicons name="calendar" size={20} color={COLORS.primary} />
+          </View>
+          <View style={styles.calendarTriggerBody}>
+            <View style={styles.calendarTriggerTopRow}>
+              <Text style={styles.calendarTriggerTitle}>{t('history.calendarTriggerTitle')}</Text>
+              {pairStats.myUnansweredDays > 0 ? (
+                <View style={styles.calendarUnansweredPill}>
+                  <Text style={styles.calendarUnansweredPillText}>
+                    {t('home.unansweredDays', { count: pairStats.myUnansweredDays })}
+                  </Text>
                 </View>
               ) : (
-                <View style={styles.singleContainer}>
-                  <Text style={styles.singleNotice}>今回が初めての出題です</Text>
-                  <Text style={styles.singleSub}>
-                    一定期間後に再出題され、変化を比較できるようになります
-                  </Text>
+                <View style={styles.calendarDonePill}>
+                  <Text style={styles.calendarDonePillText}>{t('history.calendarDonePill')}</Text>
                 </View>
               )}
             </View>
-          );
-        })}
-      </View>
-
-      {/* 過去の未回答お題（カレンダー・プレミアム案内） */}
-      <Text style={styles.sectionLabel}>過去の未回答お題</Text>
-
-      {isPairPremium ? (
-        <TouchableOpacity
-          style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
-          activeOpacity={0.85}
-          onPress={handleOpenCalendar}
-        >
-          <View style={styles.premiumGuideHeader}>
-            <View style={styles.premiumGuideTitleRow}>
-              <Ionicons name="diamond" size={14} color="#9E6B24" />
-              <Text style={styles.premiumGuideTitle}>
-                {pairStats.myPastUnansweredDays > 0
-                  ? `未回答 ${pairStats.myPastUnansweredDays}日分を遡って回答できます`
-                  : 'カレンダーから過去日へ遡り回答OK'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
+            <Text style={styles.calendarTriggerSub}>{calendarSubtext}</Text>
           </View>
-          <Text style={styles.premiumGuideText}>
-            回答カレンダーの未回答日をタップして回答できます。
-          </Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
         </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
-          activeOpacity={0.85}
-          onPress={() => router.push({ pathname: '/ai-report', params: { focus: 'plans' } })}
-        >
-          <View style={styles.premiumGuideHeader}>
-            <View style={styles.premiumGuideTitleRow}>
-              <Ionicons name="diamond" size={14} color="#9E6B24" />
-              <Text style={styles.premiumGuideTitle}>
-                {pairStats.myPastUnansweredDays > 0
-                  ? `未回答 ${pairStats.myPastUnansweredDays}日分をプレミアムで遡り回答`
-                  : '過去の未回答もプレミアムで遡り回答OK'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
-          </View>
-          <Text style={styles.premiumGuideText}>
-            {pairStats.pastPartnerAnsweredUnansweredDays > 0
-              ? `${partnerName}さん回答済みの日が ${pairStats.pastPartnerAnsweredUnansweredDays}日あります。カレンダーから遡って回答・閲覧できます。`
-              : 'カレンダーから未回答の過去日に遡って回答・結果閲覧できます。'}
-          </Text>
-        </TouchableOpacity>
-      )}
 
-      <TouchableOpacity
-        style={styles.backButton}
-        activeOpacity={0.8}
-        onPress={() => router.back()}
-      >
-        <Ionicons name="arrow-back" size={16} color={COLORS.text} />
-        <Text style={styles.backButtonText}>戻る</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* 今日の再出題比較セクション */}
+        <Text style={styles.sectionLabel}>{t('history.sectionTodayCompare')}</Text>
+        <View style={styles.list}>
+          {questions.map((question, index) => {
+            const myCurrent = myAnswers[question.id];
+            const partnerCurrent = isPartnerCompleted ? partnerAnswers[question.id] : undefined;
+            const history = question.pastHistory;
+
+            return (
+              <View key={question.id} style={[styles.card, SHADOWS.cardSmall]}>
+                <View style={styles.cardTopRow}>
+                  <View style={styles.categoryBadge}>
+                    <Text style={styles.categoryText}>{question.category}</Text>
+                  </View>
+                  {question.repeatBadge && (
+                    <View style={styles.repeatBadge}>
+                      <Ionicons name="time-outline" size={11} color={COLORS.primaryDark} />
+                      <Text style={styles.repeatBadgeText}>{question.repeatBadge}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text style={styles.questionTitle}>
+                  Q{index + 1}. {question.title}
+                </Text>
+
+                {history ? (
+                  <View style={styles.compareContainer}>
+                    <View style={styles.timeBlock}>
+                      <Text style={styles.timeBlockLabel}>
+                        {t('history.pastAnswerHeading', { date: history.date })}
+                      </Text>
+                      <View style={styles.answersRow}>
+                        <Text style={styles.userAnswerText}>
+                          {t('history.answerLine', {
+                            name: myName,
+                            choice: history.myAnswer
+                              ? question.choices[history.myAnswer]
+                              : t('common.unanswered'),
+                          })}
+                        </Text>
+                        <Text style={styles.userAnswerText}>
+                          {t('history.answerLine', {
+                            name: partnerName,
+                            choice: history.partnerAnswer
+                              ? question.choices[history.partnerAnswer]
+                              : t('common.unanswered'),
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.arrowRow}>
+                      <Ionicons name="arrow-down" size={14} color={COLORS.primary} />
+                    </View>
+
+                    <View style={[styles.timeBlock, styles.timeBlockCurrent]}>
+                      <Text style={[styles.timeBlockLabel, styles.timeBlockLabelCurrent]}>
+                        {t('history.currentAnswerHeading')}
+                      </Text>
+                      <View style={styles.answersRow}>
+                        <Text style={[styles.userAnswerText, styles.userAnswerCurrent]}>
+                          {t('history.answerLine', {
+                            name: myName,
+                            choice: myCurrent
+                              ? question.choices[myCurrent]
+                              : t('common.unanswered'),
+                          })}
+                        </Text>
+                        <Text style={[styles.userAnswerText, styles.userAnswerCurrent]}>
+                          {t('history.answerLine', {
+                            name: partnerName,
+                            choice: partnerCurrent
+                              ? question.choices[partnerCurrent]
+                              : isPartnerCompleted
+                                ? t('common.unanswered')
+                                : t('common.waitingReveal'),
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.singleContainer}>
+                    <Text style={styles.singleNotice}>{t('history.firstTimeNotice')}</Text>
+                    <Text style={styles.singleSub}>{t('history.firstTimeSub')}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* 過去の未回答お題 */}
+        <Text style={styles.sectionLabel}>{t('history.sectionPastUnanswered')}</Text>
+
+        {isPairPremium ? (
+          <TouchableOpacity
+            style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
+            activeOpacity={0.85}
+            onPress={handleOpenCalendar}
+          >
+            <View style={styles.premiumGuideHeader}>
+              <View style={styles.premiumGuideTitleRow}>
+                <Ionicons name="diamond" size={14} color="#9E6B24" />
+                <Text style={styles.premiumGuideTitle}>
+                  {pairStats.myPastUnansweredDays > 0
+                    ? t('history.premiumGuide.titlePremiumHasPast', {
+                        count: pairStats.myPastUnansweredDays,
+                      })
+                    : t('history.premiumGuide.titlePremiumNoPast')}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
+            </View>
+            <Text style={styles.premiumGuideText}>{t('history.premiumGuide.descPremium')}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.premiumGuideCard, SHADOWS.cardSmall]}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/ai-report', params: { focus: 'plans' } })}
+          >
+            <View style={styles.premiumGuideHeader}>
+              <View style={styles.premiumGuideTitleRow}>
+                <Ionicons name="diamond" size={14} color="#9E6B24" />
+                <Text style={styles.premiumGuideTitle}>
+                  {pairStats.myPastUnansweredDays > 0
+                    ? t('history.premiumGuide.titleFreeHasPast', {
+                        count: pairStats.myPastUnansweredDays,
+                      })
+                    : t('history.premiumGuide.titleFreeNoPast')}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={15} color="#9E6B24" />
+            </View>
+            <Text style={styles.premiumGuideText}>
+              {pairStats.pastPartnerAnsweredUnansweredDays > 0
+                ? t('history.premiumGuide.descFreePartnerAnswered', {
+                    partnerName,
+                    count: pairStats.pastPartnerAnsweredUnansweredDays,
+                  })
+                : t('history.premiumGuide.descFree')}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.8}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={16} color={COLORS.text} />
+          <Text style={styles.backButtonText}>{t('common.back')}</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <AnswerCalendarModal
         visible={isCalendarVisible}
@@ -445,12 +490,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 28,
     marginBottom: 6,
   },
   headerDesc: {
     fontSize: 13,
     color: COLORS.textMuted,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   statsCard: {
     marginBottom: 18,
@@ -464,16 +510,22 @@ const styles = StyleSheet.create({
   kpiItem: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 4,
+    minWidth: 0,
   },
   kpiValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
+    maxWidth: '100%',
   },
   kpiValue: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
     color: COLORS.text,
+    flexShrink: 1,
+    lineHeight: 23,
   },
   kpiValueUnanswered: {
     color: '#C97A2B',
@@ -483,6 +535,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
     marginTop: 2,
+    textAlign: 'center',
+    lineHeight: 15,
   },
   kpiDivider: {
     width: 1,
@@ -499,6 +553,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 17,
     marginBottom: 10,
   },
   categoryBarsList: {
@@ -518,10 +573,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 18,
   },
   categoryBarValue: {
     fontSize: 11.5,
     fontWeight: '800',
+    flexShrink: 0,
   },
   categoryBarTrack: {
     height: 7,
@@ -543,11 +600,13 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: COLORS.textMuted,
     textAlign: 'center',
+    lineHeight: 18,
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 19,
     marginBottom: 10,
     marginTop: 4,
   },
@@ -574,9 +633,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   calendarTriggerBody: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
   },
   calendarTriggerTopRow: {
@@ -589,6 +650,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 20,
+    flexShrink: 1,
   },
   calendarUnansweredPill: {
     backgroundColor: '#FDF3E7',
@@ -602,6 +665,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: '#9E6B24',
+    lineHeight: 15,
   },
   calendarDonePill: {
     backgroundColor: '#E8F4EC',
@@ -613,11 +677,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: '#3B6347',
+    lineHeight: 15,
   },
   calendarTriggerSub: {
     fontSize: 11.5,
     color: COLORS.textMuted,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   premiumGuideCard: {
     backgroundColor: '#FFFBF3',
@@ -631,6 +696,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 5,
   },
   premiumGuideTitleRow: {
@@ -638,16 +704,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flex: 1,
+    minWidth: 0,
   },
   premiumGuideTitle: {
+    flex: 1,
     fontSize: 12.5,
     fontWeight: '800',
     color: '#8C5A1B',
+    lineHeight: 19,
   },
   premiumGuideText: {
     fontSize: 11.5,
     color: '#7A5B32',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   list: {
     gap: 14,
@@ -662,8 +731,10 @@ const styles = StyleSheet.create({
   },
   cardTopRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 6,
     marginBottom: 8,
   },
   categoryBadge: {
@@ -671,11 +742,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
+    maxWidth: '100%',
   },
   categoryText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    lineHeight: 16,
   },
   repeatBadge: {
     flexDirection: 'row',
@@ -692,11 +765,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    lineHeight: 15,
   },
   questionTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 22,
     marginBottom: 12,
   },
   compareContainer: {
@@ -717,17 +792,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.textMuted,
+    lineHeight: 16,
     marginBottom: 4,
   },
   timeBlockLabelCurrent: {
     color: COLORS.primaryDark,
   },
   answersRow: {
-    gap: 2,
+    gap: 3,
   },
   userAnswerText: {
     fontSize: 12,
     color: COLORS.textMuted,
+    lineHeight: 18,
   },
   userAnswerCurrent: {
     fontWeight: '700',
@@ -747,12 +824,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
     marginBottom: 2,
   },
   singleSub: {
     fontSize: 11,
     color: COLORS.textLight,
     textAlign: 'center',
+    lineHeight: 17,
   },
   backButton: {
     flexDirection: 'row',
@@ -760,6 +840,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: COLORS.border,
@@ -769,5 +850,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 20,
   },
 });

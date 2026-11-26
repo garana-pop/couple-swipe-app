@@ -1,13 +1,17 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import i18n, { getCurrentLocale } from '../i18n';
+import { formatCurrencyAmount } from '../i18n/format';
 import type {
   AiReportData,
+  AiReportRiskPoint,
   BreakupCausePoint,
   BreakupReflectionData,
   PairAiReportRecord,
   PairBreakupReflectionRecord,
   PairEntitlement,
   Question,
+  RiskLevelKey,
 } from '../types';
 import { supabase } from './supabase';
 
@@ -73,20 +77,20 @@ function getNativePurchasesModule(): {
   if (Platform.OS === 'web') {
     return {
       rc: null,
-      unavailableReason: 'サブスクリプション購入は Android / iOS アプリから行えます。',
+      unavailableReason: i18n.t('errors.billing.webUnsupported'),
     };
   }
   if (Constants.executionEnvironment === 'storeClient') {
     return {
       rc: null,
-      unavailableReason: 'テスト環境ではアプリ内課金を利用できません。ストア配信版アプリからご購入ください。',
+      unavailableReason: i18n.t('errors.billing.expoGoUnsupported'),
     };
   }
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
     return {
       rc: null,
-      unavailableReason: '現在ストア課金の準備中です。公開までしばらくお待ちください。',
+      unavailableReason: i18n.t('errors.billing.notReady'),
     };
   }
 
@@ -96,13 +100,13 @@ function getNativePurchasesModule(): {
     const mod = require('react-native-purchases');
     const rc = (mod?.default ?? mod) as RcModule;
     if (!rc || typeof rc.configure !== 'function') {
-      return { rc: null, unavailableReason: '課金機能を読み込めませんでした。アプリを再起動してお試しください。' };
+      return { rc: null, unavailableReason: i18n.t('errors.billing.moduleLoadFailed') };
     }
     return { rc };
   } catch {
     return {
       rc: null,
-      unavailableReason: '現在のビルドではアプリ内課金を利用できません。ストア配信版アプリをご利用ください。',
+      unavailableReason: i18n.t('errors.billing.buildUnsupported'),
     };
   }
 }
@@ -115,25 +119,30 @@ function hasAnyActiveEntitlement(info: unknown): boolean {
   return Boolean(active.premium) || Object.keys(active).length > 0;
 }
 
+export function normalizeRiskLevel(level: unknown): RiskLevelKey {
+  if (typeof level !== 'string') return 'medium';
+  const normalized = level.trim().toLowerCase();
+  if (normalized === 'low' || normalized === '低') return 'low';
+  if (normalized === 'high' || normalized === '高') return 'high';
+  return 'medium';
+}
+
 function formatYearlyMeta(
   annualPkg: RcPackage | null,
   monthlyPkg: RcPackage | null
 ): { perMonthLabel: string; discountBadge: string } {
+  const locale = getCurrentLocale();
   const annualPrice = annualPkg?.product?.price;
   const monthlyPrice = monthlyPkg?.product?.price;
-  const currency = annualPkg?.product?.currencyCode ?? 'JPY';
+  const currency = annualPkg?.product?.currencyCode ?? 'USD';
 
-  let perMonthLabel = '月250円相当・2人共有';
+  let perMonthLabel = i18n.t('aiReport.plans.perMonthFallback');
   if (typeof annualPrice === 'number' && annualPrice > 0) {
-    const monthlyEq = Math.round(annualPrice / 12);
-    if (currency === 'JPY') {
-      perMonthLabel = `月¥${monthlyEq.toLocaleString('ja-JP')}相当・2人共有`;
-    } else {
-      perMonthLabel = `月あたり ${(annualPrice / 12).toFixed(2)} ${currency}・2人共有`;
-    }
+    const formattedMonthly = formatCurrencyAmount(annualPrice / 12, currency, locale);
+    perMonthLabel = i18n.t('aiReport.plans.perMonthLabel', { price: formattedMonthly });
   }
 
-  let discountBadge = '月額比 50% OFF';
+  let discountBadge = i18n.t('aiReport.plans.recommendedBadge');
   if (
     typeof annualPrice === 'number' &&
     typeof monthlyPrice === 'number' &&
@@ -143,26 +152,28 @@ function formatYearlyMeta(
     const yearlyAtMonthly = monthlyPrice * 12;
     const discountPct = Math.round((1 - annualPrice / yearlyAtMonthly) * 100);
     if (discountPct >= 5 && discountPct < 100) {
-      discountBadge = `月額比 ${discountPct}% OFF`;
-    } else {
-      discountBadge = 'おすすめ年額';
+      discountBadge = i18n.t('aiReport.plans.discountBadge', { percent: discountPct });
     }
   }
 
   return { perMonthLabel, discountBadge };
 }
 
+export function getDefaultBillingOfferingPrices(): BillingOfferingPrices {
+  return {
+    isStoreReady: false,
+    yearlyPriceLabel: i18n.t('aiReport.plans.priceLoading'),
+    yearlyPerMonthLabel: i18n.t('aiReport.plans.perMonthFallback'),
+    yearlyDiscountBadge: i18n.t('aiReport.plans.recommendedBadge'),
+    monthlyPriceLabel: i18n.t('aiReport.plans.priceLoading'),
+  };
+}
+
 /**
- * 開発ビルド／本番ビルド上で RevenueCat SDK を初期化し、Google Play / App Store の価格情報を取得する
+ * 開発ビルド／本番ビルド上で RevenueCat SDK を初期化し、ストア価格情報を取得する
  */
 export async function initializeBilling(userId: string): Promise<BillingOfferingPrices> {
-  const fallback: BillingOfferingPrices = {
-    isStoreReady: false,
-    yearlyPriceLabel: '¥3,000 / 年',
-    yearlyPerMonthLabel: '月250円相当・2人共有',
-    yearlyDiscountBadge: '月額比 50% OFF',
-    monthlyPriceLabel: '¥500 / 月',
-  };
+  const fallback = getDefaultBillingOfferingPrices();
 
   const { rc, unavailableReason } = getNativePurchasesModule();
   if (!rc) {
@@ -199,30 +210,31 @@ export async function initializeBilling(userId: string): Promise<BillingOffering
     return {
       isStoreReady: Boolean(cachedAnnualPkg || cachedMonthlyPkg),
       yearlyPriceLabel: cachedAnnualPkg?.product?.priceString
-        ? `${cachedAnnualPkg.product.priceString} / 年`
+        ? i18n.t('aiReport.plans.yearlyPriceFormat', {
+            price: cachedAnnualPkg.product.priceString,
+          })
         : fallback.yearlyPriceLabel,
       yearlyPerMonthLabel: perMonthLabel,
       yearlyDiscountBadge: discountBadge,
       monthlyPriceLabel: cachedMonthlyPkg?.product?.priceString
-        ? `${cachedMonthlyPkg.product.priceString} / 月`
+        ? i18n.t('aiReport.plans.monthlyPriceFormat', {
+            price: cachedMonthlyPkg.product.priceString,
+          })
         : fallback.monthlyPriceLabel,
       unavailableReason:
         cachedAnnualPkg || cachedMonthlyPkg
           ? undefined
-          : 'ストアの商品情報を取得できませんでした。通信環境を確認のうえ再度お試しください。',
+          : i18n.t('errors.billing.storeFetchFailed'),
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     return {
       ...fallback,
-      unavailableReason: `課金情報の取得に失敗しました（${detail}）。`,
+      unavailableReason: i18n.t('errors.billing.fetchFailed', { detail }),
     };
   }
 }
 
-/**
- * アカウント削除・切替時に RevenueCat セッション状態をリセット
- */
 export async function resetBillingSession(): Promise<void> {
   configuredUserId = null;
   cachedAnnualPkg = null;
@@ -232,7 +244,7 @@ export async function resetBillingSession(): Promise<void> {
     try {
       await rc.logOut();
     } catch {
-      // 匿名状態などで logOut が不要な場合は無視
+      // ignore
     }
   }
 }
@@ -242,14 +254,14 @@ export async function purchaseSubscriptionPlan(
 ): Promise<{ ok: boolean; hasActiveEntitlement?: boolean; cancelled?: boolean; error?: string }> {
   const { rc, unavailableReason } = getNativePurchasesModule();
   if (!rc) {
-    return { ok: false, error: unavailableReason ?? '現在この環境では購入できません。' };
+    return { ok: false, error: unavailableReason ?? i18n.t('errors.billing.cannotPurchaseHere') };
   }
 
   const pkg = plan === 'yearly' ? cachedAnnualPkg : cachedMonthlyPkg;
   if (!pkg) {
     return {
       ok: false,
-      error: '購入対象プランの情報を取得できませんでした。少し待ってから再度お試しください。',
+      error: i18n.t('errors.billing.packageNotFound'),
     };
   }
 
@@ -266,7 +278,9 @@ export async function purchaseSubscriptionPlan(
     }
     return {
       ok: false,
-      error: `購入処理に失敗しました（${rcErr?.message ?? '不明なエラー'}）。`,
+      error: i18n.t('errors.billing.purchaseFailed', {
+        detail: rcErr?.message ?? i18n.t('errors.billing.unknownError'),
+      }),
     };
   }
 }
@@ -278,7 +292,7 @@ export async function restoreSubscriptionPurchases(): Promise<{
 }> {
   const { rc, unavailableReason } = getNativePurchasesModule();
   if (!rc) {
-    return { ok: false, error: unavailableReason ?? '現在この環境では復元できません。' };
+    return { ok: false, error: unavailableReason ?? i18n.t('errors.billing.cannotRestoreHere') };
   }
   try {
     const customerInfo = await rc.restorePurchases();
@@ -288,14 +302,10 @@ export async function restoreSubscriptionPurchases(): Promise<{
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: `購入の復元に失敗しました（${detail}）。` };
+    return { ok: false, error: i18n.t('errors.billing.restoreFailed', { detail }) };
   }
 }
 
-/**
- * 購入直後・復元直後に Supabase Edge Function（sync-subscription）を呼び出し、
- * Webhook 到着前でも即座に DB（user_subscriptions）へ最新課金状態を反映する
- */
 export async function syncSubscriptionWithServer(): Promise<{
   ok: boolean;
   synced: boolean;
@@ -318,9 +328,6 @@ export async function syncSubscriptionWithServer(): Promise<{
   }
 }
 
-/**
- * サーバー側同期を実行し、Webhook 遅延がある場合も数秒リトライして最新の PairEntitlement を取得する
- */
 export async function syncAndFetchPairEntitlement(
   expectPremium = false
 ): Promise<PairEntitlement | null> {
@@ -357,8 +364,21 @@ function parseReportRecord(raw: unknown): PairAiReportRecord | null {
   ) {
     return null;
   }
+
+  const rawRisks: unknown[] = Array.isArray(report.riskPoints) ? report.riskPoints : [];
+  const riskPoints: AiReportRiskPoint[] = rawRisks
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    .map((item) => ({
+      title: typeof item.title === 'string' ? item.title : '',
+      level: normalizeRiskLevel(item.level),
+      desc: typeof item.desc === 'string' ? item.desc : '',
+      advice: typeof item.advice === 'string' ? item.advice : '',
+    }))
+    .filter((item) => Boolean(item.title || item.desc));
+
   return {
     id: String(r.id ?? ''),
+    locale: typeof r.locale === 'string' ? r.locale : undefined,
     analyzedDays: Number(r.analyzed_days ?? 0),
     analyzedAnswers: Number(r.analyzed_answers ?? 0),
     modelUsed: String(r.model_used ?? ''),
@@ -367,15 +387,15 @@ function parseReportRecord(raw: unknown): PairAiReportRecord | null {
       reportType: 'compatibility',
       overallScore: typeof report.overallScore === 'number' ? report.overallScore : 80,
       myType: {
-        tag: report.myType?.tag ?? 'バランスタイプ',
+        tag: report.myType?.tag ?? i18n.t('aiReport.fallbackTypes.myTag'),
         desc: report.myType?.desc ?? '',
       },
       partnerType: {
-        tag: report.partnerType?.tag ?? 'おおらかタイプ',
+        tag: report.partnerType?.tag ?? i18n.t('aiReport.fallbackTypes.partnerTag'),
         desc: report.partnerType?.desc ?? '',
       },
       chemistrySummary: report.chemistrySummary,
-      riskPoints: Array.isArray(report.riskPoints) ? report.riskPoints : [],
+      riskPoints,
       nextActionTip: report.nextActionTip ?? '',
     },
   };
@@ -397,7 +417,7 @@ function parseBreakupReflectionRecord(raw: unknown): PairBreakupReflectionRecord
   const rootCauses: BreakupCausePoint[] = rawCauses
     .filter((c): c is Partial<BreakupCausePoint> => Boolean(c && typeof c === 'object'))
     .map((c) => ({
-      title: typeof c.title === 'string' ? c.title : '価値観やペースの違い',
+      title: typeof c.title === 'string' ? c.title : i18n.t('aiReport.fallbackTypes.causeTitle'),
       background: typeof c.background === 'string' ? c.background : '',
       takeaway: typeof c.takeaway === 'string' ? c.takeaway : '',
     }))
@@ -405,6 +425,7 @@ function parseBreakupReflectionRecord(raw: unknown): PairBreakupReflectionRecord
 
   return {
     id: String(r.id ?? ''),
+    locale: typeof r.locale === 'string' ? r.locale : undefined,
     analyzedDays: Number(r.analyzed_days ?? 0),
     analyzedAnswers: Number(r.analyzed_answers ?? 0),
     modelUsed: String(r.model_used ?? ''),
@@ -422,12 +443,17 @@ function parseBreakupReflectionRecord(raw: unknown): PairBreakupReflectionRecord
   };
 }
 
-/**
- * サーバー側（Supabase RPC）からペア共有の課金状態と最新キャッシュ済みAIレポートを取得する
- */
 export async function fetchPairEntitlement(): Promise<PairEntitlement | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.rpc('get_pair_entitlement');
+  const locale = getCurrentLocale();
+
+  let res = await supabase.rpc('get_pair_entitlement', { p_locale: locale });
+  if (res.error) {
+    // マイグレーション適用前サーバーとの後方互換フォールバック
+    res = await supabase.rpc('get_pair_entitlement');
+  }
+
+  const { data, error } = res;
   if (error || !data || typeof data !== 'object') {
     return null;
   }
@@ -450,9 +476,6 @@ export async function fetchPairEntitlement(): Promise<PairEntitlement | null> {
   };
 }
 
-/**
- * 有料ペア向けに過去の AI レポート（通常相性診断 ＆ 別れ・関係性の振り返り診断）を1クエリで取得する
- */
 export async function fetchPairAllAiReports(
   pairId: string,
   limit = 30
@@ -463,23 +486,43 @@ export async function fetchPairAllAiReports(
   if (!supabase || !pairId) {
     return { compatibilityReports: [], reflectionReports: [] };
   }
-  const { data, error } = await supabase
+  const locale = getCurrentLocale();
+
+  let rows: Record<string, unknown>[] | null = null;
+  const withLocaleRes = await supabase
     .from('pair_ai_reports')
-    .select('id, analyzed_days, analyzed_answers, model_used, created_at, report_json')
+    .select('id, locale, analyzed_days, analyzed_answers, model_used, created_at, report_json')
     .eq('pair_id', pairId)
+    .eq('locale', locale)
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error || !Array.isArray(data)) {
+  if (!withLocaleRes.error && Array.isArray(withLocaleRes.data)) {
+    rows = withLocaleRes.data as Record<string, unknown>[];
+  } else {
+    // マイグレーション適用前サーバーとの後方互換フォールバック
+    const legacyRes = await supabase
+      .from('pair_ai_reports')
+      .select('id, analyzed_days, analyzed_answers, model_used, created_at, report_json')
+      .eq('pair_id', pairId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (!legacyRes.error && Array.isArray(legacyRes.data)) {
+      rows = legacyRes.data as Record<string, unknown>[];
+    }
+  }
+
+  if (!rows) {
     return { compatibilityReports: [], reflectionReports: [] };
   }
 
   const compatibilityReports: PairAiReportRecord[] = [];
   const reflectionReports: PairBreakupReflectionRecord[] = [];
 
-  for (const row of data) {
+  for (const row of rows) {
     const wrapped = {
       id: row.id,
+      locale: row.locale,
       analyzed_days: row.analyzed_days,
       analyzed_answers: row.analyzed_answers,
       model_used: row.model_used,
@@ -500,9 +543,6 @@ export async function fetchPairAllAiReports(
   return { compatibilityReports, reflectionReports };
 }
 
-/**
- * 有料ペア向けに過去の AI 相性レポート履歴を新しい順に一覧取得する（RLS で有料ペアメンバーのみ許可）
- */
 export async function fetchPairAiReportHistory(
   pairId: string,
   limit = 20
@@ -514,23 +554,23 @@ export async function fetchPairAiReportHistory(
 function formatAiReportError(code: string): string {
   switch (code) {
     case 'PREMIUM_REQUIRED':
-      return 'AI 診断レポートの生成には「ふたりプレミアムプラン」への加入が必要です（パートナーの加入でも利用できます）。';
+      return i18n.t('errors.billing.ai.premiumRequired');
     case 'NOT_IN_PAIR':
-      return 'ペアの回答履歴が見つかりませんでした。ペアを作成または参加してからお試しください。';
+      return i18n.t('errors.billing.ai.notInPair');
     case 'PARTNER_NOT_CONNECTED':
-      return 'パートナーとのペア連携完了後に通常の AI 相性レポートを作成できます（相手がペア解除済みの場合は、画面下部の「すれ違い・別れの原因 AI 振り返り診断」をご利用いただけます）。';
+      return i18n.t('errors.billing.ai.partnerNotConnected');
     case 'NOT_ENOUGH_DATA':
-      return '分析できる回答データがまだありません。回答履歴が1日分以上溜まるとお試しいただけます。';
+      return i18n.t('errors.billing.ai.notEnoughData');
     case 'DAILY_LIMIT_EXCEEDED':
-      return '本日の AI 診断レポート生成回数の上限（1日2回）に達しました。明日になってから再度お試しください。';
+      return i18n.t('errors.billing.ai.dailyLimit');
     case 'MONTHLY_LIMIT_EXCEEDED':
-      return '直近30日間の AI 診断レポート生成回数の上限（月30回）に達しました。しばらく期間をあけてから再度お試しください。';
+      return i18n.t('errors.billing.ai.monthlyLimit');
     case 'AI_OVERLOADED':
-      return '現在 AI サーバーが混み合っています。少し時間をおいてからもう一度お試しください。';
+      return i18n.t('errors.billing.ai.overloaded');
     case 'AI_PROVIDER_NOT_CONFIGURED':
-      return '現在 AI 診断機能をメンテナンス中です。しばらくしてからお試しください。';
+      return i18n.t('errors.billing.ai.notConfigured');
     default:
-      return 'AI レポートの生成に失敗しました。しばらくしてからもう一度お試しください。';
+      return i18n.t('errors.billing.ai.generic');
   }
 }
 
@@ -568,9 +608,6 @@ async function extractEdgeFunctionErrorCode(error: unknown): Promise<string> {
   return error instanceof Error ? error.message : '';
 }
 
-/**
- * サーバー側 Edge Function（generate-ai-report）を呼び出し、課金確認後に AI 相性レポートを生成・取得する
- */
 export async function generateServerAiReport(
   questionsById: Record<string, Question>,
   forceRefresh = false
@@ -581,12 +618,13 @@ export async function generateServerAiReport(
   error?: string;
 }> {
   if (!supabase) {
-    return { ok: false, error: 'サーバーに接続されていません。' };
+    return { ok: false, error: i18n.t('errors.notConnectedServer') };
   }
 
+  const locale = getCurrentLocale();
   const questionCatalog = buildQuestionCatalogPayload(questionsById);
   const { data, error } = await supabase.functions.invoke('generate-ai-report', {
-    body: { mode: 'compatibility', forceRefresh, questionCatalog },
+    body: { mode: 'compatibility', locale, forceRefresh, questionCatalog },
   });
 
   if (error) {
@@ -606,7 +644,7 @@ export async function generateServerAiReport(
 
   const parsed = parseReportRecord(payload?.reportRecord);
   if (!parsed) {
-    return { ok: false, error: 'レポートデータの読み込みに失敗しました。' };
+    return { ok: false, error: i18n.t('errors.billing.aiReportLoadFailed') };
   }
 
   return {
@@ -616,10 +654,6 @@ export async function generateServerAiReport(
   };
 }
 
-/**
- * 別れ・関係性の振り返り AI 診断を生成・取得する
- * （相手がすでにペアを解除して1人だけ残っている状態でも、残存回答履歴から優しく分析可能）
- */
 export async function generateServerBreakupReflection(
   questionsById: Record<string, Question>,
   forceRefresh = false
@@ -630,12 +664,13 @@ export async function generateServerBreakupReflection(
   error?: string;
 }> {
   if (!supabase) {
-    return { ok: false, error: 'サーバーに接続されていません。' };
+    return { ok: false, error: i18n.t('errors.notConnectedServer') };
   }
 
+  const locale = getCurrentLocale();
   const questionCatalog = buildQuestionCatalogPayload(questionsById);
   const { data, error } = await supabase.functions.invoke('generate-ai-report', {
-    body: { mode: 'breakup_reflection', forceRefresh, questionCatalog },
+    body: { mode: 'breakup_reflection', locale, forceRefresh, questionCatalog },
   });
 
   if (error) {
@@ -655,7 +690,7 @@ export async function generateServerBreakupReflection(
 
   const parsed = parseBreakupReflectionRecord(payload?.reportRecord);
   if (!parsed) {
-    return { ok: false, error: '振り返りレポートの読み込みに失敗しました。' };
+    return { ok: false, error: i18n.t('errors.billing.reflectionLoadFailed') };
   }
 
   return {

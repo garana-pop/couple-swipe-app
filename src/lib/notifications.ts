@@ -12,6 +12,7 @@ import {
   setNotificationChannelAsync,
   setNotificationHandler,
 } from 'expo-notifications';
+import i18n from '../i18n';
 import { supabase } from './supabase';
 import {
   DailyReminderSettings,
@@ -57,30 +58,31 @@ export function configureNotificationHandler(): void {
 }
 
 /**
- * Android 用通知チャンネルを作成（ローカル通知・相手回答プッシュ通知で分離）
- * - sound を省略することで Android 標準のデフォルト通知音＆AudioAttributes が使われる
- * - Expo Go の一部 Android 環境でチャンネル作成が失敗した場合でもローカル通知自体は動かせるよう boolean を返す
+ * Android 用通知チャンネルを作成・更新（ローカル通知・相手回答プッシュ通知で分離）
  */
 export async function ensureNotificationChannels(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
 
   try {
     await setNotificationChannelAsync(DAILY_CHANNEL_ID, {
-      name: '今日の質問リマインダー',
-      description: '毎日決まった時刻に「今日の質問が届きました」をお知らせします。',
+      name: i18n.t('notifications.channels.dailyName'),
+      description: i18n.t('notifications.channels.dailyDesc'),
       importance: AndroidImportance.DEFAULT,
     });
 
     await setNotificationChannelAsync(PARTNER_CHANNEL_ID, {
-      name: 'パートナーの回答通知',
-      description: 'パートナーが今日の質問に回答したときにお知らせします。',
+      name: i18n.t('notifications.channels.partnerName'),
+      description: i18n.t('notifications.channels.partnerDesc'),
       importance: AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
     });
 
     return true;
   } catch (err) {
-    console.warn('[Notifications] setNotificationChannelAsync failed, falling back to default channel:', err);
+    console.warn(
+      '[Notifications] setNotificationChannelAsync failed, falling back to default channel:',
+      err
+    );
     return false;
   }
 }
@@ -96,7 +98,7 @@ async function ensureNotificationPermission(): Promise<boolean> {
 }
 
 /**
- * 7-1: 毎日のローカル通知（「今日の質問が届きました」）を予約する
+ * 7-1: 毎日のローカル通知を現在の表示言語で予約する
  */
 export async function scheduleDailyReminder(
   hour: number,
@@ -105,7 +107,7 @@ export async function scheduleDailyReminder(
   if (Platform.OS === 'web') {
     return {
       ok: false,
-      error: 'ローカル通知は Android / iOS アプリで利用できます（Web ブラウザでは利用できません）。',
+      error: i18n.t('notifications.webUnsupported'),
     };
   }
 
@@ -116,7 +118,7 @@ export async function scheduleDailyReminder(
   if (!granted) {
     return {
       ok: false,
-      error: '通知の許可が必要です。端末のアプリ設定から通知を許可してください。',
+      error: i18n.t('notifications.permissionNeeded'),
     };
   }
 
@@ -132,8 +134,8 @@ export async function scheduleDailyReminder(
   try {
     const notificationId = await scheduleNotificationAsync({
       content: {
-        title: '今日の3問が届きました',
-        body: 'パートナーとの価値観スワイプ、今日も30秒で答えてみましょう！',
+        title: i18n.t('notifications.dailyTitle'),
+        body: i18n.t('notifications.dailyBody'),
         sound: true,
         data: { screen: 'home', type: 'daily_reminder' },
       },
@@ -158,8 +160,23 @@ export async function scheduleDailyReminder(
     const detail = err instanceof Error ? err.message : String(err);
     return {
       ok: false,
-      error: `リマインダーの予約に失敗しました（${detail}）。`,
+      error: i18n.t('notifications.scheduleFailed', { detail }),
     };
+  }
+}
+
+/**
+ * OS 言語切替時に、通知チャンネル名と予約済みデイリー通知の文言を新しい言語へ更新する
+ */
+export async function refreshNotificationsForLocale(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  await ensureNotificationChannels();
+  const current = await getDailyReminderSettings();
+  if (current.enabled) {
+    const perm = await getPermissionsAsync();
+    if (perm.status === 'granted') {
+      await scheduleDailyReminder(current.hour, current.minute);
+    }
   }
 }
 
@@ -186,11 +203,11 @@ export async function cancelDailyReminder(): Promise<DailyReminderSettings> {
 }
 
 /**
- * 7-1: 実機（Expo Go でも動作）でローカル通知を3秒後にテスト送信する
+ * 7-1: 実機でローカル通知を3秒後にテスト送信する
  */
 export async function sendTestLocalNotification(): Promise<{ ok: boolean; error?: string }> {
   if (Platform.OS === 'web') {
-    return { ok: false, error: 'テスト通知は Android / iOS 端末でお試しください。' };
+    return { ok: false, error: i18n.t('notifications.testWebUnsupported') };
   }
 
   configureNotificationHandler();
@@ -198,14 +215,14 @@ export async function sendTestLocalNotification(): Promise<{ ok: boolean; error?
 
   const granted = await ensureNotificationPermission();
   if (!granted) {
-    return { ok: false, error: '通知の許可が必要です。端末設定から許可してください。' };
+    return { ok: false, error: i18n.t('notifications.testPermissionNeeded') };
   }
 
   try {
     await scheduleNotificationAsync({
       content: {
-        title: '【テスト】今日の3問が届きました',
-        body: '毎日設定した時刻にこのようにリマインダー通知が届きます。',
+        title: i18n.t('notifications.testTitle'),
+        body: i18n.t('notifications.testBody'),
         sound: true,
         data: { screen: 'home', type: 'test_reminder' },
       },
@@ -219,7 +236,7 @@ export async function sendTestLocalNotification(): Promise<{ ok: boolean; error?
     return { ok: true };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: `テスト通知の予約に失敗しました（${detail}）。` };
+    return { ok: false, error: i18n.t('notifications.testScheduleFailed', { detail }) };
   }
 }
 
@@ -232,7 +249,6 @@ function getEasProjectId(): string | null {
 
 /**
  * 7-2: Expo Push Token を取得して Supabase profiles.expo_push_token に保存する
- * - Expo Go (Android SDK 53+) ではリモートプッシュ非対応のためエラーにせず案内ステータスを返す
  */
 export async function registerForPushNotificationsAsync(): Promise<PushRegistrationResult> {
   if (Platform.OS === 'web') {
@@ -243,17 +259,16 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
     return {
       status: 'simulator_unsupported',
       token: null,
-      message: 'プッシュ通知は実機でのみ登録できます。',
+      message: i18n.t('notifications.simulatorUnsupported'),
     };
   }
 
-  // Expo Go（storeClient）の Android は SDK 53 以降リモートプッシュ非対応
   const isExpoGo = Constants.executionEnvironment === 'storeClient';
   if (isExpoGo && Platform.OS === 'android') {
     return {
       status: 'expo_go_unsupported',
       token: null,
-      message: 'Expo Go (Android) ではリモートプッシュ非対応のため、開発ビルド導入後に自動で有効になります。',
+      message: i18n.t('notifications.expoGoAndroidUnsupported'),
     };
   }
 
@@ -265,7 +280,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
     return {
       status: 'permission_denied',
       token: null,
-      message: '通知が許可されていません。端末の設定から許可してください。',
+      message: i18n.t('notifications.pushPermissionDenied'),
     };
   }
 
@@ -274,7 +289,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
     return {
       status: 'missing_project_id',
       token: null,
-      message: 'EAS プロジェクト未紐付けです（eas init 後に自動でプッシュ登録されます）。',
+      message: i18n.t('notifications.missingProjectId'),
     };
   }
 
@@ -294,14 +309,13 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
     return {
       status: 'error',
       token: null,
-      message: `プッシュ通知の登録に失敗しました（${detail}）。`,
+      message: i18n.t('notifications.pushRegisterFailed', { detail }),
     };
   }
 }
 
 /**
  * 7-2: 自分の全問回答完了時にパートナーへプッシュ通知を送る Edge Function を呼び出す
- * - サーバー側で完了検証＆重複防止を行うため、失敗してもアプリ進行には影響させない
  */
 export async function notifyPartnerAnswered(quizDate: string): Promise<void> {
   if (!supabase) return;

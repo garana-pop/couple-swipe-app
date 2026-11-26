@@ -9,25 +9,18 @@ import {
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { SwipeCard } from '../components/SwipeCard';
 import { DayQuizData, SwipeDirection } from '../types';
 import { COLORS } from '../constants/theme';
+import { getCurrentLocale } from '../i18n';
+import { formatIsoFullDate, formatIsoShortDate } from '../i18n/format';
 import { showAlert } from '../lib/alert';
 
-function formatShortDate(dateStr: string): string {
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  return `${Number(parts[1])}月${Number(parts[2])}日`;
-}
-
-function formatFullDate(dateStr: string): string {
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  return `${parts[0]}年${Number(parts[1])}月${Number(parts[2])}日`;
-}
-
 export default function QuizScreen() {
+  const { t } = useTranslation();
+  const locale = getCurrentLocale();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const rawDate = Array.isArray(dateParam) ? dateParam[0] : dateParam;
 
@@ -47,6 +40,8 @@ export default function QuizScreen() {
     rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && rawDate !== todayDate
   );
   const targetDate = isPastQuiz ? rawDate! : todayDate;
+  const shortTargetDate = formatIsoShortDate(targetDate, locale);
+  const fullTargetDate = formatIsoFullDate(targetDate, locale);
 
   const [pastData, setPastData] = useState<DayQuizData | null>(null);
   const [pastMyAnswers, setPastMyAnswers] = useState<Record<string, SwipeDirection>>({});
@@ -55,14 +50,12 @@ export default function QuizScreen() {
   const [retryNonce, setRetryNonce] = useState(0);
   const submittingRef = useRef(false);
 
-  // 途中まで回答済みの場合、最初の未回答質問から再開（当日モード用初期値）
   const initialIndex = Math.max(
     0,
     questions.findIndex((q) => !myAnswers[q.id])
   );
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
-  // 過去日モードのデータ読み込み
   useEffect(() => {
     if (!isPastQuiz) return;
 
@@ -73,7 +66,7 @@ export default function QuizScreen() {
         if (!active) return;
 
         if (!loaded || loaded.questions.length === 0) {
-          setPastLoadError('この日の出題データが見つかりませんでした。');
+          setPastLoadError(t('quiz.pastNotFound'));
           return;
         }
 
@@ -92,13 +85,14 @@ export default function QuizScreen() {
         setCurrentIndex(firstUnanswered >= 0 ? firstUnanswered : 0);
       } catch (err) {
         if (active) {
+          const typedErr = err as Error & { code?: string };
           const msg =
-            err instanceof Error && err.message
-              ? err.message
-              : '過去の質問データの読み込みに失敗しました。';
+            typedErr instanceof Error && typedErr.message
+              ? typedErr.message
+              : t('quiz.pastLoadFailed');
           setPastLoadError(msg);
-          if (msg.includes('プレミアム')) {
-            showAlert('プレミアム限定機能', msg);
+          if (typedErr?.code === 'PREMIUM_REQUIRED') {
+            showAlert(t('quiz.premiumOnlyTitle'), msg);
             router.replace({ pathname: '/ai-report', params: { focus: 'plans' } });
           }
         }
@@ -112,9 +106,8 @@ export default function QuizScreen() {
     return () => {
       active = false;
     };
-  }, [isPastQuiz, targetDate, loadDayQuizData]);
+  }, [isPastQuiz, targetDate, loadDayQuizData, t]);
 
-  // 当日モード: 全問回答完了なら結果または待機画面へ自動遷移
   useEffect(() => {
     if (isPastQuiz) return;
     if (questions.length > 0 && questions.every((q) => !!myAnswers[q.id])) {
@@ -137,8 +130,8 @@ export default function QuizScreen() {
         if (!res.ok) {
           setRetryNonce((n) => n + 1);
           showAlert(
-            '通信エラー',
-            res.error ?? '回答の保存に失敗しました。通信環境をご確認のうえもう一度お試しください。'
+            t('quiz.networkErrorTitle'),
+            res.error ?? t('errors.answerSaveFailed')
           );
           return;
         }
@@ -151,7 +144,6 @@ export default function QuizScreen() {
         return;
       }
 
-      // 過去日モード: RLS で課金チェックしつつ保存
       const nextAnswers: Record<string, SwipeDirection> = {
         ...activeMyAnswers,
         [currentQuestion.id]: direction,
@@ -162,8 +154,8 @@ export default function QuizScreen() {
       const res = await submitPastAnswer(targetDate, currentQuestion.id, direction, isFinalQuestion);
       if (!res.ok) {
         setRetryNonce((n) => n + 1);
-        showAlert('回答できませんでした', res.error ?? '過去の質問の保存に失敗しました。');
-        if (res.error?.includes('プレミアム')) {
+        showAlert(t('quiz.cannotAnswerTitle'), res.error ?? t('quiz.pastSaveFailed'));
+        if (res.errorCode === 'PREMIUM_REQUIRED') {
           router.replace({ pathname: '/ai-report', params: { focus: 'plans' } });
         }
         return;
@@ -183,8 +175,8 @@ export default function QuizScreen() {
           router.replace({ pathname: '/result', params: { date: targetDate } });
         } else {
           showAlert(
-            '過去のお題に回答しました',
-            `${formatShortDate(targetDate)}のお題への回答を記録しました！${partnerName}さんもこの日に回答すると、結果と一致率が履歴に表示されます。`
+            t('quiz.pastCompletedTitle'),
+            t('quiz.pastCompletedBody', { date: shortTargetDate, partnerName })
           );
           router.replace('/history');
         }
@@ -194,13 +186,17 @@ export default function QuizScreen() {
     }
   };
 
+  const screenTitle = isPastQuiz
+    ? t('nav.quizPast', { date: shortTargetDate })
+    : t('nav.quiz');
+
   if (isPastQuiz && loadingPast) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Stack.Screen options={{ title: `${formatShortDate(targetDate)}の質問` }} />
+        <Stack.Screen options={{ title: screenTitle }} />
         <View style={styles.centerBox}>
           <ActivityIndicator color={COLORS.primary} size="large" />
-          <Text style={styles.centerText}>過去の質問を読み込んでいます...</Text>
+          <Text style={styles.centerText}>{t('quiz.loadingPast')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -209,14 +205,14 @@ export default function QuizScreen() {
   if (isPastQuiz && (pastLoadError || activeQuestions.length === 0)) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Stack.Screen options={{ title: `${formatShortDate(targetDate)}の質問` }} />
+        <Stack.Screen options={{ title: screenTitle }} />
         <View style={styles.centerBox}>
           <Ionicons name="alert-circle-outline" size={40} color={COLORS.textMuted} />
           <Text style={styles.centerText}>
-            {pastLoadError ?? 'この日の質問を表示できませんでした。'}
+            {pastLoadError ?? t('quiz.cannotShowQuestions')}
           </Text>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/history')}>
-            <Text style={styles.backBtnText}>履歴へ戻る</Text>
+            <Text style={styles.backBtnText}>{t('quiz.backToHistory')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -225,18 +221,14 @@ export default function QuizScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Stack.Screen
-        options={{
-          title: isPastQuiz ? `${formatShortDate(targetDate)}の質問` : '今日の質問',
-        }}
-      />
+      <Stack.Screen options={{ title: screenTitle }} />
       <View style={styles.container}>
         <View style={styles.header}>
           {isPastQuiz && (
             <View style={styles.pastBadge}>
               <Ionicons name="diamond" size={12} color="#8C5A1B" />
-              <Text style={styles.pastBadgeText}>
-                過去の未回答お題（{formatFullDate(targetDate)}）
+              <Text style={styles.pastBadgeText} numberOfLines={2}>
+                {t('quiz.pastBadge', { date: fullTargetDate })}
               </Text>
             </View>
           )}
@@ -251,7 +243,7 @@ export default function QuizScreen() {
           </View>
           <View style={styles.stepInfoRow}>
             <Text style={styles.stepText}>
-              第 {currentIndex + 1} 問 / 全 {total} 問
+              {t('quiz.stepProgress', { current: currentIndex + 1, total })}
             </Text>
           </View>
         </View>
@@ -290,7 +282,7 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   backBtn: {
     marginTop: 8,
@@ -303,6 +295,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13.5,
     fontWeight: '700',
+    lineHeight: 19,
   },
   header: {
     paddingHorizontal: 24,
@@ -322,11 +315,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
     alignSelf: 'center',
+    maxWidth: '100%',
   },
   pastBadgeText: {
     fontSize: 11,
     fontWeight: '800',
     color: '#8C5A1B',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   progressBarBg: {
     height: 6,
@@ -348,7 +345,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    lineHeight: 18,
   },
   cardArea: {
     flex: 1,

@@ -9,10 +9,17 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { getCurrentLocale } from '../i18n';
+import {
+  formatIsoFullDate,
+  formatIsoShortDate,
+  formatYearMonth,
+  getCalendarWeekdayLabels,
+} from '../i18n/format';
+import { getDeviceFirstWeekday } from '../i18n/locale';
 import type { CalendarDaySummary, HistoryDayItem } from '../types';
-
-const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 type DayVisualStatus =
   | 'inactive'
@@ -62,17 +69,6 @@ function getWeekdayUtc(year: number, month: number, day: number): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
-function formatJpFullDate(iso: string): string {
-  const { year, month, day } = parseIsoParts(iso);
-  const w = WEEKDAY_LABELS[getWeekdayUtc(year, month, day)] ?? '';
-  return `${year}年${month}月${day}日（${w}）`;
-}
-
-function formatJpShortDate(iso: string): string {
-  const { month, day } = parseIsoParts(iso);
-  return `${month}月${day}日`;
-}
-
 function shiftIsoDate(iso: string, deltaDays: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return iso;
@@ -103,6 +99,19 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
   onOpenWaiting,
   onOpenPremium,
 }) => {
+  const { t, i18n } = useTranslation();
+  const locale = getCurrentLocale();
+  const weekStartsOn = useMemo(() => getDeviceFirstWeekday(locale), [locale]);
+  const weekdayLabels = useMemo(
+    () => getCalendarWeekdayLabels(locale, weekStartsOn),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale, weekStartsOn, i18n.language]
+  );
+
+  // 週の開始曜日に応じた日曜・土曜の列インデックス
+  const sundayColIdx = (7 - weekStartsOn) % 7;
+  const saturdayColIdx = (6 - weekStartsOn) % 7;
+
   const todayParts = useMemo(() => parseIsoParts(todayDate), [todayDate]);
 
   const effectiveStartDate = useMemo(() => {
@@ -132,7 +141,6 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
     return map;
   }, [historyDays]);
 
-  // 最も新しい過去の未回答日を探す（モーダルを開いた直後にフォーカスするため）
   const latestPastUnansweredDate = useMemo(() => {
     if (!hasPair || !effectiveStartDate || effectiveStartDate >= todayDate) return null;
     let cursor = shiftIsoDate(todayDate, -1);
@@ -218,12 +226,12 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
     return 'past_unanswered';
   };
 
-  // 表示月のカレンダーセル配列（先頭空白 + 1..末日 + 末尾空白）
   const calendarCells = useMemo(() => {
-    const firstWeekday = getWeekdayUtc(displayYear, displayMonth, 1);
+    const firstDayOfWeek = getWeekdayUtc(displayYear, displayMonth, 1);
+    const leadingBlanks = (firstDayOfWeek - weekStartsOn + 7) % 7;
     const totalDays = getDaysInMonth(displayYear, displayMonth);
     const cells: (string | null)[] = [];
-    for (let i = 0; i < firstWeekday; i++) {
+    for (let i = 0; i < leadingBlanks; i++) {
       cells.push(null);
     }
     for (let d = 1; d <= totalDays; d++) {
@@ -233,9 +241,8 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
       cells.push(null);
     }
     return cells;
-  }, [displayYear, displayMonth]);
+  }, [displayYear, displayMonth, weekStartsOn]);
 
-  // 表示月のサマリー集計
   const monthSummary = useMemo(() => {
     let answered = 0;
     let unanswered = 0;
@@ -260,7 +267,6 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
   const handleTapDay = (iso: string, status: DayVisualStatus) => {
     if (status === 'inactive') return;
     userTouchedRef.current = true;
-    // すでに選択中の未回答過去日を課金ユーザーがもう一度タップしたら即回答へ進む
     if (
       selectedDate === iso &&
       isPairPremium &&
@@ -280,9 +286,7 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
     if (!hasPair || selectedStatus === 'inactive') {
       return (
         <View style={styles.detailCard}>
-          <Text style={styles.detailEmptyText}>
-            ペア連携を開始すると、毎日の回答・未回答ステータスがカレンダーに記録されます。
-          </Text>
+          <Text style={styles.detailEmptyText}>{t('calendar.emptyPanel')}</Text>
         </View>
       );
     }
@@ -291,8 +295,9 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
     const myCount = selectedRec?.myAnsweredCount ?? 0;
     const partnerCount = selectedRec?.partnerAnsweredCount ?? 0;
     const remaining = Math.max(1, totalQ - myCount);
+    const fullDateText = formatIsoFullDate(selectedDate, locale);
+    const shortDateText = formatIsoShortDate(selectedDate, locale);
 
-    // 1. 過去の未回答日（課金ユーザー → 遡り回答 / 無料ユーザー → 課金誘導）
     if (selectedStatus === 'past_unanswered' || selectedStatus === 'past_unanswered_partner_done') {
       return (
         <View
@@ -302,7 +307,7 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
           ]}
         >
           <View style={styles.detailHeaderRow}>
-            <Text style={styles.detailDate}>{formatJpFullDate(selectedDate)}</Text>
+            <Text style={styles.detailDate}>{fullDateText}</Text>
             <View style={isPairPremium ? styles.badgePremium : styles.badgeAmber}>
               <Ionicons
                 name={isPairPremium ? 'diamond' : 'lock-closed'}
@@ -310,7 +315,9 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
                 color="#8C5A1B"
               />
               <Text style={styles.badgeAmberText}>
-                {myCount > 0 ? `途中まで回答（残り${remaining}問）` : '未回答の日'}
+                {myCount > 0
+                  ? t('calendar.badges.partial', { count: remaining })
+                  : t('calendar.badges.unansweredDay')}
               </Text>
             </View>
           </View>
@@ -320,15 +327,21 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
               <Ionicons name="heart" size={14} color="#D97559" />
               <Text style={styles.partnerHighlightText}>
                 {isPairPremium
-                  ? `${partnerName}さんは ${partnerCount}問 回答済みです（ネタバレ防止のため伏せています）。今から遡って回答すると、相手の答えと一致率が見られます！`
-                  : `${partnerName}さんはこの日 ${partnerCount}問 回答済みです！プレミアムプランに加入すると、今から遡って回答して相手の答えと一致率を見られます。`}
+                  ? t('calendar.pastUnanswered.partnerDonePremium', {
+                      partnerName,
+                      count: partnerCount,
+                    })
+                  : t('calendar.pastUnanswered.partnerDoneFree', {
+                      partnerName,
+                      count: partnerCount,
+                    })}
               </Text>
             </View>
           ) : (
             <Text style={styles.detailDesc}>
               {isPairPremium
-                ? `この日のお題はまだ未回答です。プレミアム特典としてカレンダーから遡って回答できます（${partnerName}さんも回答すると一致率が表示されます）。`
-                : 'この日のお題はまだ未回答です。プレミアムプランに加入すると、答え忘れた過去日のお題もカレンダーからいつでも遡って回答できます（片方の課金で2人とも利用OK）。'}
+                ? t('calendar.pastUnanswered.descPremium', { partnerName })
+                : t('calendar.pastUnanswered.descFree')}
             </Text>
           )}
 
@@ -340,7 +353,10 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             >
               <Ionicons name="play-circle" size={17} color="#FFFFFF" />
               <Text style={styles.primaryCtaBtnText}>
-                {formatJpShortDate(selectedDate)}のお題に遡って回答する（残り{remaining}問）
+                {t('calendar.pastUnanswered.ctaPremium', {
+                  date: shortDateText,
+                  count: remaining,
+                })}
               </Text>
               <Ionicons name="chevron-forward" size={15} color="#FFFFFF" />
             </TouchableOpacity>
@@ -352,7 +368,7 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             >
               <Ionicons name="diamond" size={15} color="#FFFFFF" />
               <Text style={styles.primaryCtaBtnText}>
-                プレミアムで{formatJpShortDate(selectedDate)}に遡って回答する
+                {t('calendar.pastUnanswered.ctaFree', { date: shortDateText })}
               </Text>
               <Ionicons name="chevron-forward" size={15} color="#FFFFFF" />
             </TouchableOpacity>
@@ -361,20 +377,22 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
       );
     }
 
-    // 2. 今日の未回答（誰でも無料）
     if (selectedStatus === 'today_unanswered') {
       return (
         <View style={[styles.detailCard, styles.detailCardToday]}>
           <View style={styles.detailHeaderRow}>
-            <Text style={styles.detailDate}>{formatJpFullDate(selectedDate)}</Text>
+            <Text style={styles.detailDate}>{fullDateText}</Text>
             <View style={styles.badgeToday}>
-              <Text style={styles.badgeTodayText}>今日・未回答</Text>
+              <Text style={styles.badgeTodayText}>{t('calendar.badges.todayUnanswered')}</Text>
             </View>
           </View>
           <Text style={styles.detailDesc}>
             {partnerCount > 0
-              ? `${partnerName}さんは回答を進めています！今日のお題（残り${remaining}問）に回答して結果をひらきましょう。`
-              : `今日のお題（残り${remaining}問）はまだ未回答です。無料で今すぐ回答できます。`}
+              ? t('calendar.todayUnanswered.descPartnerStarted', {
+                  partnerName,
+                  count: remaining,
+                })
+              : t('calendar.todayUnanswered.descDefault', { count: remaining })}
           </Text>
           <TouchableOpacity
             style={styles.primaryCtaBtn}
@@ -382,29 +400,34 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             onPress={() => onAnswerDate(selectedDate, true)}
           >
             <Ionicons name="play" size={15} color="#FFFFFF" />
-            <Text style={styles.primaryCtaBtnText}>今日の質問へ進む（残り{remaining}問）</Text>
+            <Text style={styles.primaryCtaBtnText}>
+              {t('calendar.todayUnanswered.cta', { count: remaining })}
+            </Text>
             <Ionicons name="chevron-forward" size={15} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       );
     }
 
-    // 3. 双方回答完了
     if (selectedStatus === 'both_done') {
       const bothItems = selectedHistory?.items.filter((i) => i.myAnswer && i.partnerAnswer) ?? [];
       const matched = bothItems.filter((i) => i.isMatched).length;
       const rateText =
         bothItems.length > 0
-          ? `一致率 ${Math.round((matched / bothItems.length) * 100)}%（${matched}/${bothItems.length}問一致）`
-          : '二人とも回答完了しています';
+          ? t('calendar.bothDone.rateText', {
+              percentage: Math.round((matched / bothItems.length) * 100),
+              matched,
+              total: bothItems.length,
+            })
+          : t('calendar.bothDone.fallbackText');
 
       return (
         <View style={[styles.detailCard, styles.detailCardDone]}>
           <View style={styles.detailHeaderRow}>
-            <Text style={styles.detailDate}>{formatJpFullDate(selectedDate)}</Text>
+            <Text style={styles.detailDate}>{fullDateText}</Text>
             <View style={styles.badgeDone}>
               <Ionicons name="checkmark-circle" size={12} color="#3B6347" />
-              <Text style={styles.badgeDoneText}>双方回答済み</Text>
+              <Text style={styles.badgeDoneText}>{t('calendar.badges.bothDone')}</Text>
             </View>
           </View>
           <Text style={styles.detailDesc}>{rateText}</Text>
@@ -414,31 +437,33 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             onPress={() => onOpenResult(selectedDate, selectedDate === todayDate)}
           >
             <Ionicons name="sparkles-outline" size={15} color="#3B6347" />
-            <Text style={styles.secondaryCtaBtnText}>この日の診断結果・回答を見る</Text>
+            <Text style={styles.secondaryCtaBtnText}>{t('calendar.bothDone.cta')}</Text>
             <Ionicons name="chevron-forward" size={14} color="#3B6347" />
           </TouchableOpacity>
         </View>
       );
     }
 
-    // 4. 自分のみ回答完了（相手待ち / 相手未完了）
     const isToday = selectedDate === todayDate;
     const canViewPastPartial = !isToday && isPairPremium && partnerCount > 0;
     return (
       <View style={[styles.detailCard, styles.detailCardWaiting]}>
         <View style={styles.detailHeaderRow}>
-          <Text style={styles.detailDate}>{formatJpFullDate(selectedDate)}</Text>
+          <Text style={styles.detailDate}>{fullDateText}</Text>
           <View style={styles.badgeWaiting}>
             <Ionicons name="time-outline" size={12} color="#33587A" />
-            <Text style={styles.badgeWaitingText}>自分は回答済み</Text>
+            <Text style={styles.badgeWaitingText}>{t('calendar.badges.myDone')}</Text>
           </View>
         </View>
         <Text style={styles.detailDesc}>
           {isToday
-            ? `あなたは回答完了しています。${partnerName}さんの回答完了を待っています。`
+            ? t('calendar.myDoneWaiting.descToday', { partnerName })
             : partnerCount > 0
-              ? `あなたは回答完了済みです（${partnerName}さんは ${partnerCount}問 回答済み）。`
-              : `あなたは回答完了済みですが、${partnerName}さんはまだ未回答です。`}
+              ? t('calendar.myDoneWaiting.descPastPartnerPartial', {
+                  partnerName,
+                  count: partnerCount,
+                })
+              : t('calendar.myDoneWaiting.descPastPartnerNone', { partnerName })}
         </Text>
         {isToday ? (
           <TouchableOpacity
@@ -447,7 +472,7 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             onPress={onOpenWaiting}
           >
             <Ionicons name="lock-closed-outline" size={15} color="#33587A" />
-            <Text style={styles.waitingCtaBtnText}>回答待機画面を見る</Text>
+            <Text style={styles.waitingCtaBtnText}>{t('calendar.myDoneWaiting.ctaWaiting')}</Text>
             <Ionicons name="chevron-forward" size={14} color="#33587A" />
           </TouchableOpacity>
         ) : canViewPastPartial ? (
@@ -457,7 +482,9 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             onPress={() => onOpenResult(selectedDate, false)}
           >
             <Ionicons name="diamond-outline" size={15} color="#33587A" />
-            <Text style={styles.waitingCtaBtnText}>相手の途中回答と結果を見る</Text>
+            <Text style={styles.waitingCtaBtnText}>
+              {t('calendar.myDoneWaiting.ctaPastPartial')}
+            </Text>
             <Ionicons name="chevron-forward" size={14} color="#33587A" />
           </TouchableOpacity>
         ) : null}
@@ -471,18 +498,22 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
         <Pressable style={styles.backdrop} onPress={onClose} />
 
         <View style={[styles.sheet, SHADOWS.cardFloating]}>
-          {/* ヘッダー */}
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleRow}>
               <View style={styles.sheetIconBadge}>
                 <Ionicons name="calendar" size={16} color={COLORS.primary} />
               </View>
-              <View>
-                <Text style={styles.sheetTitle}>回答カレンダー</Text>
-                <Text style={styles.sheetSubtitle}>
+              <View style={styles.sheetTitleTextCol}>
+                <Text style={styles.sheetTitle} numberOfLines={1}>
+                  {t('calendar.title')}
+                </Text>
+                <Text style={styles.sheetSubtitle} numberOfLines={2}>
                   {myUnansweredDays > 0
-                    ? `未回答 ${myUnansweredDays}日（うち過去 ${myPastUnansweredDays}日）`
-                    : 'すべての出題に回答済みです！'}
+                    ? t('calendar.subtitleUnanswered', {
+                        total: myUnansweredDays,
+                        past: myPastUnansweredDays,
+                      })
+                    : t('calendar.subtitleAllDone')}
                 </Text>
               </View>
             </View>
@@ -499,7 +530,6 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollBody}
           >
-            {/* 月切替バー */}
             <View style={styles.monthBar}>
               <TouchableOpacity
                 style={[styles.monthNavBtn, !canGoPrevMonth && styles.monthNavBtnDisabled]}
@@ -514,18 +544,28 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
               </TouchableOpacity>
 
               <View style={styles.monthCenter}>
-                <Text style={styles.monthLabel}>
-                  {displayYear}年{displayMonth}月
+                <Text
+                  style={styles.monthLabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
+                  {formatYearMonth(displayYear, displayMonth, locale)}
                 </Text>
-                <Text style={styles.monthMiniStat}>
-                  回答済 {monthSummary.answered}日 / 未回答 {monthSummary.unanswered}日
+                <Text style={styles.monthMiniStat} numberOfLines={2}>
+                  {t('calendar.monthMiniStat', {
+                    answered: monthSummary.answered,
+                    unanswered: monthSummary.unanswered,
+                  })}
                 </Text>
               </View>
 
               <View style={styles.monthRightGroup}>
                 {!isViewingCurrentMonth && (
                   <TouchableOpacity style={styles.todayChip} onPress={handleJumpToday}>
-                    <Text style={styles.todayChipText}>今月</Text>
+                    <Text style={styles.todayChipText} numberOfLines={1}>
+                      {t('calendar.todayChip')}
+                    </Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -542,16 +582,18 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
               </View>
             </View>
 
-            {/* 曜日ヘッダー */}
             <View style={styles.weekdayRow}>
-              {WEEKDAY_LABELS.map((w, idx) => (
-                <View key={w} style={styles.weekdayCell}>
+              {weekdayLabels.map((w, idx) => (
+                <View key={`${w}-${idx}`} style={styles.weekdayCell}>
                   <Text
                     style={[
                       styles.weekdayText,
-                      idx === 0 && { color: '#C85338' },
-                      idx === 6 && { color: '#4D779E' },
+                      idx === sundayColIdx && { color: '#C85338' },
+                      idx === saturdayColIdx && { color: '#4D779E' },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
                   >
                     {w}
                   </Text>
@@ -559,7 +601,6 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
               ))}
             </View>
 
-            {/* 日付グリッド */}
             <View style={styles.grid}>
               {calendarCells.map((iso, idx) => {
                 if (!iso) {
@@ -600,7 +641,6 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
                         {dayNum}
                       </Text>
 
-                      {/* 状態インジケーター（1目で回答・未回答・相手済が判別可能） */}
                       <View style={styles.indicatorRow}>
                         {status === 'both_done' && (
                           <Ionicons name="checkmark" size={11} color="#3B6347" />
@@ -609,7 +649,14 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
                           <View style={[styles.dot, { backgroundColor: '#4D779E' }]} />
                         )}
                         {status === 'today_unanswered' && (
-                          <Text style={styles.todayTinyLabel}>今日</Text>
+                          <Text
+                            style={styles.todayTinyLabel}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.65}
+                          >
+                            {t('calendar.todayTinyLabel')}
+                          </Text>
                         )}
                         {status === 'past_unanswered_partner_done' && (
                           <View style={styles.miniIconsPair}>
@@ -632,30 +679,27 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
               })}
             </View>
 
-            {/* 凡例 */}
             <View style={styles.legendRow}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendSwatch, styles.cellBothDone]} />
-                <Text style={styles.legendText}>双方回答</Text>
+                <Text style={styles.legendText}>{t('calendar.legend.bothDone')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendSwatch, styles.cellMyDoneWaiting]} />
-                <Text style={styles.legendText}>自分済</Text>
+                <Text style={styles.legendText}>{t('calendar.legend.myDone')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendSwatch, styles.cellPastPartnerDone]} />
-                <Text style={styles.legendText}>未回答(相手済)</Text>
+                <Text style={styles.legendText}>{t('calendar.legend.pastPartnerDone')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendSwatch, styles.cellPastUnanswered]} />
-                <Text style={styles.legendText}>未回答</Text>
+                <Text style={styles.legendText}>{t('calendar.legend.unanswered')}</Text>
               </View>
             </View>
 
-            {/* 選択日の詳細・アクションパネル */}
             {renderSelectedDayPanel()}
 
-            {/* 未課金ユーザーかつ過去未回答ありの時のまとめ訴求ストリップ */}
             {!isPairPremium && myPastUnansweredDays > 0 && (
               <TouchableOpacity
                 style={styles.footerUpsellStrip}
@@ -665,8 +709,11 @@ export const AnswerCalendarModal: React.FC<AnswerCalendarModalProps> = ({
                 <Ionicons name="diamond" size={14} color="#8C5A1B" />
                 <Text style={styles.footerUpsellText}>
                   {pastPartnerAnsweredUnansweredDays > 0
-                    ? `過去の未回答 ${myPastUnansweredDays}日（うち相手済 ${pastPartnerAnsweredUnansweredDays}日）をプレミアムで遡り回答 →`
-                    : `過去の未回答 ${myPastUnansweredDays}日分をプレミアムでいつでも遡り回答 →`}
+                    ? t('calendar.footerUpsellPartner', {
+                        past: myPastUnansweredDays,
+                        partner: pastPartnerAnsweredUnansweredDays,
+                      })
+                    : t('calendar.footerUpsellDefault', { count: myPastUnansweredDays })}
                 </Text>
               </TouchableOpacity>
             )}
@@ -694,7 +741,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 404,
     maxHeight: '88%',
     backgroundColor: COLORS.background,
     borderRadius: 24,
@@ -706,6 +753,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: 18,
     paddingTop: 16,
     paddingBottom: 12,
@@ -718,6 +766,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
+  },
+  sheetTitleTextCol: {
+    flex: 1,
+    minWidth: 0,
   },
   sheetIconBadge: {
     width: 34,
@@ -726,20 +779,24 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   sheetTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 22,
   },
   sheetSubtitle: {
     fontSize: 11.5,
     fontWeight: '600',
     color: COLORS.textMuted,
     marginTop: 1,
+    lineHeight: 16,
   },
   closeBtn: {
     padding: 4,
+    flexShrink: 0,
   },
   scrollBody: {
     padding: 16,
@@ -749,6 +806,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 12,
   },
   monthNavBtn: {
@@ -760,6 +818,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   monthNavBtnDisabled: {
     opacity: 0.45,
@@ -767,22 +826,28 @@ const styles = StyleSheet.create({
   monthCenter: {
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 4,
   },
   monthLabel: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 21,
   },
   monthMiniStat: {
     fontSize: 10.5,
     fontWeight: '600',
     color: COLORS.textMuted,
     marginTop: 1,
+    textAlign: 'center',
+    lineHeight: 15,
   },
   monthRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   todayChip: {
     backgroundColor: COLORS.primaryLight,
@@ -796,6 +861,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 15,
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -804,11 +870,13 @@ const styles = StyleSheet.create({
   weekdayCell: {
     width: '14.2857%',
     alignItems: 'center',
+    paddingHorizontal: 1,
   },
   weekdayText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.textMuted,
+    lineHeight: 16,
   },
   grid: {
     flexDirection: 'row',
@@ -825,12 +893,13 @@ const styles = StyleSheet.create({
     padding: 2.5,
   },
   dayCell: {
-    height: 44,
+    height: 46,
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
+    paddingHorizontal: 2,
   },
   cellBothDone: {
     backgroundColor: '#E8F4EC',
@@ -889,7 +958,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   indicatorRow: {
-    height: 12,
+    height: 14,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
@@ -903,6 +973,8 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    maxWidth: '94%',
+    textAlign: 'center',
   },
   miniIconsPair: {
     flexDirection: 'row',
@@ -913,7 +985,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 10,
+    rowGap: 6,
+    columnGap: 10,
     marginBottom: 14,
   },
   legendItem: {
@@ -931,6 +1004,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     color: COLORS.textMuted,
+    lineHeight: 16,
   },
   detailCard: {
     backgroundColor: COLORS.card,
@@ -961,15 +1035,18 @@ const styles = StyleSheet.create({
   },
   detailHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
     marginBottom: 8,
   },
   detailDate: {
     fontSize: 13.5,
     fontWeight: '800',
     color: COLORS.text,
+    flexShrink: 1,
+    lineHeight: 20,
   },
   badgeAmber: {
     flexDirection: 'row',
@@ -979,6 +1056,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    maxWidth: '100%',
   },
   badgePremium: {
     flexDirection: 'row',
@@ -990,11 +1068,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    maxWidth: '100%',
   },
   badgeAmberText: {
     fontSize: 10.5,
     fontWeight: '800',
     color: '#8C5A1B',
+    lineHeight: 15,
+    flexShrink: 1,
   },
   badgeToday: {
     backgroundColor: COLORS.primaryLight,
@@ -1006,6 +1087,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: COLORS.primaryDark,
+    lineHeight: 15,
   },
   badgeDone: {
     flexDirection: 'row',
@@ -1020,6 +1102,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: '#3B6347',
+    lineHeight: 15,
   },
   badgeWaiting: {
     flexDirection: 'row',
@@ -1034,18 +1117,19 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     color: '#33587A',
+    lineHeight: 15,
   },
   detailDesc: {
     fontSize: 12,
     color: COLORS.textMuted,
-    lineHeight: 18,
+    lineHeight: 20,
     marginBottom: 11,
   },
   detailEmptyText: {
     fontSize: 12,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   partnerHighlightBox: {
     flexDirection: 'row',
@@ -1061,7 +1145,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: '#7A5B32',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   primaryCtaBtn: {
     flexDirection: 'row',
@@ -1088,6 +1172,8 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   secondaryCtaBtn: {
     flexDirection: 'row',
@@ -1105,6 +1191,9 @@ const styles = StyleSheet.create({
     color: '#3B6347',
     fontSize: 12.5,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   waitingCtaBtn: {
     flexDirection: 'row',
@@ -1122,6 +1211,9 @@ const styles = StyleSheet.create({
     color: '#33587A',
     fontSize: 12.5,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   footerUpsellStrip: {
     marginTop: 12,
@@ -1140,6 +1232,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#8C5A1B',
-    lineHeight: 16,
+    lineHeight: 18,
   },
 });

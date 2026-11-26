@@ -1,4 +1,5 @@
 import { Alert, Platform } from 'react-native';
+import i18n from '../i18n';
 
 export function showAlert(title: string, message?: string): void {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -21,7 +22,7 @@ export function showConfirm(
     return;
   }
   Alert.alert(title, message, [
-    { text: 'キャンセル', style: 'cancel' },
+    { text: i18n.t('common.cancel'), style: 'cancel' },
     {
       text: confirmLabel,
       style: 'destructive',

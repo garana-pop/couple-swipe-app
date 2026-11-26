@@ -6,20 +6,14 @@ import {
   Animated,
   PanResponder,
   PanResponderGestureState,
-  Dimensions,
+  useWindowDimensions,
   LayoutRectangle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Question, SwipeDirection } from '../types';
 import { COLORS, SHADOWS } from '../constants/theme';
-
-const { width: WINDOW_WIDTH } = Dimensions.get('window');
-const SCREEN_WIDTH = Math.min(WINDOW_WIDTH, 430);
-
-// カードと左右スロットの寸法バランス（左右に十分な呼吸スペースを確保）
-const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.56, 224);
-const CARD_HEIGHT = 236;
-const SIDE_SLOT_WIDTH = Math.max((SCREEN_WIDTH - CARD_WIDTH) / 2 - 18, 60);
+import { isCompactCjkLocale, isLongTextLocale, isThaiLocale } from '../i18n/locale';
 
 const VERTICAL_OVERLAP_MIN = 12;
 const HORIZONTAL_OVERLAP_MIN = 20;
@@ -113,7 +107,21 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
   question,
   onSwipe,
 }) => {
-  // Animated インスタンス
+  const { t, i18n } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const locale = i18n.resolvedLanguage || i18n.language || 'en';
+  const isCompactCjk = isCompactCjkLocale(locale);
+  const isLongText = isLongTextLocale(locale);
+  const isThai = isThaiLocale(locale);
+
+  // 言語特性に応じたカード幅・左右スロット幅の動的調整（欧文・ロシア語・タイ語の崩れ防止）
+  const screenWidth = Math.min(windowWidth, 430);
+  const cardWidth = isCompactCjk
+    ? Math.min(screenWidth * 0.55, 222)
+    : Math.min(screenWidth * 0.5, 204);
+  const cardHeight = isCompactCjk ? 236 : 244;
+  const sideSlotWidth = Math.max((screenWidth - cardWidth) / 2 - 10, isCompactCjk ? 64 : 78);
+
   const [pan] = useState(() => new Animated.ValueXY());
   const [activeDirection, setActiveDirection] = useState<SwipeDirection | null>(null);
   const isAnimatingRef = useRef(false);
@@ -122,7 +130,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
   const cardRestLayoutRef = useRef<LayoutRectangle | null>(null);
   const stageLayoutRef = useRef<LayoutRectangle | null>(null);
 
-  // カードが答えのエリア（スロット）に重なっているかを判定
   const getOverlapForGesture = useCallback((dx: number, dy: number): SwipeDirection | null => {
     const rest = cardRestLayoutRef.current;
     if (!rest) return null;
@@ -138,7 +145,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
     );
   }, []);
 
-  // カードが回答確定位置までスワイプされたかを判定
   const getConfirmSwipeDirection = useCallback(
     (dx: number, dy: number, vx: number, vy: number): SwipeDirection | null => {
       const rest = cardRestLayoutRef.current;
@@ -183,7 +189,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
     [getOverlapForGesture]
   );
 
-  // 初期位置へスプリングで戻す
   const resetCardPosition = useCallback(() => {
     Animated.spring(pan, {
       toValue: { x: 0, y: 0 },
@@ -194,7 +199,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
     setActiveDirection(null);
   }, [pan]);
 
-  // スワイプアウトのアニメーション
   const animateSwipeOut = useCallback(
     (direction: SwipeDirection) => {
       if (isAnimatingRef.current) return;
@@ -205,16 +209,16 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
 
       switch (direction) {
         case 'UP':
-          targetY = -SCREEN_WIDTH * 1.6;
+          targetY = -screenWidth * 1.6;
           break;
         case 'DOWN':
-          targetY = SCREEN_WIDTH * 1.6;
+          targetY = screenWidth * 1.6;
           break;
         case 'LEFT':
-          targetX = -SCREEN_WIDTH * 1.6;
+          targetX = -screenWidth * 1.6;
           break;
         case 'RIGHT':
-          targetX = SCREEN_WIDTH * 1.6;
+          targetX = screenWidth * 1.6;
           break;
       }
 
@@ -226,10 +230,9 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         onSwipe(direction);
       });
     },
-    [onSwipe, pan]
+    [onSwipe, pan, screenWidth]
   );
 
-  // PanResponder はマウント時に1回だけ生成し、ドラッグ中に再生成されてタッチが途切れないようにする
   const [gestureBridge] = useState(createStablePanHandlers);
 
   useEffect(() => {
@@ -266,20 +269,29 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
     resetCardPosition,
   ]);
 
-  // カードの回転計算
   const rotate = useMemo(
     () =>
       pan.x.interpolate({
-        inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+        inputRange: [-screenWidth, 0, screenWidth],
         outputRange: ['-14deg', '0deg', '14deg'],
       }),
-    [pan.x]
+    [pan.x, screenWidth]
   );
 
-  // ドラッグ方向に応じたカードボーダー色とアクセントカラー
   const activeColor = activeDirection ? COLORS.directions[activeDirection].color : null;
   const cardBorderColor = activeColor ?? COLORS.darkCardBorder;
   const cardAccentColor = activeColor ?? COLORS.primary;
+
+  const horizontalSlotTextStyle = [
+    styles.slotTextHorizontal,
+    isLongText && styles.slotTextHorizontalLong,
+    isThai && styles.slotTextHorizontalThai,
+  ];
+  const verticalSlotTextStyle = [
+    styles.slotTextVertical,
+    isLongText && styles.slotTextVerticalLong,
+    isThai && styles.slotTextVerticalThai,
+  ];
 
   return (
     <View
@@ -288,10 +300,6 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         stageLayoutRef.current = e.nativeEvent.layout;
       }}
     >
-      {/* ========================================================
-          4方向の枠なしミニマルスロット（矢印アイコン＋選択肢テキスト）
-          ======================================================== */}
-
       {/* 上：UP スロット */}
       <View
         onLayout={(e) => {
@@ -313,13 +321,15 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         />
         <Text
           style={[
-            styles.slotTextHorizontal,
+            ...horizontalSlotTextStyle,
             activeDirection === 'UP' && {
               color: COLORS.directions.UP.activeText,
               fontWeight: '800',
             },
           ]}
-          numberOfLines={2}
+          numberOfLines={3}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
         >
           {question.choices.UP}
         </Text>
@@ -333,6 +343,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.slotPlate,
           styles.slotLeft,
+          { width: sideSlotWidth },
           activeDirection === 'LEFT' && {
             backgroundColor: COLORS.directions.LEFT.bg,
             transform: [{ scale: 1.04 }],
@@ -341,18 +352,20 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
       >
         <Ionicons
           name="arrow-back"
-          size={18}
+          size={17}
           color={activeDirection === 'LEFT' ? COLORS.directions.LEFT.activeText : COLORS.directions.LEFT.color}
         />
         <Text
           style={[
-            styles.slotTextVertical,
+            ...verticalSlotTextStyle,
             activeDirection === 'LEFT' && {
               color: COLORS.directions.LEFT.activeText,
               fontWeight: '800',
             },
           ]}
-          numberOfLines={4}
+          numberOfLines={5}
+          adjustsFontSizeToFit
+          minimumFontScale={0.76}
         >
           {question.choices.LEFT}
         </Text>
@@ -366,6 +379,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         style={[
           styles.slotPlate,
           styles.slotRight,
+          { width: sideSlotWidth },
           activeDirection === 'RIGHT' && {
             backgroundColor: COLORS.directions.RIGHT.bg,
             transform: [{ scale: 1.04 }],
@@ -374,18 +388,20 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
       >
         <Ionicons
           name="arrow-forward"
-          size={18}
+          size={17}
           color={activeDirection === 'RIGHT' ? COLORS.directions.RIGHT.activeText : COLORS.directions.RIGHT.color}
         />
         <Text
           style={[
-            styles.slotTextVertical,
+            ...verticalSlotTextStyle,
             activeDirection === 'RIGHT' && {
               color: COLORS.directions.RIGHT.activeText,
               fontWeight: '800',
             },
           ]}
-          numberOfLines={4}
+          numberOfLines={5}
+          adjustsFontSizeToFit
+          minimumFontScale={0.76}
         >
           {question.choices.RIGHT}
         </Text>
@@ -407,13 +423,15 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
       >
         <Text
           style={[
-            styles.slotTextHorizontal,
+            ...horizontalSlotTextStyle,
             activeDirection === 'DOWN' && {
               color: COLORS.directions.DOWN.activeText,
               fontWeight: '800',
             },
           ]}
-          numberOfLines={2}
+          numberOfLines={3}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
         >
           {question.choices.DOWN}
         </Text>
@@ -424,16 +442,17 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         />
       </View>
 
-      {/* ========================================================
-          中央カードエリア（ダーク主役カード＋水平スタック）
-          ======================================================== */}
-
-      {/* 奥にあるカード（水平スタックで奥行き感を演出） */}
+      {/* 奥にあるカード */}
       <View
         onLayout={(e) => {
           cardRestLayoutRef.current = e.nativeEvent.layout;
         }}
-        style={[styles.card, styles.cardBehind, SHADOWS.cardSmall]}
+        style={[
+          styles.card,
+          styles.cardBehind,
+          SHADOWS.cardSmall,
+          { width: cardWidth, height: cardHeight },
+        ]}
       />
 
       {/* 手前の操作可能カード */}
@@ -444,6 +463,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
           styles.cardFront,
           SHADOWS.darkCardFloating,
           {
+            width: cardWidth,
+            height: cardHeight,
             borderColor: cardBorderColor,
             transform: [
               { translateX: pan.x },
@@ -454,31 +475,48 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
         ]}
       >
         <View style={styles.cardInner}>
-          {/* 上部アクセントライン */}
           <View style={[styles.cardAccentBar, { backgroundColor: cardAccentColor }]} />
 
           <View style={styles.cardBody}>
-            {/* カード上部：カテゴリ＆リマインドバッジ */}
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderLeft}>
                 <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>{question.category}</Text>
+                  <Text
+                    style={[styles.categoryText, isThai && styles.thaiCompactLine]}
+                    numberOfLines={1}
+                  >
+                    {question.category}
+                  </Text>
                 </View>
                 {question.repeatBadge && (
                   <View style={styles.repeatBadge}>
                     <Ionicons name="time-outline" size={11} color={COLORS.secondary} />
-                    <Text style={styles.repeatBadgeText}>{question.repeatBadge}</Text>
+                    <Text
+                      style={[styles.repeatBadgeText, isThai && styles.thaiCompactLine]}
+                      numberOfLines={1}
+                    >
+                      {question.repeatBadge}
+                    </Text>
                   </View>
                 )}
               </View>
             </View>
 
-            {/* 質問文 */}
             <View style={styles.questionBox}>
-              <Text style={styles.questionTitle}>{question.title}</Text>
+              <Text
+                style={[
+                  styles.questionTitle,
+                  isLongText && styles.questionTitleLong,
+                  isThai && styles.questionTitleThai,
+                ]}
+                numberOfLines={5}
+                adjustsFontSizeToFit
+                minimumFontScale={0.76}
+              >
+                {question.title}
+              </Text>
             </View>
 
-            {/* カード下部：ジェスチャーガイド */}
             <View style={styles.cardFooter}>
               <View
                 style={[
@@ -494,15 +532,17 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({
                 <Text
                   style={[
                     styles.swipeGuideText,
+                    isThai && styles.thaiGuideLine,
                     activeColor
                       ? { color: COLORS.darkCardText, fontWeight: '700' }
                       : null,
                   ]}
                   numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {activeDirection
-                    ? `「${question.choices[activeDirection]}」`
-                    : '上下左右にスワイプ'}
+                    ? t('common.quoted', { text: question.choices[activeDirection] })
+                    : t('swipeCard.guide')}
                 </Text>
               </View>
             </View>
@@ -523,72 +563,64 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     userSelect: 'none',
   },
-
-  // ----------------------------------------------------
-  // 4方向ミニマルスロット（通常時は枠なし・矢印＋テキストのみ）
-  // ----------------------------------------------------
   slotPlate: {
     position: 'absolute',
     borderRadius: 18,
     backgroundColor: 'transparent',
     zIndex: 1,
   },
-
-  // 上スロット
   slotTop: {
-    top: 16,
-    left: 24,
-    right: 24,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    top: 12,
+    left: 16,
+    right: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     alignItems: 'center',
     gap: 4,
   },
-
-  // 下スロット
   slotBottom: {
-    bottom: 22,
-    left: 24,
-    right: 24,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    bottom: 16,
+    left: 16,
+    right: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     alignItems: 'center',
     gap: 4,
   },
-
-  // 左スロット（上下スロットと干渉しない範囲で縦長に確保）
   slotLeft: {
-    left: 6,
-    top: 100,
-    bottom: 106,
-    width: SIDE_SLOT_WIDTH,
-    paddingVertical: 12,
+    left: 4,
+    top: 94,
+    bottom: 100,
+    paddingVertical: 10,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
   },
-
-  // 右スロット（上下スロットと干渉しない範囲で縦長に確保）
   slotRight: {
-    right: 6,
-    top: 100,
-    bottom: 106,
-    width: SIDE_SLOT_WIDTH,
-    paddingVertical: 12,
+    right: 4,
+    top: 94,
+    bottom: 100,
+    paddingVertical: 10,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
   },
-
-  // スロットテキスト
   slotTextHorizontal: {
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 20,
+  },
+  slotTextHorizontalLong: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  slotTextHorizontalThai: {
+    fontSize: 13.5,
+    lineHeight: 22,
   },
   slotTextVertical: {
     fontSize: 12,
@@ -596,18 +628,20 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
     lineHeight: 17,
+    width: '100%',
   },
-
-  // ----------------------------------------------------
-  // 中央カード（ダークエスプレッソ主役カード＋水平スタック）
-  // ----------------------------------------------------
+  slotTextVerticalLong: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  slotTextVerticalThai: {
+    fontSize: 11.5,
+    lineHeight: 19,
+  },
   card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     borderRadius: 24,
     backgroundColor: COLORS.darkCard,
   },
-  // 奥のカード（水平スタックで奥行き感を演出）
   cardBehind: {
     position: 'absolute',
     backgroundColor: COLORS.darkCardBehind,
@@ -616,7 +650,6 @@ const styles = StyleSheet.create({
     transform: [{ translateY: 10 }, { scale: 0.94 }],
     zIndex: 5,
   },
-  // 手前のメイン操作カード
   cardFront: {
     borderWidth: 2,
     zIndex: 10,
@@ -632,7 +665,7 @@ const styles = StyleSheet.create({
   },
   cardBody: {
     flex: 1,
-    padding: 16,
+    padding: 15,
     justifyContent: 'space-between',
   },
   cardHeader: {
@@ -642,8 +675,9 @@ const styles = StyleSheet.create({
   },
   cardHeaderLeft: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     flexShrink: 1,
   },
   categoryBadge: {
@@ -651,11 +685,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+    maxWidth: '100%',
   },
   categoryText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.secondary,
+    lineHeight: 15,
   },
   repeatBadge: {
     flexDirection: 'row',
@@ -667,11 +703,16 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
+    maxWidth: '100%',
   },
   repeatBadgeText: {
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.darkCardMuted,
+    lineHeight: 14,
+  },
+  thaiCompactLine: {
+    lineHeight: 17,
   },
   questionBox: {
     flex: 1,
@@ -681,12 +722,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   questionTitle: {
-    fontSize: 18,
+    fontSize: 17.5,
     fontWeight: '800',
     color: COLORS.darkCardText,
     textAlign: 'center',
-    lineHeight: 26,
-    letterSpacing: -0.3,
+    lineHeight: 25,
+    letterSpacing: -0.2,
+  },
+  questionTitleLong: {
+    fontSize: 16,
+    lineHeight: 22,
+    letterSpacing: -0.1,
+  },
+  questionTitleThai: {
+    fontSize: 16.5,
+    lineHeight: 27,
   },
   cardFooter: {
     alignItems: 'center',
@@ -697,14 +747,18 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 16,
     maxWidth: '100%',
   },
   swipeGuideText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
     color: COLORS.darkCardMuted,
     flexShrink: 1,
+    lineHeight: 16,
+  },
+  thaiGuideLine: {
+    lineHeight: 19,
   },
 });

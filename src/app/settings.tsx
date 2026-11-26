@@ -11,10 +11,13 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { getCurrentLocale } from '../i18n';
+import { formatTimeHHMM } from '../i18n/format';
 import { showAlert, showConfirm } from '../lib/alert';
-import { LEGAL_URLS, openExternalLink } from '../lib/links';
+import { getLegalUrls, getStoreName, openExternalLink } from '../lib/links';
 import { sendTestLocalNotification } from '../lib/notifications';
 
 const TIME_PRESETS: { label: string; hour: number; minute: number }[] = [
@@ -25,11 +28,12 @@ const TIME_PRESETS: { label: string; hour: number; minute: number }[] = [
   { label: '22:00', hour: 22, minute: 0 },
 ];
 
-function formatTime(hour: number, minute: number): string {
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
 export default function SettingsScreen() {
+  const { t } = useTranslation();
+  const locale = getCurrentLocale();
+  const legalUrls = getLegalUrls(locale);
+  const storeName = getStoreName();
+
   const {
     isSupabaseReady,
     hasPair,
@@ -53,11 +57,16 @@ export default function SettingsScreen() {
       if (nextValue) {
         const res = await enableDailyReminder(dailyReminder.hour, dailyReminder.minute);
         if (!res.ok) {
-          showAlert('通知設定エラー', res.error ?? 'リマインダーの設定に失敗しました。');
+          showAlert(
+            t('settings.reminder.errorTitle'),
+            res.error ?? t('settings.reminder.enableFailed')
+          );
         } else {
           showAlert(
-            'リマインダーを設定しました',
-            `毎日 ${formatTime(dailyReminder.hour, dailyReminder.minute)} に「今日の3問が届きました」と通知します。`
+            t('settings.reminder.enabledTitle'),
+            t('settings.reminder.enabledBody', {
+              time: formatTimeHHMM(dailyReminder.hour, dailyReminder.minute),
+            })
           );
         }
       } else {
@@ -73,7 +82,10 @@ export default function SettingsScreen() {
     try {
       const res = await enableDailyReminder(hour, minute);
       if (!res.ok) {
-        showAlert('通知設定エラー', res.error ?? '時刻の更新に失敗しました。');
+        showAlert(
+          t('settings.reminder.errorTitle'),
+          res.error ?? t('settings.reminder.timeUpdateFailed')
+        );
       }
     } finally {
       setReminderBusy(false);
@@ -92,9 +104,12 @@ export default function SettingsScreen() {
     try {
       const res = await sendTestLocalNotification();
       if (res.ok) {
-        showAlert('テスト通知を予約しました', '約3秒後に通知が届きます。');
+        showAlert(t('settings.reminder.testScheduledTitle'), t('settings.reminder.testScheduledBody'));
       } else {
-        showAlert('テスト通知エラー', res.error ?? '通知の送信に失敗しました。');
+        showAlert(
+          t('settings.reminder.testErrorTitle'),
+          res.error ?? t('settings.reminder.testErrorBody')
+        );
       }
     } finally {
       setReminderBusy(false);
@@ -106,11 +121,11 @@ export default function SettingsScreen() {
     try {
       const res = await registerPushNotifications();
       if (res.status === 'registered') {
-        showAlert('プッシュ通知を有効にしました', 'パートナーが回答を完了するとお知らせが届きます。');
+        showAlert(t('settings.push.enabledTitle'), t('settings.push.enabledBody'));
       } else {
         showAlert(
-          'プッシュ通知の状態',
-          res.message ?? '現在の環境ではリモートプッシュ通知を登録できませんでした。'
+          t('settings.push.statusAlertTitle'),
+          res.message ?? t('settings.push.statusAlertFallback')
         );
       }
     } finally {
@@ -124,12 +139,12 @@ export default function SettingsScreen() {
       const res = await linkGoogle();
       if (res.cancelled || res.redirecting) return;
       if (res.ok) {
-        showAlert(
-          'Google アカウントと連携しました',
-          '現在のペアと回答履歴が保護されました。機種変更しても同じ Google アカウントで引き継げます。'
-        );
+        showAlert(t('settings.account.linkedAlertTitle'), t('settings.account.linkedAlertBody'));
       } else {
-        showAlert('連携エラー', res.error ?? 'Google アカウントの連携に失敗しました。');
+        showAlert(
+          t('settings.account.linkErrorTitle'),
+          res.error ?? t('settings.account.linkErrorBody')
+        );
       }
     } finally {
       setAuthBusy(false);
@@ -143,10 +158,13 @@ export default function SettingsScreen() {
         const res = await signInWithGoogle();
         if (res.cancelled || res.redirecting) return;
         if (res.ok) {
-          showAlert('データを復元しました', 'Google アカウントに紐づくペアと履歴を読み込みました。');
+          showAlert(t('settings.account.restoredTitle'), t('settings.account.restoredBody'));
           router.replace('/');
         } else {
-          showAlert('ログインエラー', res.error ?? 'Google ログインに失敗しました。');
+          showAlert(
+            t('settings.account.loginErrorTitle'),
+            res.error ?? t('settings.account.loginErrorBody')
+          );
         }
       } finally {
         setAuthBusy(false);
@@ -155,9 +173,9 @@ export default function SettingsScreen() {
 
     if (hasPair && accountAuth.isAnonymous) {
       showConfirm(
-        '既存アカウントで復元しますか？',
-        'この端末には未連携のペアがあります。別の Google アカウントでログインすると表示が切り替わります。現在のデータを残したい場合は、先に「Google と連携してデータを保護」を押してください。',
-        '復元ログインへ進む',
+        t('settings.account.restoreConfirmTitle'),
+        t('settings.account.restoreConfirmBody'),
+        t('settings.account.restoreConfirmAction'),
         runSignIn
       );
       return;
@@ -167,30 +185,31 @@ export default function SettingsScreen() {
   };
 
   const renderPushStatusText = () => {
-    if (!pushStatus) return '未確認';
+    if (!pushStatus) return t('settings.push.statusUnchecked');
     switch (pushStatus.status) {
       case 'registered':
-        return '登録済み（パートナーの回答時に通知が届きます）';
+        return t('settings.push.statusRegistered');
       case 'expo_go_unsupported':
-        return 'Expo Go (Android) ではリモートプッシュ非対応です（EAS 開発ビルドで自動有効化）';
+        return t('settings.push.statusExpoGo');
       case 'missing_project_id':
-        return 'EAS プロジェクト未設定（eas init 後に有効化）';
+        return t('settings.push.statusMissingProject');
       case 'web_unsupported':
-        return 'Web ブラウザではプッシュ通知を利用できません';
+        return t('settings.push.statusWeb');
       case 'simulator_unsupported':
-        return 'シミュレータ／エミュレータでは利用できません（実機のみ）';
+        return t('settings.push.statusSimulator');
       case 'permission_denied':
-        return '通知が拒否されています（端末の設定から許可してください）';
+        return t('settings.push.statusDenied');
       default:
-        return pushStatus.message ?? '未登録';
+        return pushStatus.message ?? t('settings.push.statusUnregistered');
     }
   };
 
+  const subscriptionsLabel =
+    Platform.OS === 'ios' ? t('links.subscriptionsIos') : t('links.subscriptionsAndroid');
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* ================================================================
-          7-1: 毎日のローカル通知（「今日の質問が届きました」）
-         ================================================================ */}
+      {/* 毎日のローカル通知 */}
       <View style={[styles.card, SHADOWS.card]}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardHeaderLeft}>
@@ -198,8 +217,8 @@ export default function SettingsScreen() {
               <Ionicons name="notifications-outline" size={20} color={COLORS.primary} />
             </View>
             <View style={styles.cardHeaderTexts}>
-              <Text style={styles.cardTitle}>毎日の質問リマインダー</Text>
-              <Text style={styles.cardSubtitle}>端末ローカル通知（サーバー不要）</Text>
+              <Text style={styles.cardTitle}>{t('settings.reminder.title')}</Text>
+              <Text style={styles.cardSubtitle}>{t('settings.reminder.subtitle')}</Text>
             </View>
           </View>
           <Switch
@@ -211,13 +230,10 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <Text style={styles.descText}>
-          毎日決まった時刻に「今日の3問が届きました」と端末からお知らせします。
-        </Text>
+        <Text style={styles.descText}>{t('settings.reminder.desc')}</Text>
 
-        {/* 時刻設定エリア */}
         <View style={styles.timeBox}>
-          <Text style={styles.timeBoxLabel}>通知する時刻</Text>
+          <Text style={styles.timeBoxLabel}>{t('settings.reminder.timeLabel')}</Text>
           <View style={styles.timeStepperRow}>
             <TouchableOpacity
               style={styles.stepBtn}
@@ -227,7 +243,7 @@ export default function SettingsScreen() {
               <Ionicons name="remove" size={18} color={COLORS.primaryDark} />
             </TouchableOpacity>
             <Text style={styles.timeValue}>
-              {formatTime(dailyReminder.hour, dailyReminder.minute)}
+              {formatTimeHHMM(dailyReminder.hour, dailyReminder.minute)}
             </Text>
             <TouchableOpacity
               style={styles.stepBtn}
@@ -268,27 +284,23 @@ export default function SettingsScreen() {
           ) : (
             <Ionicons name="paper-plane-outline" size={16} color={COLORS.primaryDark} />
           )}
-          <Text style={styles.secondaryBtnText}>テスト通知を3秒後に試す</Text>
+          <Text style={styles.secondaryBtnText}>{t('settings.reminder.testBtn')}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ================================================================
-          7-2: 「相手が回答した」プッシュ通知
-         ================================================================ */}
+      {/* パートナー回答プッシュ通知 */}
       <View style={[styles.card, SHADOWS.card]}>
         <View style={styles.cardHeaderLeft}>
           <View style={[styles.iconBox, { backgroundColor: '#F0F5F9' }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color="#4D779E" />
           </View>
           <View style={styles.cardHeaderTexts}>
-            <Text style={styles.cardTitle}>パートナーの回答通知</Text>
-            <Text style={styles.cardSubtitle}>回答完了をリアルタイムでお知らせ</Text>
+            <Text style={styles.cardTitle}>{t('settings.push.title')}</Text>
+            <Text style={styles.cardSubtitle}>{t('settings.push.subtitle')}</Text>
           </View>
         </View>
 
-        <Text style={styles.descText}>
-          パートナーが今日の3問に回答し終えたタイミング（または2人揃って結果がひらいたタイミング）でプッシュ通知をお届けします。
-        </Text>
+        <Text style={styles.descText}>{t('settings.push.desc')}</Text>
 
         <View style={styles.statusBox}>
           <Ionicons
@@ -309,13 +321,11 @@ export default function SettingsScreen() {
           ) : (
             <Ionicons name="refresh-outline" size={16} color={COLORS.primaryDark} />
           )}
-          <Text style={styles.secondaryBtnText}>プッシュ通知トークンを登録・更新</Text>
+          <Text style={styles.secondaryBtnText}>{t('settings.push.registerBtn')}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ================================================================
-          7-3: アカウント保護・機種変更引き継ぎ（Google ログイン昇格）
-         ================================================================ */}
+      {/* アカウント保護・機種変更引き継ぎ */}
       <View style={[styles.card, SHADOWS.card]}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardHeaderLeft}>
@@ -323,8 +333,8 @@ export default function SettingsScreen() {
               <Ionicons name="shield-checkmark-outline" size={20} color="#4A7C59" />
             </View>
             <View style={styles.cardHeaderTexts}>
-              <Text style={styles.cardTitle}>アカウント保護・機種変更</Text>
-              <Text style={styles.cardSubtitle}>Google アカウント連携でデータを保護</Text>
+              <Text style={styles.cardTitle}>{t('settings.account.title')}</Text>
+              <Text style={styles.cardSubtitle}>{t('settings.account.subtitle')}</Text>
             </View>
           </View>
           <View
@@ -338,8 +348,11 @@ export default function SettingsScreen() {
                 styles.authBadgeText,
                 accountAuth.isAnonymous ? styles.authBadgeTextAnon : styles.authBadgeTextLinked,
               ]}
+              numberOfLines={1}
             >
-              {accountAuth.isAnonymous ? '未連携' : '連携済み'}
+              {accountAuth.isAnonymous
+                ? t('settings.account.badgeAnon')
+                : t('settings.account.badgeLinked')}
             </Text>
           </View>
         </View>
@@ -348,20 +361,16 @@ export default function SettingsScreen() {
           <View style={styles.linkedInfoBox}>
             <Ionicons name="logo-google" size={18} color="#4A7C59" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.linkedTitle}>Google アカウント連携済み</Text>
+              <Text style={styles.linkedTitle}>{t('settings.account.linkedTitle')}</Text>
               {accountAuth.email ? (
                 <Text style={styles.linkedEmail}>{accountAuth.email}</Text>
               ) : null}
-              <Text style={styles.linkedHint}>
-                機種変更やアプリ再インストール時も、同じ Google アカウントで復元ログインするとペアと履歴を引き継げます。
-              </Text>
+              <Text style={styles.linkedHint}>{t('settings.account.linkedHint')}</Text>
             </View>
           </View>
         ) : (
           <>
-            <Text style={styles.descText}>
-              現在は匿名アカウントで利用中です。Google アカウントと連携しておくと、ペア情報や過去の回答履歴をそのまま保持したまま機種変更できます。
-            </Text>
+            <Text style={styles.descText}>{t('settings.account.anonDesc')}</Text>
 
             <TouchableOpacity
               style={styles.googlePrimaryBtn}
@@ -374,9 +383,7 @@ export default function SettingsScreen() {
               ) : (
                 <>
                   <Ionicons name="logo-google" size={17} color="#FFFFFF" />
-                  <Text style={styles.googlePrimaryBtnText}>
-                    Google と連携してデータを保護する
-                  </Text>
+                  <Text style={styles.googlePrimaryBtnText}>{t('settings.account.linkBtn')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -389,24 +396,22 @@ export default function SettingsScreen() {
             >
               <Ionicons name="log-in-outline" size={17} color={COLORS.primaryDark} />
               <Text style={styles.googleSecondaryBtnText}>
-                機種変更後のデータ復元（Google ログイン）
+                {t('settings.account.restoreBtn')}
               </Text>
             </TouchableOpacity>
           </>
         )}
       </View>
 
-      {/* ================================================================
-          規約・プライバシーポリシー・解約案内
-         ================================================================ */}
+      {/* 規約・プライバシーポリシー・解約案内 */}
       <View style={[styles.card, SHADOWS.card]}>
         <View style={styles.cardHeaderLeft}>
           <View style={[styles.iconBox, { backgroundColor: '#F5EFE8' }]}>
             <Ionicons name="document-text-outline" size={20} color={COLORS.primaryDark} />
           </View>
           <View style={styles.cardHeaderTexts}>
-            <Text style={styles.cardTitle}>プライバシー・解約案内</Text>
-            <Text style={styles.cardSubtitle}>定期購入の管理・各種ポリシー</Text>
+            <Text style={styles.cardTitle}>{t('settings.legal.title')}</Text>
+            <Text style={styles.cardSubtitle}>{t('settings.legal.subtitle')}</Text>
           </View>
         </View>
 
@@ -414,23 +419,13 @@ export default function SettingsScreen() {
           <TouchableOpacity
             style={styles.legalRow}
             activeOpacity={0.75}
-            onPress={() => void openExternalLink(LEGAL_URLS.privacyPolicy, 'プライバシーポリシー')}
+            onPress={() =>
+              void openExternalLink(legalUrls.privacyPolicy, t('links.privacyPolicy'))
+            }
           >
             <View style={styles.legalRowLeft}>
               <Ionicons name="shield-outline" size={17} color={COLORS.primaryDark} />
-              <Text style={styles.legalRowText}>プライバシーポリシー</Text>
-            </View>
-            <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.legalRow}
-            activeOpacity={0.75}
-            onPress={() => void openExternalLink(LEGAL_URLS.termsOfService, '利用規約')}
-          >
-            <View style={styles.legalRowLeft}>
-              <Ionicons name="reader-outline" size={17} color={COLORS.primaryDark} />
-              <Text style={styles.legalRowText}>利用規約</Text>
+              <Text style={styles.legalRowText}>{t('settings.legal.privacy')}</Text>
             </View>
             <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
           </TouchableOpacity>
@@ -439,15 +434,26 @@ export default function SettingsScreen() {
             style={styles.legalRow}
             activeOpacity={0.75}
             onPress={() =>
-              void openExternalLink(
-                LEGAL_URLS.googlePlaySubscriptions,
-                'Google Play 定期購入管理'
-              )
+              void openExternalLink(legalUrls.termsOfService, t('links.termsOfService'))
             }
           >
             <View style={styles.legalRowLeft}>
+              <Ionicons name="reader-outline" size={17} color={COLORS.primaryDark} />
+              <Text style={styles.legalRowText}>{t('settings.legal.terms')}</Text>
+            </View>
+            <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.legalRow}
+            activeOpacity={0.75}
+            onPress={() => void openExternalLink(legalUrls.subscriptions, subscriptionsLabel)}
+          >
+            <View style={styles.legalRowLeft}>
               <Ionicons name="card-outline" size={17} color={COLORS.primaryDark} />
-              <Text style={styles.legalRowText}>サブスクリプションの解約・管理（Google Play）</Text>
+              <Text style={styles.legalRowText}>
+                {t('settings.legal.subscriptions', { storeName })}
+              </Text>
             </View>
             <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
           </TouchableOpacity>
@@ -456,12 +462,12 @@ export default function SettingsScreen() {
             style={[styles.legalRow, styles.legalRowLast]}
             activeOpacity={0.75}
             onPress={() =>
-              void openExternalLink(LEGAL_URLS.accountDeletion, '退会・アカウント削除案内')
+              void openExternalLink(legalUrls.accountDeletion, t('links.accountDeletion'))
             }
           >
             <View style={styles.legalRowLeft}>
               <Ionicons name="person-remove-outline" size={17} color={COLORS.primaryDark} />
-              <Text style={styles.legalRowText}>退会・アカウント削除のご案内</Text>
+              <Text style={styles.legalRowText}>{t('settings.legal.accountDeletion')}</Text>
             </View>
             <Ionicons name="open-outline" size={15} color={COLORS.textMuted} />
           </TouchableOpacity>
@@ -474,7 +480,7 @@ export default function SettingsScreen() {
         onPress={() => router.back()}
       >
         <Ionicons name="arrow-back" size={16} color={COLORS.text} />
-        <Text style={styles.backButtonText}>ホームへ戻る</Text>
+        <Text style={styles.backButtonText}>{t('common.backHome')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -509,6 +515,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
     marginBottom: 8,
   },
   iconBox: {
@@ -517,24 +524,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   cardHeaderTexts: {
     flex: 1,
+    minWidth: 0,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: COLORS.text,
+    lineHeight: 21,
   },
   cardSubtitle: {
     fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 1,
+    lineHeight: 16,
   },
   descText: {
     fontSize: 12.5,
     color: COLORS.textMuted,
-    lineHeight: 19,
+    lineHeight: 20,
     marginBottom: 14,
   },
   timeBox: {
@@ -550,6 +561,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
     textAlign: 'center',
+    lineHeight: 16,
     marginBottom: 8,
   },
   timeStepperRow: {
@@ -618,7 +630,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     color: COLORS.text,
-    lineHeight: 17,
+    lineHeight: 19,
   },
   secondaryBtn: {
     flexDirection: 'row',
@@ -630,16 +642,21 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 12,
     paddingVertical: 11,
+    paddingHorizontal: 14,
   },
   secondaryBtnText: {
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   authBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    flexShrink: 0,
   },
   authBadgeAnon: {
     backgroundColor: '#FDF3E7',
@@ -650,6 +667,7 @@ const styles = StyleSheet.create({
   authBadgeText: {
     fontSize: 11,
     fontWeight: '800',
+    lineHeight: 16,
   },
   authBadgeTextAnon: {
     color: '#C97A2B',
@@ -671,6 +689,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#3B6347',
+    lineHeight: 19,
     marginBottom: 2,
   },
   linkedEmail: {
@@ -682,7 +701,7 @@ const styles = StyleSheet.create({
   linkedHint: {
     fontSize: 11.5,
     color: '#4A7C59',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   googlePrimaryBtn: {
     flexDirection: 'row',
@@ -692,12 +711,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 14,
     paddingVertical: 13,
+    paddingHorizontal: 14,
     marginBottom: 10,
   },
   googlePrimaryBtnText: {
     fontSize: 13.5,
     fontWeight: '800',
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   googleSecondaryBtn: {
     flexDirection: 'row',
@@ -709,11 +732,15 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     borderRadius: 14,
     paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   googleSecondaryBtnText: {
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.primaryDark,
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   legalLinksList: {
     backgroundColor: COLORS.surface,
@@ -740,12 +767,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 9,
     flex: 1,
+    minWidth: 0,
   },
   legalRowText: {
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.text,
+    lineHeight: 19,
   },
   backButton: {
     flexDirection: 'row',
@@ -753,6 +782,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: COLORS.border,
@@ -762,5 +792,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 20,
   },
 });

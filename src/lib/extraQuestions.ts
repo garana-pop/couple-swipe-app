@@ -1,4 +1,9 @@
-import { MatchRule, RemoteQuestionRecord, SwipeDirection } from '../types';
+import {
+  MatchRule,
+  RemoteQuestionRecord,
+  RemoteQuestionTranslation,
+  SwipeDirection,
+} from '../types';
 import { supabase } from './supabase';
 import {
   getCachedExtraQuestions,
@@ -18,6 +23,23 @@ function isValidChoices(value: unknown): value is Record<SwipeDirection, string>
     typeof obj.LEFT === 'string' &&
     typeof obj.RIGHT === 'string'
   );
+}
+
+function parseTranslations(raw: unknown): Record<string, RemoteQuestionTranslation> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: Record<string, RemoteQuestionTranslation> = {};
+  for (const [lang, entry] of Object.entries(raw as Record<string, unknown>)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const parsed: RemoteQuestionTranslation = {};
+    if (typeof e.category === 'string' && e.category.trim()) parsed.category = e.category;
+    if (typeof e.title === 'string' && e.title.trim()) parsed.title = e.title;
+    if (isValidChoices(e.choices)) parsed.choices = e.choices;
+    if (parsed.category || parsed.title || parsed.choices) {
+      out[lang] = parsed;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function parseRemoteRecord(raw: unknown): RemoteQuestionRecord | null {
@@ -40,6 +62,7 @@ function parseRemoteRecord(raw: unknown): RemoteQuestionRecord | null {
     matchRule,
     isActive: r.isActive !== false,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : new Date().toISOString(),
+    translations: parseTranslations(r.translations),
   };
 }
 
@@ -60,8 +83,6 @@ function mergeRecords(
 
 /**
  * Supabase の extra_questions を差分同期し、最新のローカルキャッシュを返す。
- * - force = false: 前回チェックから24時間未満なら通信せずキャッシュを返す
- * - force = true : 未知の質問IDを検知した場合などに即時フル同期（p_since = null）を実行
  */
 export async function syncExtraQuestions(options?: {
   force?: boolean;

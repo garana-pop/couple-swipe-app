@@ -1,0 +1,1096 @@
+{
+  "categories": {
+    "lifestyle": "Home & Values",
+    "holidays": "Days Off",
+    "anniversary": "Special Days",
+    "food": "Food & Taste",
+    "communication": "Communication",
+    "affection": "Love & Affection",
+    "money_future": "Money & Future",
+    "travel": "Travel & Outings",
+    "relationship": "Our Bond",
+    "other": "Other"
+  },
+  "items": {
+    "q1": {
+      "title": "Who is stricter about housework?",
+      "choices": {
+        "UP": "Definitely me",
+        "DOWN": "Definitely my partner",
+        "LEFT": "About the same",
+        "RIGHT": "We're both pretty chill"
+      }
+    },
+    "q2": {
+      "title": "What's your ideal day off together?",
+      "choices": {
+        "UP": "Active day out",
+        "DOWN": "Lazy day at home",
+        "LEFT": "Doing our own thing",
+        "RIGHT": "Hang out with friends"
+      }
+    },
+    "q3": {
+      "title": "How should we celebrate birthdays & anniversaries?",
+      "choices": {
+        "UP": "Go all out with surprises",
+        "DOWN": "Plan it together ahead",
+        "LEFT": "A great meal is plenty",
+        "RIGHT": "Keep it low-key & natural"
+      }
+    },
+    "q4": {
+      "title": "How often should we tidy & clean?",
+      "choices": {
+        "UP": "A little bit every day",
+        "DOWN": "Deep clean on weekends",
+        "LEFT": "Whenever we notice a mess",
+        "RIGHT": "Robot vacuum or cleaner"
+      }
+    },
+    "q5": {
+      "title": "Early bird or night owl?",
+      "choices": {
+        "UP": "Total early bird",
+        "DOWN": "Classic night owl",
+        "LEFT": "Early weekdays, late weekends",
+        "RIGHT": "Depends on the day"
+      }
+    },
+    "q6": {
+      "title": "Ideal bedroom light & sound for sleep?",
+      "choices": {
+        "UP": "Pitch dark & silent",
+        "DOWN": "Soft nightlight on",
+        "LEFT": "TV or music in background",
+        "RIGHT": "Can sleep anywhere"
+      }
+    },
+    "q7": {
+      "title": "What's your ideal AC / thermostat style?",
+      "choices": {
+        "UP": "Comfort first all year",
+        "DOWN": "Eco-friendly & energy saving",
+        "LEFT": "Open windows when possible",
+        "RIGHT": "Whatever partner prefers"
+      }
+    },
+    "q8": {
+      "title": "Who takes longer to get ready?",
+      "choices": {
+        "UP": "I take longer",
+        "DOWN": "My partner takes longer",
+        "LEFT": "We're both quick",
+        "RIGHT": "We're both slow"
+      }
+    },
+    "q9": {
+      "title": "How easily do you declutter?",
+      "choices": {
+        "UP": "Toss unused stuff fast",
+        "DOWN": "Keep sentimental items",
+        "LEFT": "Sell it online first",
+        "RIGHT": "Let partner decide"
+      }
+    },
+    "q10": {
+      "title": "If we get a pet, which kind?",
+      "choices": {
+        "UP": "Team Dog",
+        "DOWN": "Team Cat",
+        "LEFT": "Small pets or fish",
+        "RIGHT": "No pets, keep life light"
+      }
+    },
+    "q11": {
+      "title": "When do you prefer to shower or bathe?",
+      "choices": {
+        "UP": "Right when getting home",
+        "DOWN": "Slow soak before bed",
+        "LEFT": "Morning shower person",
+        "RIGHT": "Changes day to day"
+      }
+    },
+    "q12": {
+      "title": "Where's your dream neighborhood to live?",
+      "choices": {
+        "UP": "Walkable downtown hub",
+        "DOWN": "Quiet, green suburbs",
+        "LEFT": "Shortest commute to work",
+        "RIGHT": "Cozy area full of cafes"
+      }
+    },
+    "q13": {
+      "title": "How do you prefer to make up after a fight?",
+      "choices": {
+        "UP": "Talk it out the same day",
+        "DOWN": "Sleep on it & cool off",
+        "LEFT": "Peace offering with treats",
+        "RIGHT": "Naturally blow over"
+      }
+    },
+    "q14": {
+      "title": "How often should we text during the day?",
+      "choices": {
+        "UP": "Frequent little updates",
+        "DOWN": "Only when needed",
+        "LEFT": "A daily goodnight text",
+        "RIGHT": "Quick phone call instead"
+      }
+    },
+    "q15": {
+      "title": "Which expression of love warms you most?",
+      "choices": {
+        "UP": "Words like 'I love you'",
+        "DOWN": "Hugs & holding hands",
+        "LEFT": "Little surprise treats",
+        "RIGHT": "Thoughtful acts of help"
+      }
+    },
+    "q16": {
+      "title": "Who usually says 'I'm sorry' first?",
+      "choices": {
+        "UP": "Usually me",
+        "DOWN": "Usually my partner",
+        "LEFT": "We both apologize fast",
+        "RIGHT": "We rarely even argue"
+      }
+    },
+    "q17": {
+      "title": "When venting a problem, what do you want?",
+      "choices": {
+        "UP": "Just listen & empathize",
+        "DOWN": "Practical advice & fixes",
+        "LEFT": "Good food to cheer up",
+        "RIGHT": "Quiet moral support"
+      }
+    },
+    "q18": {
+      "title": "Holding hands while walking outside?",
+      "choices": {
+        "UP": "Always love holding hands!",
+        "DOWN": "In quieter spots",
+        "LEFT": "Linking arms feels right",
+        "RIGHT": "Walking side by side"
+      }
+    },
+    "q19": {
+      "title": "How much alone time do you need?",
+      "choices": {
+        "UP": "A little bit every day",
+        "DOWN": "A few hours a week",
+        "LEFT": "Happy together 24/7",
+        "RIGHT": "Only when stressed/busy"
+      }
+    },
+    "q20": {
+      "title": "Who gets jealous more easily?",
+      "choices": {
+        "UP": "I get more jealous",
+        "DOWN": "My partner gets more jealous",
+        "LEFT": "We both get a little jealous",
+        "RIGHT": "We're both easygoing"
+      }
+    },
+    "q21": {
+      "title": "How do you feel about random surprises?",
+      "choices": {
+        "UP": "Love giving & getting them!",
+        "DOWN": "A bit shy, secretly thrilled",
+        "LEFT": "Tiny treats are best",
+        "RIGHT": "Prefer everyday stability"
+      }
+    },
+    "q22": {
+      "title": "Sharing phone passcodes with each other?",
+      "choices": {
+        "UP": "Totally fine to share",
+        "DOWN": "For emergencies only",
+        "LEFT": "Keep our own privacy",
+        "RIGHT": "Never really thought of it"
+      }
+    },
+    "q23": {
+      "title": "Who is more clingy / affectionate?",
+      "choices": {
+        "UP": "I'm more affectionate",
+        "DOWN": "My partner is more affectionate",
+        "LEFT": "We're both cuddly",
+        "RIGHT": "We're both independent"
+      }
+    },
+    "q24": {
+      "title": "When you're exhausted, what helps most?",
+      "choices": {
+        "UP": "Cuddles & listening to me",
+        "DOWN": "A comforting meal ready",
+        "LEFT": "Let me sleep in peace",
+        "RIGHT": "Watch something funny together"
+      }
+    },
+    "q25": {
+      "title": "What's your money mindset?",
+      "choices": {
+        "UP": "Steady, planned saver",
+        "DOWN": "Spend on memories now",
+        "LEFT": "Grow it through investing",
+        "RIGHT": "Spend freely when it counts"
+      }
+    },
+    "q26": {
+      "title": "Best way to manage shared expenses?",
+      "choices": {
+        "UP": "One shared bank account",
+        "DOWN": "Split by bill category",
+        "LEFT": "Track & settle via app",
+        "RIGHT": "Keep it rough & casual"
+      }
+    },
+    "q27": {
+      "title": "Check in before making a big purchase?",
+      "choices": {
+        "UP": "Always if over ~$200",
+        "DOWN": "Tell after if own budget",
+        "LEFT": "Only for home/appliances",
+        "RIGHT": "Share everything, any amount"
+      }
+    },
+    "q28": {
+      "title": "Usual dining-out budget for dates?",
+      "choices": {
+        "UP": "Find cheap hidden gems",
+        "DOWN": "Splurge on great ambiance",
+        "LEFT": "Save daily, splurge rarely",
+        "RIGHT": "Home cooking beats all"
+      }
+    },
+    "q29": {
+      "title": "Where do you picture us in 5 years?",
+      "choices": {
+        "UP": "Cozy in a bigger home",
+        "DOWN": "Chasing career & hobbies",
+        "LEFT": "Traveling all the time",
+        "RIGHT": "Simply smiling together"
+      }
+    },
+    "q30": {
+      "title": "Who is more likely to impulse buy?",
+      "choices": {
+        "UP": "I impulse buy more",
+        "DOWN": "My partner impulse buys more",
+        "LEFT": "We're both careful",
+        "RIGHT": "We both buy on sight"
+      }
+    },
+    "q31": {
+      "title": "What's the best way to pick gifts?",
+      "choices": {
+        "UP": "Share a wish list ahead",
+        "DOWN": "A thoughtful surprise pick",
+        "LEFT": "Go shopping together",
+        "RIGHT": "Dining or travel experiences"
+      }
+    },
+    "q32": {
+      "title": "Where would you love to retire?",
+      "choices": {
+        "UP": "Convenient city condo",
+        "DOWN": "Peaceful nature or spa town",
+        "LEFT": "Abroad or two-home life",
+        "RIGHT": "Near family & familiar turf"
+      }
+    },
+    "q33": {
+      "title": "What sounds best for dinner tonight?",
+      "choices": {
+        "UP": "Warm homestyle comfort",
+        "DOWN": "Hearty steak or grill",
+        "LEFT": "Italian or chic bistro",
+        "RIGHT": "Ramen, Asian, or spicy"
+      }
+    },
+    "q34": {
+      "title": "Ideal balance of cooking vs. eating out?",
+      "choices": {
+        "UP": "Cook at home most days",
+        "DOWN": "Cook weekdays, out weekends",
+        "LEFT": "Mix in easy delivery too",
+        "RIGHT": "Love trying restaurants"
+      }
+    },
+    "q35": {
+      "title": "What's your breakfast style?",
+      "choices": {
+        "UP": "Hearty savory breakfast",
+        "DOWN": "Toast, pastry & coffee",
+        "LEFT": "Light fruit or yogurt",
+        "RIGHT": "Skip breakfast mostly"
+      }
+    },
+    "q36": {
+      "title": "How well do you handle spicy food?",
+      "choices": {
+        "UP": "Bring on extra spicy!",
+        "DOWN": "Mild kick is perfect",
+        "LEFT": "Not great with spice",
+        "RIGHT": "Zero spice for me"
+      }
+    },
+    "q37": {
+      "title": "How about dessert after dinner?",
+      "choices": {
+        "UP": "Always room, every day!",
+        "DOWN": "Weekends & treats only",
+        "LEFT": "Fresh fruit is enough",
+        "RIGHT": "Salty snacks over sweets"
+      }
+    },
+    "q38": {
+      "title": "What's your daily go-to drink?",
+      "choices": {
+        "UP": "Coffee all the way",
+        "DOWN": "Green tea or matcha",
+        "LEFT": "Black or herbal tea",
+        "RIGHT": "Water or sparkling water"
+      }
+    },
+    "q39": {
+      "title": "What's your style with alcohol?",
+      "choices": {
+        "UP": "Enjoy it at home & out",
+        "DOWN": "Only on special nights",
+        "LEFT": "Rarely drink / mocktails",
+        "RIGHT": "Here for the bar snacks"
+      }
+    },
+    "q40": {
+      "title": "Who picks their menu order faster?",
+      "choices": {
+        "UP": "I decide faster",
+        "DOWN": "My partner decides faster",
+        "LEFT": "We both pick fast",
+        "RIGHT": "We're both indecisive"
+      }
+    },
+    "q41": {
+      "title": "What's your travel planning style?",
+      "choices": {
+        "UP": "Detailed hour-by-hour plan",
+        "DOWN": "Just pick a city & wing it",
+        "LEFT": "List must-eat spots only",
+        "RIGHT": "Happy to let partner plan"
+      }
+    },
+    "q42": {
+      "title": "Where should we go next long weekend?",
+      "choices": {
+        "UP": "Relaxing spa / hot spring",
+        "DOWN": "Theme park or sightseeing",
+        "LEFT": "Tropical beach or abroad",
+        "RIGHT": "Foodie road trip"
+      }
+    },
+    "q43": {
+      "title": "When do you pack for a trip?",
+      "choices": {
+        "UP": "Ready days in advance",
+        "DOWN": "Quick pack the night before",
+        "LEFT": "Rushing the morning of",
+        "RIGHT": "Pack light, buy if needed"
+      }
+    },
+    "q44": {
+      "title": "Movie night genre pick?",
+      "choices": {
+        "UP": "Action, sci-fi, thriller",
+        "DOWN": "Comedy & feel-good",
+        "LEFT": "Romance & drama",
+        "RIGHT": "Anime or documentary"
+      }
+    },
+    "q45": {
+      "title": "Best rainy-day date idea?",
+      "choices": {
+        "UP": "Movies & games at home",
+        "DOWN": "Museum or aquarium",
+        "LEFT": "Stroll a big indoor mall",
+        "RIGHT": "Spa & sauna unwind"
+      }
+    },
+    "q46": {
+      "title": "Favorite way to travel?",
+      "choices": {
+        "UP": "Road trip by car",
+        "DOWN": "Scenic train with snacks",
+        "LEFT": "Fly somewhere far fast",
+        "RIGHT": "Bike or walk nearby"
+      }
+    },
+    "q47": {
+      "title": "How often do you take photos on outings?",
+      "choices": {
+        "UP": "Snap lots of memories",
+        "DOWN": "Just views & good food",
+        "LEFT": "Lots of couple selfies",
+        "RIGHT": "Stay in the moment"
+      }
+    },
+    "q48": {
+      "title": "Top priority when picking a hotel?",
+      "choices": {
+        "UP": "Amazing bath / spa",
+        "DOWN": "Delicious breakfast/food",
+        "LEFT": "Great location & value",
+        "RIGHT": "Stylish room vibe"
+      }
+    },
+    "q49": {
+      "title": "Who is more of a homebody?",
+      "choices": {
+        "UP": "I'm more of a homebody",
+        "DOWN": "My partner is more of one",
+        "LEFT": "We both love staying in",
+        "RIGHT": "We both love going out"
+      }
+    },
+    "q50": {
+      "title": "Who is the bigger romantic?",
+      "choices": {
+        "UP": "I'm more romantic",
+        "DOWN": "My partner is more romantic",
+        "LEFT": "We're both romantics",
+        "RIGHT": "We're both practical"
+      }
+    },
+    "q51": {
+      "title": "Ideal holiday season / New Year's vibe?",
+      "choices": {
+        "UP": "Lights & fancy dinner out",
+        "DOWN": "Cozy home dinner & cake",
+        "LEFT": "Holiday getaway trip",
+        "RIGHT": "Big party with loved ones"
+      }
+    },
+    "q52": {
+      "title": "Which shared hobby should we try next?",
+      "choices": {
+        "UP": "Cooking, baking & cafes",
+        "DOWN": "Sports, gym, or camping",
+        "LEFT": "Video/board games & film",
+        "RIGHT": "Travel, photo & exploring"
+      }
+    },
+    "q53": {
+      "title": "Who has the worse sense of direction?",
+      "choices": {
+        "UP": "Definitely me",
+        "DOWN": "Definitely my partner",
+        "LEFT": "We're both great with maps",
+        "RIGHT": "We both get lost easily"
+      }
+    },
+    "q54": {
+      "title": "What makes you feel safest with your partner?",
+      "choices": {
+        "UP": "Their warm smile & vibe",
+        "DOWN": "Reliable decisiveness",
+        "LEFT": "Open, honest feelings",
+        "RIGHT": "Comfortable silence"
+      }
+    },
+    "q55": {
+      "title": "When you're sick, how can partner help?",
+      "choices": {
+        "UP": "Nurse me & run errands",
+        "DOWN": "Rest solo so you stay well",
+        "LEFT": "Just drop off soup & drinks",
+        "RIGHT": "Come with me to the doctor"
+      }
+    },
+    "q56": {
+      "title": "Posting couple photos on social media?",
+      "choices": {
+        "UP": "Happy to post openly",
+        "DOWN": "Aesthetic / no-face shots",
+        "LEFT": "Close friends list only",
+        "RIGHT": "Keep private just for us"
+      }
+    },
+    "q57": {
+      "title": "Weekend alarm clock habit?",
+      "choices": {
+        "UP": "Same time as weekdays",
+        "DOWN": "No alarm, wake naturally",
+        "LEFT": "Set so I'm up before noon",
+        "RIGHT": "Only if we have plans"
+      }
+    },
+    "q58": {
+      "title": "When partner changes hair or outfit?",
+      "choices": {
+        "UP": "Compliment right away!",
+        "DOWN": "Quietly admire inside",
+        "LEFT": "Say so when it suits them",
+        "RIGHT": "Might not notice fast..."
+      }
+    },
+    "q59": {
+      "title": "How would you describe our relationship?",
+      "choices": {
+        "UP": "Best friends for life",
+        "DOWN": "Full of romance & sparks",
+        "LEFT": "Comforting like family",
+        "RIGHT": "Partners who grow together"
+      }
+    },
+    "q60": {
+      "title": "Next little goal to achieve together?",
+      "choices": {
+        "UP": "Mini trip to a new town",
+        "DOWN": "Fancy home-cooked feast",
+        "LEFT": "Start a new shared hobby",
+        "RIGHT": "Say 'thank you' every day"
+      }
+    },
+    "q61": {
+      "title": "When should dinner dishes get washed?",
+      "choices": {
+        "UP": "Right after eating",
+        "DOWN": "After a short rest",
+        "LEFT": "Anytime before bed",
+        "RIGHT": "Team dishwasher!"
+      }
+    },
+    "q62": {
+      "title": "Picky about drying & folding laundry?",
+      "choices": {
+        "UP": "Neat folds, zero wrinkles",
+        "DOWN": "As long as it's dry",
+        "LEFT": "Tumble dry & done fast",
+        "RIGHT": "Hang straight in closet"
+      }
+    },
+    "q63": {
+      "title": "Dream home interior style?",
+      "choices": {
+        "UP": "Warm natural wood",
+        "DOWN": "Sleek minimalist hotel",
+        "LEFT": "Cozy vintage cafe vibe",
+        "RIGHT": "Lively & full of favorites"
+      }
+    },
+    "q64": {
+      "title": "Who loses or forgets things more often?",
+      "choices": {
+        "UP": "I forget things more",
+        "DOWN": "My partner forgets more",
+        "LEFT": "We're both organized",
+        "RIGHT": "We're both scatterbrained"
+      }
+    },
+    "q65": {
+      "title": "Favorite bedtime wind-down routine?",
+      "choices": {
+        "UP": "Scrolling phone or videos",
+        "DOWN": "Reading books or comics",
+        "LEFT": "Chatting about our day",
+        "RIGHT": "Asleep the second I lie down"
+      }
+    },
+    "q66": {
+      "title": "How do you handle groceries & fridge?",
+      "choices": {
+        "UP": "Meal plan & bulk shop",
+        "DOWN": "Buy what I crave daily",
+        "LEFT": "Stock freezer & meal prep",
+        "RIGHT": "Online grocery delivery"
+      }
+    },
+    "q67": {
+      "title": "What matters most when buying home gear?",
+      "choices": {
+        "UP": "Durable classic quality",
+        "DOWN": "Time-saving smart features",
+        "LEFT": "Great value & reviews",
+        "RIGHT": "Clean matching aesthetic"
+      }
+    },
+    "q68": {
+      "title": "When do you start weekend chores?",
+      "choices": {
+        "UP": "Knock it out in the morning",
+        "DOWN": "Slowly after lunch",
+        "LEFT": "Done before evening",
+        "RIGHT": "No chores on weekends!"
+      }
+    },
+    "q69": {
+      "title": "Background TV or music at home?",
+      "choices": {
+        "UP": "TV or videos always on",
+        "DOWN": "Chill music or radio",
+        "LEFT": "Love a quiet room",
+        "RIGHT": "Only for a specific show"
+      }
+    },
+    "q70": {
+      "title": "Who gets cold more easily?",
+      "choices": {
+        "UP": "I get cold faster",
+        "DOWN": "My partner gets cold faster",
+        "LEFT": "We both hate the cold",
+        "RIGHT": "We both hate the heat"
+      }
+    },
+    "q71": {
+      "title": "When good news happens, how do you share it?",
+      "choices": {
+        "UP": "Call or text right away!",
+        "DOWN": "Tell them face to face",
+        "LEFT": "Grab cake or drinks to toast",
+        "RIGHT": "Mention it casually later"
+      }
+    },
+    "q72": {
+      "title": "How late is okay when meeting up?",
+      "choices": {
+        "UP": "Tell me even for 5 min",
+        "DOWN": "15 min late is no big deal",
+        "LEFT": "30 min fine with a heads-up",
+        "RIGHT": "I'm often late myself..."
+      }
+    },
+    "q73": {
+      "title": "Who cries more easily at touching moments?",
+      "choices": {
+        "UP": "I cry more easily",
+        "DOWN": "My partner cries more easily",
+        "LEFT": "We both tear up fast",
+        "RIGHT": "Neither of us cries much"
+      }
+    },
+    "q74": {
+      "title": "When we disagree on a plan, how to decide?",
+      "choices": {
+        "UP": "Talk until both agree",
+        "DOWN": "Meet in the middle",
+        "LEFT": "Take turns choosing",
+        "RIGHT": "Rock-paper-scissors / gut"
+      }
+    },
+    "q75": {
+      "title": "When partner replies a bit slow, you think...",
+      "choices": {
+        "UP": "Must be busy, no rush",
+        "DOWN": "Get a tiny bit worried",
+        "LEFT": "Busy doing my own thing",
+        "RIGHT": "Send a cute nudge sticker"
+      }
+    },
+    "q76": {
+      "title": "Who replies to texts faster?",
+      "choices": {
+        "UP": "I reply faster",
+        "DOWN": "My partner replies faster",
+        "LEFT": "We both reply instantly",
+        "RIGHT": "We're both slow texters"
+      }
+    },
+    "q77": {
+      "title": "How do you react when complimented?",
+      "choices": {
+        "UP": "Smile & say 'Thank you!'",
+        "DOWN": "Get shy & brush it off",
+        "LEFT": "Compliment right back!",
+        "RIGHT": "Can't stop grinning"
+      }
+    },
+    "q78": {
+      "title": "Who wakes up in a better mood?",
+      "choices": {
+        "UP": "I'm better in the morning",
+        "DOWN": "My partner is better",
+        "LEFT": "We both pop right up",
+        "RIGHT": "Neither wants to get up"
+      }
+    },
+    "q79": {
+      "title": "Can you keep a surprise secret until the day?",
+      "choices": {
+        "UP": "Total poker face pro",
+        "DOWN": "My grin gives it away",
+        "LEFT": "Too excited, drop hints",
+        "RIGHT": "Can't hide it, tell early"
+      }
+    },
+    "q80": {
+      "title": "How do you cheer up your partner when down?",
+      "choices": {
+        "UP": "Big hug & stay close",
+        "DOWN": "Bring their favorite treat",
+        "LEFT": "Make them laugh with videos",
+        "RIGHT": "Listen quietly all the way"
+      }
+    },
+    "q81": {
+      "title": "Who plays the teasing realist vs. goofball?",
+      "choices": {
+        "UP": "I'm the teasing realist",
+        "DOWN": "My partner is the realist",
+        "LEFT": "We're both total goofballs",
+        "RIGHT": "Calm & gentle banter"
+      }
+    },
+    "q82": {
+      "title": "When do you like to plan the next date?",
+      "choices": {
+        "UP": "1–2 weeks in advance",
+        "DOWN": "A few days before",
+        "LEFT": "Spontaneous day-of vibes",
+        "RIGHT": "At the end of each date"
+      }
+    },
+    "q83": {
+      "title": "Thoughts on matching couple outfits?",
+      "choices": {
+        "UP": "Subtle accessories/shoes",
+        "DOWN": "Matching PJs at home",
+        "LEFT": "Coordinated color palettes",
+        "RIGHT": "Wear our own styles"
+      }
+    },
+    "q84": {
+      "title": "Phone etiquette during a date?",
+      "choices": {
+        "UP": "Photos & maps only",
+        "DOWN": "Relaxed & flexible",
+        "LEFT": "Scroll fun stuff together",
+        "RIGHT": "Trying to use it less"
+      }
+    },
+    "q85": {
+      "title": "Favorite way to call each other?",
+      "choices": {
+        "UP": "By our first names",
+        "DOWN": "Our own special pet names",
+        "LEFT": "Short cute nicknames",
+        "RIGHT": "Changes with the mood"
+      }
+    },
+    "q86": {
+      "title": "Who fell for the other first?",
+      "choices": {
+        "UP": "I fell first",
+        "DOWN": "My partner fell first",
+        "LEFT": "At the exact same time!",
+        "RIGHT": "Slowly & naturally together"
+      }
+    },
+    "q87": {
+      "title": "What little gesture melts your heart most?",
+      "choices": {
+        "UP": "Walking on the street side",
+        "DOWN": "Remembering my favorites",
+        "LEFT": "A sudden smile or head pat",
+        "RIGHT": "Always having my back"
+      }
+    },
+    "q88": {
+      "title": "How should we keep our couple photos?",
+      "choices": {
+        "UP": "Shared cloud photo album",
+        "DOWN": "Print a yearly photo book",
+        "LEFT": "Frame favorites at home",
+        "RIGHT": "Scroll back on our phones"
+      }
+    },
+    "q89": {
+      "title": "Do you dress with your partner's taste in mind?",
+      "choices": {
+        "UP": "Yes, match vibe & taste",
+        "DOWN": "Neat, but true to my style",
+        "LEFT": "Coordinate outfits ahead",
+        "RIGHT": "Comfort comes first"
+      }
+    },
+    "q90": {
+      "title": "How to get through time apart?",
+      "choices": {
+        "UP": "Long video or voice calls",
+        "DOWN": "Plan our next fun meetup",
+        "LEFT": "Focus on work & hobbies",
+        "RIGHT": "Send a sweet note or gift"
+      }
+    },
+    "q91": {
+      "title": "Favorite ramen broth style?",
+      "choices": {
+        "UP": "Classic soy or light salt",
+        "DOWN": "Rich tonkotsu pork",
+        "LEFT": "Savory miso or spicy",
+        "RIGHT": "Dipping or dry noodles"
+      }
+    },
+    "q92": {
+      "title": "First sushi pick at a sushi spot?",
+      "choices": {
+        "UP": "Tuna / fatty toro",
+        "DOWN": "Salmon or seared rolls",
+        "LEFT": "White fish, squid, shellfish",
+        "RIGHT": "Tamago, soup, or sides"
+      }
+    },
+    "q93": {
+      "title": "Best finale for a cozy hot pot?",
+      "choices": {
+        "UP": "Silky egg rice porridge",
+        "DOWN": "Chewy udon noodles",
+        "LEFT": "Ramen noodles",
+        "RIGHT": "Cheesy risotto style"
+      }
+    },
+    "q94": {
+      "title": "At a BBQ or grill, who's the grill master?",
+      "choices": {
+        "UP": "I run the grill",
+        "DOWN": "My partner runs the grill",
+        "LEFT": "Grill your own plate",
+        "RIGHT": "Whoever notices flips it"
+      }
+    },
+    "q95": {
+      "title": "Ideal way to spend time at a cafe?",
+      "choices": {
+        "UP": "Deep chat over dessert",
+        "DOWN": "Quiet reading or working",
+        "LEFT": "People-watching on patio",
+        "RIGHT": "Coffee to go & park walk"
+      }
+    },
+    "q96": {
+      "title": "Midnight munchies strike—what do you do?",
+      "choices": {
+        "UP": "Resist with warm tea",
+        "DOWN": "Instant noodles or snacks",
+        "LEFT": "Light yogurt or soup",
+        "RIGHT": "Midnight feast together!"
+      }
+    },
+    "q97": {
+      "title": "Fun weekend meal to cook together?",
+      "choices": {
+        "UP": "Dumplings or DIY tacos",
+        "DOWN": "Scratch pasta or curry",
+        "LEFT": "Baking bread or sweets",
+        "RIGHT": "I'll stick to cleanup!"
+      }
+    },
+    "q98": {
+      "title": "Go-to impulse treat at a convenience store?",
+      "choices": {
+        "UP": "Fresh pastry or pudding",
+        "DOWN": "Ice cream or chocolate",
+        "LEFT": "Hot savory snacks",
+        "RIGHT": "Iced latte or new drink"
+      }
+    },
+    "q99": {
+      "title": "If we won $100,000, what's our first move?",
+      "choices": {
+        "UP": "Dream luxury trip abroad",
+        "DOWN": "Save & invest almost all",
+        "LEFT": "Move or upgrade our home",
+        "RIGHT": "Enjoy half, save half"
+      }
+    },
+    "q100": {
+      "title": "Reward points & coupons—are you into them?",
+      "choices": {
+        "UP": "Love deals! Track them all",
+        "DOWN": "Casually on favorite apps",
+        "LEFT": "Skip if it takes effort",
+        "RIGHT": "Let partner handle it all"
+      }
+    },
+    "q101": {
+      "title": "Rough day at work—do you bring it home?",
+      "choices": {
+        "UP": "Vent to partner & unwind",
+        "DOWN": "Leave work at the door",
+        "LEFT": "Share only when really tough",
+        "RIGHT": "Eat good food & forget it"
+      }
+    },
+    "q102": {
+      "title": "Who is the better planner?",
+      "choices": {
+        "UP": "I'm more organized",
+        "DOWN": "My partner is more organized",
+        "LEFT": "We're both planners",
+        "RIGHT": "We both go with the flow"
+      }
+    },
+    "q103": {
+      "title": "What feels like a comfy birthday gift budget?",
+      "choices": {
+        "UP": "Around $50–$100, casual",
+        "DOWN": "$150–$300, extra special",
+        "LEFT": "No limit if they love it",
+        "RIGHT": "Set a cap & swap lists"
+      }
+    },
+    "q104": {
+      "title": "Ideal work-life balance?",
+      "choices": {
+        "UP": "Off on time for us",
+        "DOWN": "Go big on fulfilling work",
+        "LEFT": "Flexible remote work",
+        "RIGHT": "Work hard, long vacations"
+      }
+    },
+    "q105": {
+      "title": "Non-negotiable when apartment hunting?",
+      "choices": {
+        "UP": "Sunlight & spacious layout",
+        "DOWN": "Transit & nearby shops",
+        "LEFT": "Modern kitchen & bathroom",
+        "RIGHT": "Quiet area & security"
+      }
+    },
+    "q106": {
+      "title": "What should we use our joint savings for?",
+      "choices": {
+        "UP": "Bucket-list trip abroad",
+        "DOWN": "Future home or moving",
+        "LEFT": "A car or home upgrades",
+        "RIGHT": "Peace-of-mind emergency fund"
+      }
+    },
+    "q107": {
+      "title": "Which season do you love most?",
+      "choices": {
+        "UP": "Warm spring blossoms",
+        "DOWN": "Sunny beach & fireworks",
+        "LEFT": "Crisp autumn foliage",
+        "RIGHT": "Cozy winter & lights"
+      }
+    },
+    "q108": {
+      "title": "How do you enjoy a theme park?",
+      "choices": {
+        "UP": "Conquer every thrill ride!",
+        "DOWN": "Shows, parades & vibes",
+        "LEFT": "Park snacks & merch",
+        "RIGHT": "Skip lines, stroll slowly"
+      }
+    },
+    "q109": {
+      "title": "Best road-trip car vibe?",
+      "choices": {
+        "UP": "Blast music & sing along",
+        "DOWN": "Podcasts or radio",
+        "LEFT": "Soft tunes & nonstop chat",
+        "RIGHT": "Try every rest-stop snack"
+      }
+    },
+    "q110": {
+      "title": "How do you shop for travel souvenirs?",
+      "choices": {
+        "UP": "Gifts for family & friends",
+        "DOWN": "Local treats for ourselves",
+        "LEFT": "Mugs, magnets & keepsakes",
+        "RIGHT": "Minimal to travel light"
+      }
+    },
+    "q111": {
+      "title": "Camping or glamping together?",
+      "choices": {
+        "UP": "Real tent & campfire!",
+        "DOWN": "Chic comfy glamping",
+        "LEFT": "Daytime BBQ is plenty",
+        "RIGHT": "No bugs—hotel please!"
+      }
+    },
+    "q112": {
+      "title": "At a hot spring or spa resort, how many soaks?",
+      "choices": {
+        "UP": "Arrival, night & morning (3+)",
+        "DOWN": "Night & morning (2)",
+        "LEFT": "Once at night is enough",
+        "RIGHT": "Private bath or sauna"
+      }
+    },
+    "q113": {
+      "title": "Dream summer memory to make?",
+      "choices": {
+        "UP": "Fireworks & summer fest",
+        "DOWN": "Beach or pool all day",
+        "LEFT": "Cool mountain escape",
+        "RIGHT": "Cold treats in the AC"
+      }
+    },
+    "q114": {
+      "title": "Favorite place to see animals?",
+      "choices": {
+        "UP": "Relaxed stroll at the zoo",
+        "DOWN": "Dreamy aquarium date",
+        "LEFT": "Farm visit & ice cream",
+        "RIGHT": "Cozy cat or dog cafe"
+      }
+    },
+    "q115": {
+      "title": "Surprise full week off together—what's the move?",
+      "choices": {
+        "UP": "Spontaneous trip abroad",
+        "DOWN": "Epic domestic road trip",
+        "LEFT": "Eat great food & chill",
+        "RIGHT": "Half travel, half sofa"
+      }
+    },
+    "q116": {
+      "title": "If we had a time machine, where would we go?",
+      "choices": {
+        "UP": "Peek at the day we met",
+        "DOWN": "See our life 10 years ahead",
+        "LEFT": "Visit our childhoods",
+        "RIGHT": "Stay right here in today"
+      }
+    },
+    "q117": {
+      "title": "What do you admire most about your partner?",
+      "choices": {
+        "UP": "Kindness toward others",
+        "DOWN": "Steady drive & effort",
+        "LEFT": "Bright, positive energy",
+        "RIGHT": "Strong inner values"
+      }
+    },
+    "q118": {
+      "title": "Most important key to staying happy long-term?",
+      "choices": {
+        "UP": "Say 'thanks' & 'sorry'",
+        "DOWN": "Respect solo time & hobbies",
+        "LEFT": "Regular couple date nights",
+        "RIGHT": "Voice little issues early"
+      }
+    },
+    "q119": {
+      "title": "A note to us 10 years from now?",
+      "choices": {
+        "UP": "Keep laughing just as much",
+        "DOWN": "Hope we've seen the world!",
+        "LEFT": "Always in your corner",
+        "RIGHT": "Hope we're eating well daily"
+      }
+    },
+    "q120": {
+      "title": "Something new to try together next?",
+      "choices": {
+        "UP": "Start seasonal traditions",
+        "DOWN": "Work out or play a sport",
+        "LEFT": "Explore new states/regions",
+        "RIGHT": "Learn a skill or language"
+      }
+    }
+  }
+}

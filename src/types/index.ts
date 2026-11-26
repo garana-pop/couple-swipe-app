@@ -2,6 +2,24 @@ export type SwipeDirection = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
 export type MatchRule = 'exact' | 'mirror_up_down';
 
+export type QuestionCategoryKey =
+  | 'lifestyle'
+  | 'holidays'
+  | 'anniversary'
+  | 'food'
+  | 'communication'
+  | 'affection'
+  | 'money_future'
+  | 'travel'
+  | 'relationship'
+  | 'other';
+
+export interface RemoteQuestionTranslation {
+  category?: string;
+  title?: string;
+  choices?: Record<SwipeDirection, string>;
+}
+
 export interface QuestionChoice {
   direction: SwipeDirection;
   label: string;
@@ -17,6 +35,7 @@ export interface QuestionHistoryItem {
 
 export interface Question {
   id: string;
+  categoryKey?: QuestionCategoryKey;
   category: string;
   title: string;
   choices: Record<SwipeDirection, string>;
@@ -28,6 +47,7 @@ export interface Question {
 export interface RemoteQuestionRecord extends Question {
   isActive: boolean;
   updatedAt: string;
+  translations?: Record<string, RemoteQuestionTranslation>;
 }
 
 export interface PairUser {
@@ -71,9 +91,11 @@ export interface HistoryDayItem {
   items: HistoryDayAnswer[];
 }
 
+export type RiskLevelKey = 'low' | 'medium' | 'high';
+
 export interface AiReportRiskPoint {
   title: string;
-  level: '低' | '中' | '高';
+  level: RiskLevelKey | '低' | '中' | '高';
   desc: string;
   advice: string;
 }
@@ -90,6 +112,7 @@ export interface AiReportData {
 
 export interface PairAiReportRecord {
   id: string;
+  locale?: string;
   analyzedDays: number;
   analyzedAnswers: number;
   modelUsed: string;
@@ -116,6 +139,7 @@ export interface BreakupReflectionData {
 
 export interface PairBreakupReflectionRecord {
   id: string;
+  locale?: string;
   analyzedDays: number;
   analyzedAnswers: number;
   modelUsed: string;
@@ -151,6 +175,7 @@ export interface PairEntitlement {
 }
 
 export interface CategoryMatchStat {
+  categoryKey?: QuestionCategoryKey;
   category: string;
   matched: number;
   total: number;

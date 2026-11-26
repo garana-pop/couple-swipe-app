@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 export default function WaitingScreen() {
+  const { t } = useTranslation();
   const {
     partnerName,
     myName,
@@ -45,7 +47,6 @@ export default function WaitingScreen() {
     ).start();
   }, [pulseAnim]);
 
-  // 相手の回答状況を定期ポーリング（5秒間隔）
   useEffect(() => {
     if (!isSupabaseReady || isPartnerCompleted) return;
 
@@ -67,10 +68,13 @@ export default function WaitingScreen() {
   };
 
   const partnerProgressText = isPartnerCompleted
-    ? '回答完了'
+    ? t('waiting.progressDone')
     : dayStatus.partnerAnsweredCount > 0
-      ? `${dayStatus.partnerAnsweredCount} / ${dayStatus.totalQuestions} 問回答中`
-      : '回答待ち';
+      ? t('waiting.progressAnswering', {
+          answered: dayStatus.partnerAnsweredCount,
+          total: dayStatus.totalQuestions,
+        })
+      : t('waiting.progressPending');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -93,26 +97,26 @@ export default function WaitingScreen() {
       <View style={styles.textSection}>
         <Text style={styles.statusTitle}>
           {isPartnerCompleted
-            ? '二人の回答が揃いました'
-            : `${partnerName} さんの回答待ちです`}
+            ? t('waiting.titleBothDone')
+            : t('waiting.titleWaiting', { partnerName })}
         </Text>
         <Text style={styles.statusDesc}>
-          {isPartnerCompleted
-            ? 'お互いの回答と今日の一致率が公開されました。結果を確認しましょう。'
-            : '2人とも回答を終えるまで、お互いの答えを見ることはできません。'}
+          {isPartnerCompleted ? t('waiting.descBothDone') : t('waiting.descWaiting')}
         </Text>
       </View>
 
       <View style={[styles.statusCard, SHADOWS.card]}>
-        <Text style={styles.cardHeaderTitle}>回答状況</Text>
+        <Text style={styles.cardHeaderTitle}>{t('waiting.statusCardTitle')}</Text>
 
         <View style={styles.userStatusRow}>
           <View style={styles.userCol}>
             <View style={styles.badgeDone}>
               <Ionicons name="checkmark" size={16} color="#FFFFFF" />
             </View>
-            <Text style={styles.userName}>{myName} (あなた)</Text>
-            <Text style={styles.userStatusDone}>回答済み</Text>
+            <Text style={styles.userName} numberOfLines={2}>
+              {t('common.youSuffix', { name: myName })}
+            </Text>
+            <Text style={styles.userStatusDone}>{t('waiting.myStatusDone')}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -129,7 +133,9 @@ export default function WaitingScreen() {
                 color="#FFFFFF"
               />
             </View>
-            <Text style={styles.userName}>{partnerName}</Text>
+            <Text style={styles.userName} numberOfLines={2}>
+              {partnerName}
+            </Text>
             <Text
               style={
                 isPartnerCompleted ? styles.userStatusDone : styles.userStatusPending
@@ -147,7 +153,7 @@ export default function WaitingScreen() {
           activeOpacity={0.8}
           onPress={() => router.replace('/result')}
         >
-          <Text style={styles.resultButtonText}>結果画面へ進む</Text>
+          <Text style={styles.resultButtonText}>{t('waiting.goToResult')}</Text>
           <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       ) : (
@@ -162,7 +168,7 @@ export default function WaitingScreen() {
           ) : (
             <Ionicons name="refresh-outline" size={17} color={COLORS.primary} />
           )}
-          <Text style={styles.refreshButtonText}>最新の状況を確認する</Text>
+          <Text style={styles.refreshButtonText}>{t('waiting.refreshBtn')}</Text>
         </TouchableOpacity>
       )}
 
@@ -184,18 +190,25 @@ export default function WaitingScreen() {
           <Text style={styles.premiumHintTitle}>
             {pairStats.myPastUnansweredDays > 0
               ? isPairPremium
-                ? `待っている間に過去の未回答（${pairStats.myPastUnansweredDays}日分）に遡り回答`
-                : `過去の未回答が ${pairStats.myPastUnansweredDays}日分 あります`
-              : '過去の未回答日もカレンダーから遡って回答'}
+                ? t('waiting.premiumHint.titlePremiumHasPast', {
+                    count: pairStats.myPastUnansweredDays,
+                  })
+                : t('waiting.premiumHint.titleFreeHasPast', {
+                    count: pairStats.myPastUnansweredDays,
+                  })
+              : t('waiting.premiumHint.titleDefault')}
           </Text>
           <Ionicons name="chevron-forward" size={14} color="#8C5A1B" />
         </View>
         <Text style={styles.premiumHintText}>
           {pairStats.myPastUnansweredDays > 0 && isPairPremium
-            ? 'プレミアム特典として、回答カレンダーから未回答の過去日をタップすると今から遡って回答できます。'
+            ? t('waiting.premiumHint.descPremiumHasPast')
             : pairStats.pastPartnerAnsweredUnansweredDays > 0 && !isPairPremium
-              ? `うち ${pairStats.pastPartnerAnsweredUnansweredDays}日 は ${partnerName} さんが回答済み！待っている間にプレミアムでカレンダーから遡って回答し、相手の答えと一致率を見てみませんか？`
-              : '当日の回答はお互い完了するまで秘密ですが、プレミアムプランでは自分が未回答だった過去日の質問にカレンダーから遡って回答でき、回答後に相手の答えと一致率を見られます（AI相性診断にも反映）。'}
+              ? t('waiting.premiumHint.descFreePartnerAnswered', {
+                  count: pairStats.pastPartnerAnsweredUnansweredDays,
+                  partnerName,
+                })
+              : t('waiting.premiumHint.descDefault')}
         </Text>
       </TouchableOpacity>
 
@@ -203,7 +216,7 @@ export default function WaitingScreen() {
         style={styles.backHomeBtn}
         onPress={() => router.replace('/')}
       >
-        <Text style={styles.backHomeText}>ホーム画面に戻る</Text>
+        <Text style={styles.backHomeText}>{t('waiting.backHome')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -240,20 +253,22 @@ const styles = StyleSheet.create({
   textSection: {
     alignItems: 'center',
     marginBottom: 22,
+    width: '100%',
   },
   statusTitle: {
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '800',
     color: COLORS.text,
     textAlign: 'center',
+    lineHeight: 28,
     marginBottom: 8,
   },
   statusDesc: {
     fontSize: 13,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 12,
+    lineHeight: 21,
+    paddingHorizontal: 10,
   },
   statusCard: {
     width: '100%',
@@ -270,6 +285,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: 14,
     textAlign: 'center',
+    lineHeight: 19,
   },
   userStatusRow: {
     flexDirection: 'row',
@@ -279,6 +295,7 @@ const styles = StyleSheet.create({
   userCol: {
     alignItems: 'center',
     flex: 1,
+    paddingHorizontal: 6,
   },
   divider: {
     width: 1,
@@ -304,20 +321,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   userName: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     color: COLORS.text,
+    textAlign: 'center',
+    lineHeight: 19,
     marginBottom: 4,
   },
   userStatusDone: {
     fontSize: 12,
     fontWeight: '700',
     color: '#4A7C59',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   userStatusPending: {
     fontSize: 12,
     fontWeight: '600',
     color: '#8D8179',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   resultButton: {
     width: '100%',
@@ -326,6 +349,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
+    paddingHorizontal: 16,
     borderRadius: 18,
     gap: 8,
     marginBottom: 20,
@@ -335,6 +359,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 21,
   },
   refreshButton: {
     width: '100%',
@@ -343,6 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     paddingVertical: 13,
+    paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: COLORS.primary,
@@ -353,6 +381,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.primary,
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   premiumHintCard: {
     width: '100%',
@@ -374,11 +405,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#8C5A1B',
+    lineHeight: 18,
   },
   premiumHintText: {
     fontSize: 11.5,
     color: '#7A5B32',
-    lineHeight: 17,
+    lineHeight: 19,
   },
   backHomeBtn: {
     paddingVertical: 8,
@@ -388,5 +420,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textMuted,
     fontWeight: '600',
+    lineHeight: 19,
   },
 });

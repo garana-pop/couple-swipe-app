@@ -1,0 +1,1096 @@
+{
+  "categories": {
+    "lifestyle": "Quotidien & valeurs",
+    "holidays": "Jours de repos",
+    "anniversary": "Dates spéciales",
+    "food": "Cuisine & goûts",
+    "communication": "Communication",
+    "affection": "Amour & tendresse",
+    "money_future": "Budget & avenir",
+    "travel": "Voyages & sorties",
+    "relationship": "Notre duo",
+    "other": "Autre"
+  },
+  "items": {
+    "q1": {
+      "title": "Qui est le plus exigeant sur le ménage ?",
+      "choices": {
+        "UP": "Clairement moi",
+        "DOWN": "Clairement mon/ma partenaire",
+        "LEFT": "À peu près pareil",
+        "RIGHT": "Cool tous les deux"
+      }
+    },
+    "q2": {
+      "title": "Ton jour de repos idéal à deux ?",
+      "choices": {
+        "UP": "Sortie active dehors",
+        "DOWN": "Cocooning à la maison",
+        "LEFT": "Chacun son programme",
+        "RIGHT": "Voir des amis ensemble"
+      }
+    },
+    "q3": {
+      "title": "Comment fêter anniversaires et dates clés ?",
+      "choices": {
+        "UP": "Sortir le grand jeu / surprises",
+        "DOWN": "Préparer ensemble à l'avance",
+        "LEFT": "Un bon resto suffit largement",
+        "RIGHT": "Simple et naturel"
+      }
+    },
+    "q4": {
+      "title": "À quelle fréquence ranger et nettoyer ?",
+      "choices": {
+        "UP": "Un peu chaque jour",
+        "DOWN": "Grand ménage le week-end",
+        "LEFT": "Quand ça se remarque",
+        "RIGHT": "Robot aspirateur ou aide"
+      }
+    },
+    "q5": {
+      "title": "Plutôt lève-tôt ou couche-tard ?",
+      "choices": {
+        "UP": "100 % lève-tôt",
+        "DOWN": "Vrai couche-tard",
+        "LEFT": "Tôt en semaine, tard le week-end",
+        "RIGHT": "Ça dépend des jours"
+      }
+    },
+    "q6": {
+      "title": "Lumière et bruit idéaux pour dormir ?",
+      "choices": {
+        "UP": "Noir total et silence",
+        "DOWN": "Petite veilleuse douce",
+        "LEFT": "Télé ou musique en fond",
+        "RIGHT": "Je dors n'importe où"
+      }
+    },
+    "q7": {
+      "title": "Ton réglage idéal de chauffage / clim ?",
+      "choices": {
+        "UP": "Confort avant tout toute l'année",
+        "DOWN": "Mode éco et sobriété",
+        "LEFT": "Aérer au maximum",
+        "RIGHT": "Comme préfère mon/ma partenaire"
+      }
+    },
+    "q8": {
+      "title": "Qui met le plus de temps à se préparer ?",
+      "choices": {
+        "UP": "Moi, sans hésiter",
+        "DOWN": "Mon/ma partenaire",
+        "LEFT": "Rapides tous les deux",
+        "RIGHT": "On prend tous deux notre temps"
+      }
+    },
+    "q9": {
+      "title": "Facile pour toi de trier et jeter ?",
+      "choices": {
+        "UP": "Je jette vite l'inutile",
+        "DOWN": "Je garde les souvenirs",
+        "LEFT": "Je revends en ligne d'abord",
+        "RIGHT": "Je laisse l'autre décider"
+      }
+    },
+    "q10": {
+      "title": "Si on adopte un animal, lequel ?",
+      "choices": {
+        "UP": "Team chien",
+        "DOWN": "Team chat",
+        "LEFT": "Petits animaux ou poissons",
+        "RIGHT": "Pas d'animal, liberté avant tout"
+      }
+    },
+    "q11": {
+      "title": "Tu préfères te doucher à quel moment ?",
+      "choices": {
+        "UP": "Dès le retour à la maison",
+        "DOWN": "Long bain avant de dormir",
+        "LEFT": "Douche le matin",
+        "RIGHT": "Ça change selon le jour"
+      }
+    },
+    "q12": {
+      "title": "Ton quartier rêvé pour habiter ?",
+      "choices": {
+        "UP": "Centre-ville tout à pied",
+        "DOWN": "Banlieue calme et verte",
+        "LEFT": "Trajet boulot le plus court",
+        "RIGHT": "Quartier cosy plein de cafés"
+      }
+    },
+    "q13": {
+      "title": "Comment faire la paix après une dispute ?",
+      "choices": {
+        "UP": "En parler le jour même",
+        "DOWN": "Dormir dessus pour calmer",
+        "LEFT": "Se réconcilier avec un dessert",
+        "RIGHT": "Laisser passer naturellement"
+      }
+    },
+    "q14": {
+      "title": "À quelle fréquence s'écrire dans la journée ?",
+      "choices": {
+        "UP": "Plein de petits messages",
+        "DOWN": "Uniquement si nécessaire",
+        "LEFT": "Un message « bonne nuit » / jour",
+        "RIGHT": "Un petit appel rapide"
+      }
+    },
+    "q15": {
+      "title": "Quelle preuve d'amour te touche le plus ?",
+      "choices": {
+        "UP": "Les mots comme « je t'aime »",
+        "DOWN": "Câlins et mains dans la main",
+        "LEFT": "Petites surprises au hasard",
+        "RIGHT": "Coups de main attentionnés"
+      }
+    },
+    "q16": {
+      "title": "Qui dit « pardon » en premier en général ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "On s'excuse vite tous les deux",
+        "RIGHT": "On se dispute très rarement"
+      }
+    },
+    "q17": {
+      "title": "Quand tu te confies sur un souci, tu veux...",
+      "choices": {
+        "UP": "Juste de l'écoute et empathie",
+        "DOWN": "Des conseils concrets",
+        "LEFT": "Un bon repas pour remonter",
+        "RIGHT": "Un soutien calme et discret"
+      }
+    },
+    "q18": {
+      "title": "Se tenir la main en marchant dehors ?",
+      "choices": {
+        "UP": "Toujours, j'adore ça !",
+        "DOWN": "Dans les coins tranquilles",
+        "LEFT": "Bras dessus, bras dessous",
+        "RIGHT": "Marcher côte à côte suffit"
+      }
+    },
+    "q19": {
+      "title": "De combien de temps solo as-tu besoin ?",
+      "choices": {
+        "UP": "Un petit moment chaque jour",
+        "DOWN": "Quelques heures par semaine",
+        "LEFT": "Ensemble 24 h/24, j'adore",
+        "RIGHT": "Juste en période de stress"
+      }
+    },
+    "q20": {
+      "title": "Qui est le plus facilement jaloux ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Un petit peu tous les deux",
+        "RIGHT": "On est zen tous les deux"
+      }
+    },
+    "q21": {
+      "title": "Que penses-tu des surprises imprévues ?",
+      "choices": {
+        "UP": "J'adore en faire et en avoir !",
+        "DOWN": "Timide, mais j'adore en secret",
+        "LEFT": "Les petites attentions suffisent",
+        "RIGHT": "Je préfère la stabilité"
+      }
+    },
+    "q22": {
+      "title": "Partager le code de son téléphone ?",
+      "choices": {
+        "UP": "Aucun souci pour le partager",
+        "DOWN": "En cas d'urgence seulement",
+        "LEFT": "Chacun son jardin secret",
+        "RIGHT": "Je n'y ai jamais pensé"
+      }
+    },
+    "q23": {
+      "title": "Qui est le plus câlin / pot de colle ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Très câlins tous les deux",
+        "RIGHT": "Indépendants tous les deux"
+      }
+    },
+    "q24": {
+      "title": "Quand tu es épuisé(e), qu'est-ce qui aide le plus ?",
+      "choices": {
+        "UP": "Des câlins et qu'on m'écoute",
+        "DOWN": "Un bon plat déjà prêt",
+        "LEFT": "Me laisser dormir tranquille",
+        "RIGHT": "Regarder un truc drôle à deux"
+      }
+    },
+    "q25": {
+      "title": "Ton rapport à l'argent ?",
+      "choices": {
+        "UP": "Épargne régulière et carrée",
+        "DOWN": "Dépenser pour des souvenirs",
+        "LEFT": "Faire fructifier en investissant",
+        "RIGHT": "Dépenser sans compter si utile"
+      }
+    },
+    "q26": {
+      "title": "Meilleure façon de gérer les dépenses communes ?",
+      "choices": {
+        "UP": "Un compte bancaire commun",
+        "DOWN": "Répartir selon les factures",
+        "LEFT": "Suivre et équilibrer sur appli",
+        "RIGHT": "Au feeling, sans trop compter"
+      }
+    },
+    "q27": {
+      "title": "Se concerter avant un gros achat ?",
+      "choices": {
+        "UP": "Toujours dès ~100–200 €",
+        "DOWN": "Après coup si budget perso",
+        "LEFT": "Juste maison / électroménager",
+        "RIGHT": "On se dit tout, peu importe"
+      }
+    },
+    "q28": {
+      "title": "Budget resto habituel pour un date ?",
+      "choices": {
+        "UP": "Dénicher des pépites pas chères",
+        "DOWN": "Se faire plaisir pour le cadre",
+        "LEFT": "Économe souvent, folie parfois",
+        "RIGHT": "Rien ne vaut la cuisine maison"
+      }
+    },
+    "q29": {
+      "title": "Comment nous vois-tu dans 5 ans ?",
+      "choices": {
+        "UP": "Bien au chaud dans plus grand",
+        "DOWN": "À fond dans projets et passions",
+        "LEFT": "À voyager tout le temps",
+        "RIGHT": "Simplement heureux ensemble"
+      }
+    },
+    "q30": {
+      "title": "Qui craque le plus vite en achat impulsif ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Prudence des deux côtés",
+        "RIGHT": "Coups de cœur tous les deux"
+      }
+    },
+    "q31": {
+      "title": "La meilleure façon de choisir un cadeau ?",
+      "choices": {
+        "UP": "Partager une liste d'envies",
+        "DOWN": "Une belle surprise réfléchie",
+        "LEFT": "Faire les boutiques ensemble",
+        "RIGHT": "Un resto ou une escapade"
+      }
+    },
+    "q32": {
+      "title": "Où aimerais-tu passer ta retraite ?",
+      "choices": {
+        "UP": "Appartement pratique en ville",
+        "DOWN": "Nature calme ou ville thermale",
+        "LEFT": "À l'étranger ou 2 résidences",
+        "RIGHT": "Près de la famille et des siens"
+      }
+    },
+    "q33": {
+      "title": "Ce soir pour dîner, qu'est-ce qui te tente ?",
+      "choices": {
+        "UP": "Bon petit plat réconfortant",
+        "DOWN": "Bonne viande ou grillade",
+        "LEFT": "Italien ou bistrot chic",
+        "RIGHT": "Ramen, asiatique ou épicé"
+      }
+    },
+    "q34": {
+      "title": "Équilibre idéal entre cuisine maison et resto ?",
+      "choices": {
+        "UP": "Cuisiner presque tous les jours",
+        "DOWN": "Maison semaine, resto week-end",
+        "LEFT": "Un peu de livraison aussi",
+        "RIGHT": "J'adore tester des restos"
+      }
+    },
+    "q35": {
+      "title": "Ton style de petit-déjeuner ?",
+      "choices": {
+        "UP": "Salé et bien copieux",
+        "DOWN": "Tartines, croissant et café",
+        "LEFT": "Fruits frais ou yaourt léger",
+        "RIGHT": "Je saute souvent le matin"
+      }
+    },
+    "q36": {
+      "title": "Et toi avec la cuisine épicée ?",
+      "choices": {
+        "UP": "Plus c'est épicé, mieux c'est !",
+        "DOWN": "Juste un peu relevé",
+        "LEFT": "Pas fan du piment",
+        "RIGHT": "Zéro épice pour moi"
+      }
+    },
+    "q37": {
+      "title": "Un dessert après le dîner ?",
+      "choices": {
+        "UP": "Toujours de la place, 7j/7 !",
+        "DOWN": "Le week-end et petites envies",
+        "LEFT": "Un fruit frais suffit",
+        "RIGHT": "Plutôt salé que sucré"
+      }
+    },
+    "q38": {
+      "title": "Ta boisson réflexe au quotidien ?",
+      "choices": {
+        "UP": "Café avant tout",
+        "DOWN": "Thé vert ou matcha",
+        "LEFT": "Thé noir ou tisane",
+        "RIGHT": "Eau plate ou gazeuse"
+      }
+    },
+    "q39": {
+      "title": "Ton rapport à l'alcool ?",
+      "choices": {
+        "UP": "J'apprécie chez moi et dehors",
+        "DOWN": "Juste les soirées spéciales",
+        "LEFT": "Rarement / sans alcool",
+        "RIGHT": "Je suis là pour l'apéro !"
+      }
+    },
+    "q40": {
+      "title": "Qui choisit son plat le plus vite au resto ?",
+      "choices": {
+        "UP": "Je décide plus vite",
+        "DOWN": "Mon/ma partenaire décide vite",
+        "LEFT": "Rapides tous les deux",
+        "RIGHT": "On hésite tous les deux"
+      }
+    },
+    "q41": {
+      "title": "Ton style d'organisation en voyage ?",
+      "choices": {
+        "UP": "Planning détaillé heure/heure",
+        "DOWN": "Une ville et on improvise",
+        "LEFT": "Juste la liste des restos",
+        "RIGHT": "Je laisse l'autre organiser"
+      }
+    },
+    "q42": {
+      "title": "Où partir au prochain long week-end ?",
+      "choices": {
+        "UP": "Spa ou thermes détente",
+        "DOWN": "Parc d'attractions ou visites",
+        "LEFT": "Plage tropicale ou étranger",
+        "RIGHT": "Road trip gastronomique"
+      }
+    },
+    "q43": {
+      "title": "Quand fais-tu ta valise avant de partir ?",
+      "choices": {
+        "UP": "Prête plusieurs jours avant",
+        "DOWN": "Vite fait la veille au soir",
+        "LEFT": "En vitesse le matin même",
+        "RIGHT": "Léger, j'achète sur place"
+      }
+    },
+    "q44": {
+      "title": "Quel genre pour une soirée film ?",
+      "choices": {
+        "UP": "Action, SF, thriller",
+        "DOWN": "Comédie et feel-good",
+        "LEFT": "Romance et drame",
+        "RIGHT": "Anime ou documentaire"
+      }
+    },
+    "q45": {
+      "title": "Meilleure idée de date un jour de pluie ?",
+      "choices": {
+        "UP": "Films et jeux à la maison",
+        "DOWN": "Musée ou aquarium",
+        "LEFT": "Flâner en galerie marchande",
+        "RIGHT": "Spa et sauna détente"
+      }
+    },
+    "q46": {
+      "title": "Ton moyen de transport préféré en voyage ?",
+      "choices": {
+        "UP": "Road trip en voiture",
+        "DOWN": "Train avec vue et snacks",
+        "LEFT": "Avion loin et vite",
+        "RIGHT": "À vélo ou à pied pas loin"
+      }
+    },
+    "q47": {
+      "title": "Tu prends beaucoup de photos en sortie ?",
+      "choices": {
+        "UP": "Plein de photos souvenirs",
+        "DOWN": "Juste paysages et bons plats",
+        "LEFT": "Plein de selfies à deux",
+        "RIGHT": "Je profite de l'instant"
+      }
+    },
+    "q48": {
+      "title": "Critère n° 1 pour choisir un hôtel ?",
+      "choices": {
+        "UP": "Super bain ou spa",
+        "DOWN": "Délicieux petit-déj / repas",
+        "LEFT": "Emplacement et bon prix",
+        "RIGHT": "Chambre au style canon"
+      }
+    },
+    "q49": {
+      "title": "Qui est le plus casanier des deux ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "On adore rester chez nous",
+        "RIGHT": "On adore sortir tous les deux"
+      }
+    },
+    "q50": {
+      "title": "Qui est le plus romantique ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Romantiques tous les deux",
+        "RIGHT": "Pragmatiques tous les deux"
+      }
+    },
+    "q51": {
+      "title": "Ambiance idéale pour les fêtes de fin d'année ?",
+      "choices": {
+        "UP": "Illuminations et beau resto",
+        "DOWN": "Dîner cosy et gâteau maison",
+        "LEFT": "Escapade pour les fêtes",
+        "RIGHT": "Grande fête en famille/amis"
+      }
+    },
+    "q52": {
+      "title": "Quel loisir commun tester ensemble bientôt ?",
+      "choices": {
+        "UP": "Cuisine, pâtisserie et cafés",
+        "DOWN": "Sport, salle ou camping",
+        "LEFT": "Jeux vidéo/société et ciné",
+        "RIGHT": "Voyages, photo et balades"
+      }
+    },
+    "q53": {
+      "title": "Qui a le pire sens de l'orientation ?",
+      "choices": {
+        "UP": "Clairement moi",
+        "DOWN": "Clairement mon/ma partenaire",
+        "LEFT": "Bons en cartes tous les deux",
+        "RIGHT": "On se perd tous les deux"
+      }
+    },
+    "q54": {
+      "title": "Qu'est-ce qui te rassure le plus chez ton/ta partenaire ?",
+      "choices": {
+        "UP": "Son sourire et sa douceur",
+        "DOWN": "Sa fiabilité et son aplomb",
+        "LEFT": "Sa franchise sur ses émotions",
+        "RIGHT": "Nos silences confortables"
+      }
+    },
+    "q55": {
+      "title": "Quand tu es malade, comment t'aider au mieux ?",
+      "choices": {
+        "UP": "Me chouchouter et les courses",
+        "DOWN": "Repos solo pour te protéger",
+        "LEFT": "Juste soupe et boissons",
+        "RIGHT": "M'accompagner chez le médecin"
+      }
+    },
+    "q56": {
+      "title": "Poster des photos de couple sur les réseaux ?",
+      "choices": {
+        "UP": "Oui, sans problème !",
+        "DOWN": "Photos stylées sans visages",
+        "LEFT": "Amis proches uniquement",
+        "RIGHT": "Garder ça juste pour nous"
+      }
+    },
+    "q57": {
+      "title": "Ton habitude de réveil le week-end ?",
+      "choices": {
+        "UP": "Même heure que la semaine",
+        "DOWN": "Sans réveil, au naturel",
+        "LEFT": "Réveil pour se lever avant midi",
+        "RIGHT": "Seulement si on a un programme"
+      }
+    },
+    "q58": {
+      "title": "Quand ton/ta partenaire change de coupe ou de tenue ?",
+      "choices": {
+        "UP": "Compliment immédiat !",
+        "DOWN": "J'admire en silence",
+        "LEFT": "Je le dis si ça lui va bien",
+        "RIGHT": "Je risque de ne pas remarquer..."
+      }
+    },
+    "q59": {
+      "title": "Comment décrirais-tu notre relation ?",
+      "choices": {
+        "UP": "Meilleurs amis pour la vie",
+        "DOWN": "Passion, amour et étincelles",
+        "LEFT": "Rassurante comme une famille",
+        "RIGHT": "Un duo qui grandit ensemble"
+      }
+    },
+    "q60": {
+      "title": "Prochain petit objectif à réaliser à deux ?",
+      "choices": {
+        "UP": "Week-end dans une nouvelle ville",
+        "DOWN": "Festin chic fait maison",
+        "LEFT": "Démarrer un nouveau loisir",
+        "RIGHT": "Se dire « merci » chaque jour"
+      }
+    },
+    "q61": {
+      "title": "Quand faire la vaisselle du dîner ?",
+      "choices": {
+        "UP": "Juste après le repas",
+        "DOWN": "Après une petite pause",
+        "LEFT": "Avant d'aller dormir",
+        "RIGHT": "Team lave-vaisselle !"
+      }
+    },
+    "q62": {
+      "title": "Pointilleux sur le séchage et le pliage du linge ?",
+      "choices": {
+        "UP": "Pliage nickel, zéro pli",
+        "DOWN": "Tant que c'est sec, ça va",
+        "LEFT": "Sèche-linge et vite réglé",
+        "RIGHT": "Direct sur cintre au placard"
+      }
+    },
+    "q63": {
+      "title": "Votre style de déco intérieure rêvé ?",
+      "choices": {
+        "UP": "Bois chaleureux et naturel",
+        "DOWN": "Minimaliste façon hôtel chic",
+        "LEFT": "Ambiance café vintage cosy",
+        "RIGHT": "Vivant, plein d'objets aimés"
+      }
+    },
+    "q64": {
+      "title": "Qui perd ou oublie ses affaires le plus souvent ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Bien carrés tous les deux",
+        "RIGHT": "Têtes en l'air tous les deux"
+      }
+    },
+    "q65": {
+      "title": "Ton rituel préféré avant de dormir ?",
+      "choices": {
+        "UP": "Scroller ou voir des vidéos",
+        "DOWN": "Lire un livre ou une BD",
+        "LEFT": "Se raconter notre journée",
+        "RIGHT": "Je m'endors en deux secondes"
+      }
+    },
+    "q66": {
+      "title": "Comment gères-tu les courses et le frigo ?",
+      "choices": {
+        "UP": "Menus prévus + grosses courses",
+        "DOWN": "J'achète selon l'envie du jour",
+        "LEFT": "Batch cooking et congélateur",
+        "RIGHT": "Courses livrées en ligne"
+      }
+    },
+    "q67": {
+      "title": "Qu'est-ce qui compte le plus pour équiper la maison ?",
+      "choices": {
+        "UP": "Qualité durable et fiable",
+        "DOWN": "Fonctions gain de temps",
+        "LEFT": "Rapport qualité-prix et avis",
+        "RIGHT": "Esthétique sobre et assortie"
+      }
+    },
+    "q68": {
+      "title": "Quand attaquer les tâches ménagères du week-end ?",
+      "choices": {
+        "UP": "Boucler ça dès le matin",
+        "DOWN": "Tranquillement après déjeuner",
+        "LEFT": "Fini avant la soirée",
+        "RIGHT": "Zéro corvée le week-end !"
+      }
+    },
+    "q69": {
+      "title": "Télé ou musique en fond à la maison ?",
+      "choices": {
+        "UP": "Télé ou vidéos toujours allumées",
+        "DOWN": "Musique douce ou radio",
+        "LEFT": "J'adore le calme absolu",
+        "RIGHT": "Juste pour une émission précise"
+      }
+    },
+    "q70": {
+      "title": "Qui a froid le plus facilement ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "On craint le froid tous deux",
+        "RIGHT": "On craint le chaud tous deux"
+      }
+    },
+    "q71": {
+      "title": "Quand tu as une bonne nouvelle, tu la partages comment ?",
+      "choices": {
+        "UP": "Appel ou message tout de suite !",
+        "DOWN": "En face à face",
+        "LEFT": "Gâteau ou apéro pour trinquer",
+        "RIGHT": "Je la glisse plus tard au calme"
+      }
+    },
+    "q72": {
+      "title": "Quel retard est acceptable pour un rendez-vous ?",
+      "choices": {
+        "UP": "Prévenir même pour 5 min",
+        "DOWN": "15 min, pas grave du tout",
+        "LEFT": "30 min ok si on prévient",
+        "RIGHT": "Je suis souvent en retard..."
+      }
+    },
+    "q73": {
+      "title": "Qui pleure le plus vite devant un moment émouvant ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Larmes faciles tous les deux",
+        "RIGHT": "On pleure rarement tous deux"
+      }
+    },
+    "q74": {
+      "title": "En cas de désaccord sur un programme, comment trancher ?",
+      "choices": {
+        "UP": "Discuter jusqu'à tomber d'accord",
+        "DOWN": "Trouver un juste milieu",
+        "LEFT": "Choisir à tour de rôle",
+        "RIGHT": "Pierre-feuille-ciseaux !"
+      }
+    },
+    "q75": {
+      "title": "Si ton/ta partenaire tarde à répondre, tu penses...",
+      "choices": {
+        "UP": "Occupé(e), rien ne presse",
+        "DOWN": "Je m'inquiète un tout petit peu",
+        "LEFT": "Je suis pris(e) par mon truc",
+        "RIGHT": "J'envoie un petit sticker mignon"
+      }
+    },
+    "q76": {
+      "title": "Qui répond le plus vite aux messages ?",
+      "choices": {
+        "UP": "Je réponds plus vite",
+        "DOWN": "Mon/ma partenaire répond vite",
+        "LEFT": "Réponse éclair tous les deux",
+        "RIGHT": "Plutôt lents tous les deux"
+      }
+    },
+    "q77": {
+      "title": "Comment réagis-tu quand on te fait un compliment ?",
+      "choices": {
+        "UP": "Sourire et « Merci ! »",
+        "DOWN": "Gêné(e), je minimise vite",
+        "LEFT": "Je complimente en retour !",
+        "RIGHT": "Impossible d'arrêter de sourire"
+      }
+    },
+    "q78": {
+      "title": "Qui se lève de meilleure humeur le matin ?",
+      "choices": {
+        "UP": "Moi au top dès le matin",
+        "DOWN": "Mon/ma partenaire, carrément",
+        "LEFT": "Debout direct tous les deux",
+        "RIGHT": "Personne ne veut sortir du lit"
+      }
+    },
+    "q79": {
+      "title": "Capable de garder une surprise secrète jusqu'au jour J ?",
+      "choices": {
+        "UP": "Pro du poker face",
+        "DOWN": "Mon sourire me trahit",
+        "LEFT": "Trop hâte, je lâche des indices",
+        "RIGHT": "Je craque et je le dis avant"
+      }
+    },
+    "q80": {
+      "title": "Comment remontes-tu le moral de ton/ta partenaire ?",
+      "choices": {
+        "UP": "Gros câlin sans le/la lâcher",
+        "DOWN": "Sa gourmandise préférée",
+        "LEFT": "Le/la faire rire avec des vidéos",
+        "RIGHT": "Écouter calmement jusqu'au bout"
+      }
+    },
+    "q81": {
+      "title": "Qui taquine et qui fait le clown dans le duo ?",
+      "choices": {
+        "UP": "C'est moi qui taquine",
+        "DOWN": "Mon/ma partenaire taquine",
+        "LEFT": "Deux vrais clowns ensemble",
+        "RIGHT": "Humour doux et apaisé"
+      }
+    },
+    "q82": {
+      "title": "Quand aimes-tu prévoir votre prochain date ?",
+      "choices": {
+        "UP": "1 à 2 semaines à l'avance",
+        "DOWN": "Quelques jours avant",
+        "LEFT": "Au feeling le jour même",
+        "RIGHT": "À la fin du date précédent"
+      }
+    },
+    "q83": {
+      "title": "Ton avis sur les tenues assorties en couple ?",
+      "choices": {
+        "UP": "Petits accessoires discrets",
+        "DOWN": "Pyjamas assortis à la maison",
+        "LEFT": "Même palette de couleurs",
+        "RIGHT": "Chacun son propre style"
+      }
+    },
+    "q84": {
+      "title": "Usage du téléphone pendant un date ?",
+      "choices": {
+        "UP": "Juste photos et itinéraire",
+        "DOWN": "Détendu et flexible",
+        "LEFT": "Regarder des trucs à deux",
+        "RIGHT": "J'essaie de moins l'utiliser"
+      }
+    },
+    "q85": {
+      "title": "Comment préfères-tu vous appeler ?",
+      "choices": {
+        "UP": "Par nos prénoms",
+        "DOWN": "Nos surnoms rien qu'à nous",
+        "LEFT": "Surnoms courts et mignons",
+        "RIGHT": "Selon l'humeur du moment"
+      }
+    },
+    "q86": {
+      "title": "Qui a craqué pour l'autre en premier ?",
+      "choices": {
+        "UP": "Moi en premier",
+        "DOWN": "Mon/ma partenaire en premier",
+        "LEFT": "En même temps !",
+        "RIGHT": "Doucement, naturellement"
+      }
+    },
+    "q87": {
+      "title": "Quel petit geste te fait le plus fondre ?",
+      "choices": {
+        "UP": "Marcher côté route par réflexe",
+        "DOWN": "Retenir mes petits plaisirs",
+        "LEFT": "Un sourire ou geste tendre",
+        "RIGHT": "Me soutenir en toute situation"
+      }
+    },
+    "q88": {
+      "title": "Comment garder vos photos de couple ?",
+      "choices": {
+        "UP": "Album partagé sur le cloud",
+        "DOWN": "Imprimer un album par an",
+        "LEFT": "Encadrer nos préférées chez nous",
+        "RIGHT": "Les revoir sur nos téléphones"
+      }
+    },
+    "q89": {
+      "title": "Tu t'habilles en pensant aux goûts de ton/ta partenaire ?",
+      "choices": {
+        "UP": "Oui, selon le lieu et ses goûts",
+        "DOWN": "Soigné, mais fidèle à mon style",
+        "LEFT": "On coordonne nos tenues avant",
+        "RIGHT": "Le confort passe avant tout"
+      }
+    },
+    "q90": {
+      "title": "Comment gérer les périodes à distance ?",
+      "choices": {
+        "UP": "Longs appels ou visios",
+        "DOWN": "Préparer nos retrouvailles",
+        "LEFT": "Me concentrer sur boulot/loisirs",
+        "RIGHT": "Envoyer un mot doux ou cadeau"
+      }
+    },
+    "q91": {
+      "title": "Ton bouillon de ramen préféré ?",
+      "choices": {
+        "UP": "Soja classique ou sel léger",
+        "DOWN": "Tonkotsu riche et crémeux",
+        "LEFT": "Miso savoureux ou épicé",
+        "RIGHT": "Tsukemen ou nouilles sautées"
+      }
+    },
+    "q92": {
+      "title": "Premier choix dans un resto de sushis ?",
+      "choices": {
+        "UP": "Thon ou thon gras (toro)",
+        "DOWN": "Saumon ou rolls mi-cuits",
+        "LEFT": "Poisson blanc ou coquillages",
+        "RIGHT": "Omelette, soupe miso, entrées"
+      }
+    },
+    "q93": {
+      "title": "Meilleure fin pour une fondue asiatique (hot pot) ?",
+      "choices": {
+        "UP": "Riz fondant à l'œuf",
+        "DOWN": "Nouilles udon moelleuses",
+        "LEFT": "Nouilles ramen",
+        "RIGHT": "Façon risotto au fromage"
+      }
+    },
+    "q94": {
+      "title": "Au barbecue ou à la plancha, qui gère la cuisson ?",
+      "choices": {
+        "UP": "Je gère le grill",
+        "DOWN": "Mon/ma partenaire gère",
+        "LEFT": "Chacun grille son assiette",
+        "RIGHT": "On retourne dès qu'on y pense"
+      }
+    },
+    "q95": {
+      "title": "Votre moment idéal au café ?",
+      "choices": {
+        "UP": "Longue discussion + dessert",
+        "DOWN": "Lire ou bosser au calme",
+        "LEFT": "Observer la rue en terrasse",
+        "RIGHT": "Café à emporter au parc"
+      }
+    },
+    "q96": {
+      "title": "Petite faim à minuit : tu fais quoi ?",
+      "choices": {
+        "UP": "Résister avec une tisane",
+        "DOWN": "Nouilles instantanées ou snacks",
+        "LEFT": "Yaourt ou soupe légère",
+        "RIGHT": "Festin de minuit à deux !"
+      }
+    },
+    "q97": {
+      "title": "Un plat fun à cuisiner ensemble le week-end ?",
+      "choices": {
+        "UP": "Gyozas ou tacos maison",
+        "DOWN": "Pâtes fraîches ou curry",
+        "LEFT": "Pain ou pâtisserie maison",
+        "RIGHT": "Je fais plutôt la vaisselle !"
+      }
+    },
+    "q98": {
+      "title": "Ton achat plaisir réflexe à la supérette ?",
+      "choices": {
+        "UP": "Viennoiserie ou dessert frais",
+        "DOWN": "Glace ou chocolat",
+        "LEFT": "Snack chaud et salé",
+        "RIGHT": "Café glacé ou nouveauté"
+      }
+    },
+    "q99": {
+      "title": "Si on gagnait 100 000 €, premier réflexe ?",
+      "choices": {
+        "UP": "Voyage de rêve à l'étranger",
+        "DOWN": "Presque tout épargner/investir",
+        "LEFT": "Déménager ou refaire la déco",
+        "RIGHT": "Moitié plaisir, moitié épargne"
+      }
+    },
+    "q100": {
+      "title": "Points fidélité et bons plans : ton genre ?",
+      "choices": {
+        "UP": "J'adore ! Je cumule tout",
+        "DOWN": "Sur mes applis préférées",
+        "LEFT": "Je zappe si c'est long",
+        "RIGHT": "Je laisse l'autre gérer ça"
+      }
+    },
+    "q101": {
+      "title": "Journée dure au boulot : tu la ramènes à la maison ?",
+      "choices": {
+        "UP": "J'en parle pour souffler",
+        "DOWN": "Le boulot reste dehors",
+        "LEFT": "Seulement quand c'est dur",
+        "RIGHT": "Un bon repas et on oublie"
+      }
+    },
+    "q102": {
+      "title": "Qui a le plus le sens de l'organisation ?",
+      "choices": {
+        "UP": "Plutôt moi",
+        "DOWN": "Plutôt mon/ma partenaire",
+        "LEFT": "Organisés tous les deux",
+        "RIGHT": "Au fil de l'eau tous deux"
+      }
+    },
+    "q103": {
+      "title": "Un budget cadeau d'anniversaire qui te semble juste ?",
+      "choices": {
+        "UP": "50–100 €, sans pression",
+        "DOWN": "150–300 €, pour marquer le coup",
+        "LEFT": "Sans limite si ça fait plaisir",
+        "RIGHT": "Budget fixé + liste d'envies"
+      }
+    },
+    "q104": {
+      "title": "Ton équilibre pro / perso idéal ?",
+      "choices": {
+        "UP": "Finir à l'heure pour nous",
+        "DOWN": "À fond dans un job passion",
+        "LEFT": "Télétravail souple et libre",
+        "RIGHT": "Bosser dur + longues vacances"
+      }
+    },
+    "q105": {
+      "title": "Critère non négociable pour un logement ?",
+      "choices": {
+        "UP": "Lumière et bel espace",
+        "DOWN": "Transports et commerces près",
+        "LEFT": "Cuisine et sdb modernes",
+        "RIGHT": "Quartier calme et sûr"
+      }
+    },
+    "q106": {
+      "title": "À quoi réserver notre épargne commune ?",
+      "choices": {
+        "UP": "Grand voyage de nos rêves",
+        "DOWN": "Futur logement ou déménagement",
+        "LEFT": "Voiture ou beaux équipements",
+        "RIGHT": "Épargne de sécurité sereine"
+      }
+    },
+    "q107": {
+      "title": "Quelle saison préfères-tu ?",
+      "choices": {
+        "UP": "Printemps doux et fleuri",
+        "DOWN": "Été, plage et feux d'artifice",
+        "LEFT": "Automne coloré et frais",
+        "RIGHT": "Hiver cosy et illuminations"
+      }
+    },
+    "q108": {
+      "title": "Ta façon de profiter d'un parc d'attractions ?",
+      "choices": {
+        "UP": "À fond les sensations fortes !",
+        "DOWN": "Spectacles, parades et ambiance",
+        "LEFT": "Gourmandises et boutiques",
+        "RIGHT": "Flâner en évitant les files"
+      }
+    },
+    "q109": {
+      "title": "Ambiance idéale en voiture sur la route ?",
+      "choices": {
+        "UP": "Musique à fond et karaoké",
+        "DOWN": "Podcasts ou radio",
+        "LEFT": "Fond doux et papotage non-stop",
+        "RIGHT": "Tester les pauses gourmandes"
+      }
+    },
+    "q110": {
+      "title": "Comment choisis-tu tes souvenirs de voyage ?",
+      "choices": {
+        "UP": "Cadeaux pour famille et amis",
+        "DOWN": "Spécialités locales pour nous",
+        "LEFT": "Mugs, magnets et objets",
+        "RIGHT": "Minimum pour voyager léger"
+      }
+    },
+    "q111": {
+      "title": "Camping ou glamping à deux ?",
+      "choices": {
+        "UP": "Vraie tente et feu de camp !",
+        "DOWN": "Glamping chic et confort",
+        "LEFT": "Un barbecue la journée suffit",
+        "RIGHT": "Zéro insecte : hôtel SVP !"
+      }
+    },
+    "q112": {
+      "title": "En séjour spa ou thermal, combien de bains ?",
+      "choices": {
+        "UP": "Arrivée, soir et matin (3+)",
+        "DOWN": "Soir et matin (2 fois)",
+        "LEFT": "Une fois le soir suffit",
+        "RIGHT": "Bain privatif ou sauna"
+      }
+    },
+    "q113": {
+      "title": "Souvenir d'été rêvé à créer ensemble ?",
+      "choices": {
+        "UP": "Feux d'artifice et festivals",
+        "DOWN": "Plage ou piscine à fond",
+        "LEFT": "Fraîcheur à la montagne",
+        "RIGHT": "Glaces bien au frais dedans"
+      }
+    },
+    "q114": {
+      "title": "Où préfères-tu aller voir des animaux ?",
+      "choices": {
+        "UP": "Balade tranquille au zoo",
+        "DOWN": "Date magique à l'aquarium",
+        "LEFT": "Ferme et bonne glace artisanale",
+        "RIGHT": "Café à chats ou à chiens cosy"
+      }
+    },
+    "q115": {
+      "title": "Une semaine de vacances surprise ensemble : on fait quoi ?",
+      "choices": {
+        "UP": "Départ imprévu à l'étranger",
+        "DOWN": "Grand road trip en France",
+        "LEFT": "Bons restos et détente totale",
+        "RIGHT": "Moitié escapade, moitié canapé"
+      }
+    },
+    "q116": {
+      "title": "Avec une machine à voyager dans le temps, où irions-nous ?",
+      "choices": {
+        "UP": "Revoir le jour de la rencontre",
+        "DOWN": "Voir notre vie dans 10 ans",
+        "LEFT": "Visiter nos enfances",
+        "RIGHT": "Rester ici, dans le présent"
+      }
+    },
+    "q117": {
+      "title": "Qu'admires-tu le plus chez ton/ta partenaire ?",
+      "choices": {
+        "UP": "Sa gentillesse avec les autres",
+        "DOWN": "Sa persévérance au quotidien",
+        "LEFT": "Son énergie solaire et positive",
+        "RIGHT": "Ses convictions et ses valeurs"
+      }
+    },
+    "q118": {
+      "title": "Le secret n° 1 pour durer heureux ensemble ?",
+      "choices": {
+        "UP": "Dire « merci » et « pardon »",
+        "DOWN": "Respecter temps solo et loisirs",
+        "LEFT": "Des soirées en tête-à-tête",
+        "RIGHT": "Parler vite des petits soucis"
+      }
+    },
+    "q119": {
+      "title": "Un petit mot pour nous deux dans 10 ans ?",
+      "choices": {
+        "UP": "Rions toujours autant !",
+        "DOWN": "On aura vu le monde, j'espère !",
+        "LEFT": "Toujours dans ton camp",
+        "RIGHT": "J'espère qu'on mange bien !"
+      }
+    },
+    "q120": {
+      "title": "Quelque chose de nouveau à tenter ensemble bientôt ?",
+      "choices": {
+        "UP": "Créer nos rituels de saison",
+        "DOWN": "Faire du sport ensemble",
+        "LEFT": "Explorer de nouvelles régions",
+        "RIGHT": "Apprendre une langue ou un art"
+      }
+    }
+  }
+}
