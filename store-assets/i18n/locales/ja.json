@@ -1,0 +1,141 @@
+{
+  "locale": "ja",
+  "appLocale": "ja",
+  "displayNameJa": "日本語（デフォルト）",
+  "googlePlayCode": "ja-JP",
+  "appStoreCode": "ja",
+  "fontFamily": "\"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo UI\", sans-serif",
+  "legalBaseUrl": "https://garana-pop.github.io/couple-swipe-app",
+  "googlePlay": {
+    "appName": "Kotaeai（コタエアイ）",
+    "shortDescription": "1日3問、答え合わせで深まるふたりの距離。回答カレンダーで記録を残し、プレミアムなら過去の未回答日への遡り回答やAI相性診断も楽しめます。",
+    "fullDescription": "「相手の気持ち、意外と知らないかも？」\nKotaeai（コタエアイ）は、カップルや夫婦が1日3問・4方向スワイプで価値観を答え合う、二人だけの毎日診断アプリです。\n\n■ 特徴 1：1日3問、30秒で直感4択スワイプ\n「休日の過ごし方」「お金や家事の感覚」「連絡ペース」「将来のこと」など、普段は改まって聞きづらいテーマを毎日3問お届け。上下左右にスワイプするだけで気軽に本音を答えられます。\n\n■ 特徴 2：お互いが答え終わるまで秘密（後出し防止ロック）\n片方が回答しただけでは、相手の答えは見られません。二人とも回答を終えた瞬間にロックが解除され、一致率とそれぞれの回答がひらきます。会話のきっかけ一言付きで、その日の話題にもぴったりです。\n\n■ 特徴 3：回答カレンダー＆変化が見える振り返りタイムライン\n・回答済み・未回答の日がひと目でわかる「回答カレンダー」と、連続ストリーク・自身の未回答日数・カテゴリ別一致率グラフで二人の歩みを可視化\n・一定期間後に同じ質問が再出題されると、過去の自分たちとの回答変化を比較可能\n・プライバシーに配慮した一致率カードで結果をシェア可能\n\n■ 特徴 4：安心の設計＆通知機能\n・メールアドレス不要の匿名スタート（機種変更時の引き継ぎ用に Google アカウント連携にも対応）\n・毎日のリマインダー通知＆パートナー回答完了プッシュ通知で続けやすい\n\n■ ふたりプレミアムプラン（任意・定期購入）\nペアのどちらか1人が加入すれば、パートナーも追加料金なしで一緒に使えます。\n・回答カレンダーの未回答日をタップして、答え忘れた過去のお題へいつでも遡って回答＆相手の結果を解放（回答完了まで相手の答えを伏せるネタバレ防止付き）\n・回答履歴＋回答リズムを分析する「深層AI相性診断レポート」と過去レポートアーカイブ（性格傾向やすれ違い予防のアドバイスに加え、万が一別れてしまった際の原因のAI診断・振り返りにも対応）\n\n【定期購入について】\n・年額プラン：¥3,000 / 年（月額プラン比 50% OFF・月250円相当・2人共有）\n・月額プラン：¥500 / 月（2人共有）\n・お支払いは Google Play アカウントへ請求され、次回更新の24時間前までに Google Play の「定期購入」から解約しない限り自動更新されます。\n・アプリ内または Web ページからいつでもアカウントとデータを削除できます（アカウント削除だけでは定期購入は自動解約されないため、Google Play 側での解約手続きをお願いします）。\n\n※AI相性診断レポートはコミュニケーション支援・エンターテインメントを目的とした参考情報です。",
+    "releaseNotes": "・日本語に加え、英語・フランス語・韓国語・ロシア語・タイ語・中国語（簡体字／繁体字）の計8言語に対応しました。\n・端末の言語設定（またはOSのアプリ別言語設定）に応じて表示・120問のお題・通知・AIレポートが自動で切り替わります。\n・海外タイムゾーンでの日付同期にも対応しました。"
+  },
+  "appStore": {
+    "name": "Kotaeai（コタエアイ）",
+    "subtitle": "1日3問、ふたりで答え合う価値観診断",
+    "promotionalText": "1日3問、4方向スワイプで気軽に答え合わせ。お互いが答え終わるまで秘密だから本音がわかる。AI相性診断や回答カレンダーでふたりの距離がもっと深まる。",
+    "keywords": "カップル,夫婦,価値観,質問,診断,相性,クイズ,スワイプ,AI診断,恋愛,記念日,ふたり"
+  },
+  "subscriptions": {
+    "yearly": {
+      "productId": "couple_swipe_yearly",
+      "basePlanId": "yearly-base",
+      "name": "ふたりプレミアム（年額）",
+      "description": "1人の加入で2人とも利用可能。月額比50% OFFでお得に全機能を解放。",
+      "benefits": [
+        "1人の加入でパートナーも無料共有",
+        "過去の未回答日へいつでも遡って回答",
+        "深層AI相性診断＆振り返りレポート",
+        "月額プラン比50% OFFのお得な年額"
+      ]
+    },
+    "monthly": {
+      "productId": "couple_swipe_monthly",
+      "basePlanId": "monthly-base",
+      "name": "ふたりプレミアム（月額）",
+      "description": "1人の加入で2人とも利用可能。過去日の遡り回答とAI相性診断を解放。",
+      "benefits": [
+        "1人の加入でパートナーも無料共有",
+        "過去の未回答日へいつでも遡って回答",
+        "深層AI相性診断＆振り返りレポート",
+        "いつでもGoogle Playから解約可能"
+      ]
+    }
+  },
+  "featureGraphic": {
+    "brandSub": "コタエアイ — カップル・夫婦の価値観スワイプ",
+    "headlineBefore": "1日3問、",
+    "headlineAccent": "4方向スワイプ",
+    "headlineAfter": "で",
+    "headlineLine2": "ふたりの本音が見えてくる。",
+    "subcopyLine1": "お互いが答え終わって初めて結果がひらく。",
+    "subcopyLine2": "毎日30秒の質問とAI相性診断で、ふたりの会話がもっと深まる。",
+    "pills": ["双方回答でロック解除", "AI相性レポート", "1人課金で2人共有"],
+    "cardTag": "Q1 / 3・休日の過ごし方",
+    "cardQuestionLines": ["理想の休日の", "過ごし方は", "どっち派？"],
+    "cardFooterLabel": "2人同時に回答",
+    "cardMatchPill": "一致率 84%",
+    "choices": {
+      "up": "↑ おうちでまったり",
+      "left": "← 旅行・遠出",
+      "right": "カフェ巡り →",
+      "down": "↓ 別々に自由時間"
+    }
+  },
+  "screenshots": [
+    {
+      "output": "01-home.png",
+      "raw": "01-home.jpg",
+      "eyebrow": "Kotaeai  /  01",
+      "title": "1日3問、答え合わせ。",
+      "subtitle": "ふだん聞けない価値観を、毎日少しずつ",
+      "headerTitle": "Kotaeai",
+      "showBackArrow": false,
+      "showMenuIcon": true,
+      "showQuizProgress": false,
+      "showBrandIcon": true
+    },
+    {
+      "output": "02-swipe.png",
+      "raw": "02-swipe.jpg",
+      "eyebrow": "02  /  SWIPE",
+      "title": "4方向スワイプで直感回答。",
+      "subtitle": "上下左右に動かすだけ、30秒で完了",
+      "headerTitle": "今日の質問",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": true,
+      "showBrandIcon": false
+    },
+    {
+      "output": "03-waiting.png",
+      "raw": "03-waiting.jpg",
+      "eyebrow": "03  /  LOCK",
+      "title": "揃うまで、答えは秘密。",
+      "subtitle": "お互いが回答を終えて初めて結果がひらく",
+      "headerTitle": "回答待機中",
+      "showBackArrow": false,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "04-result.png",
+      "raw": "04-result.jpg",
+      "eyebrow": "04  /  RESULT",
+      "title": "違いも、会話のきっかけに。",
+      "subtitle": "一致率とそれぞれの回答を並べて比較",
+      "headerTitle": "診断結果",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "05-history.png",
+      "raw": "05-history.jpg",
+      "eyebrow": "05  /  HISTORY",
+      "title": "ふたりの傾向を、静かに記録。",
+      "subtitle": "カテゴリ別一致率や過去の変化を振り返る",
+      "headerTitle": "過去の回答比較",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "06-ai-report.png",
+      "raw": "06-ai-report.jpg",
+      "eyebrow": "06  /  AI ANALYSIS",
+      "title": "AIがふたりの相性を整理。",
+      "subtitle": "回答の傾向から、すれ違い予防のヒントを提案",
+      "headerTitle": "AI相性レポート",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    }
+  ]
+}

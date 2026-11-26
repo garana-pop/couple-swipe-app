@@ -1,0 +1,141 @@
+{
+  "locale": "fr-FR",
+  "appLocale": "fr",
+  "displayNameJa": "フランス語（フランス）",
+  "googlePlayCode": "fr-FR",
+  "appStoreCode": "fr-FR",
+  "fontFamily": "\"Noto Sans\", \"Segoe UI Variable Display\", \"Segoe UI\", sans-serif",
+  "legalBaseUrl": "https://garana-pop.github.io/couple-swipe-app/en",
+  "googlePlay": {
+    "appName": "Kotaeai",
+    "shortDescription": "3 questions couple/jour par swipe. Réponses débloquées à deux et bilan IA.",
+    "fullDescription": "Connaissez-vous vraiment les pensées de votre partenaire ?\nKotaeai est l'application de quiz quotidien pour couples : 3 questions par jour à répondre en 30 secondes d'un simple swipe dans 4 directions.\n\n■ 1. Trois questions par jour, 4 choix par swipe\nWeek-end idéal, partage des tâches, budget, rythme des messages, projets d'avenir… Explorez facilement des sujets essentiels en glissant simplement vers le haut, le bas, la gauche ou la droite.\n\n■ 2. Réponses secrètes jusqu'à ce que vous ayez fini tous les deux\nImpossible de tricher avant de répondre : les résultats et votre taux de compatibilité se débloquent au moment où vous avez terminé tous les deux, accompagnés d'une amorce de discussion.\n\n■ 3. Calendrier de réponses & suivi de votre duo\n• Suivez votre série de jours, vos jours manqués et votre compatibilité par catégorie sur le calendrier.\n• Lorsqu'une question revient plus tard, comparez l'évolution de vos réponses.\n• Partagez votre taux de compatibilité grâce à des cartes respectueuses de votre vie privée.\n\n■ 4. Simple, privé et sans inscription obligatoire\n• Démarrez anonymement sans adresse e-mail (connexion Google en option pour sauvegarder lors d'un changement de téléphone).\n• Rappels quotidiens et notification dès que votre partenaire a terminé.\n\n■ Duo Premium (abonnement optionnel)\nUn seul abonnement suffit : votre partenaire profite de toutes les fonctions Premium sans frais supplémentaires.\n• Rattrapage des jours passés : répondez aux questions manquées depuis le calendrier tout en gardant la réponse de l'autre cachée jusqu'à la fin.\n• Bilan IA de compatibilité approfondi & archives : analyse vos vraies réponses et votre rythme pour éclairer vos profils, prévenir les malentendus et même offrir un bilan bienveillant en cas de remise en question.\n\n[À propos de l'abonnement]\n• Formule Annuelle (-50 % par rapport au mensuel) ou Mensuelle, partagée pour le couple.\n• Le tarif dans votre devise s'affiche dans la boutique avant confirmation.\n• Renouvellement automatique sauf annulation au moins 24 h avant l'échéance dans les paramètres de votre boutique.\n• Suppression du compte et des données possible à tout moment dans l'app ou sur le Web (la suppression du compte ne résilie pas automatiquement l'abonnement).\n\n*Les rapports IA sont destinés à enrichir le dialogue et au divertissement.",
+    "releaseNotes": "• Prise en charge complète de 8 langues : français, anglais, japonais, coréen, russe, thaï, chinois simplifié et traditionnel.\n• Adaptation automatique à la langue du téléphone (et aux réglages de langue par application) pour l'interface, les 120 questions, les notifications et les bilans IA.\n• Gestion automatique du fuseau horaire mondial."
+  },
+  "appStore": {
+    "name": "Kotaeai",
+    "subtitle": "Quiz couple : 3 questions/jour",
+    "promotionalText": "3 questions par jour à swiper en couple. Les réponses restent secrètes jusqu'à ce que vous ayez répondu tous les deux. Calendrier, statistiques et bilan IA inclus.",
+    "keywords": "couple,quiz,relation,partenaire,questions,amour,compatibilité,valeurs,dialogue,swipe,jeu,duo"
+  },
+  "subscriptions": {
+    "yearly": {
+      "productId": "couple_swipe_yearly",
+      "basePlanId": "yearly-base",
+      "name": "Duo Premium (Annuel)",
+      "description": "1 abonnement pour le couple. -50 % vs mensuel pour tout débloquer à deux.",
+      "benefits": [
+        "1 abonnement partagé pour deux",
+        "Rattrapez les jours passés au choix",
+        "Bilan IA complet et archives",
+        "-50 % par rapport au forfait mensuel"
+      ]
+    },
+    "monthly": {
+      "productId": "couple_swipe_monthly",
+      "basePlanId": "monthly-base",
+      "name": "Duo Premium (Mensuel)",
+      "description": "1 abonnement pour le couple. Jours passés à rattraper et bilans IA inclus.",
+      "benefits": [
+        "1 abonnement partagé pour deux",
+        "Rattrapez les jours passés au choix",
+        "Bilan IA complet et archives",
+        "Résiliable à tout moment sur le store"
+      ]
+    }
+  },
+  "featureGraphic": {
+    "brandSub": "Quiz quotidien en 4 swipes pour couples",
+    "headlineBefore": "3 questions/jour, ",
+    "headlineAccent": "4 swipes",
+    "headlineAfter": "",
+    "headlineLine2": "Découvrez vos vraies affinités.",
+    "subcopyLine1": "Les réponses se révèlent une fois que vous avez fini.",
+    "subcopyLine2": "30 s par jour et un bilan IA pour enrichir vos échanges.",
+    "pills": ["Révélé à deux", "Bilan IA couple", "1 forfait pour 2"],
+    "cardTag": "Q1 / 3 · Week-end",
+    "cardQuestionLines": ["Votre week-end", "idéal à deux,", "c'est plutôt ?"],
+    "cardFooterLabel": "Tous deux prêts",
+    "cardMatchPill": "84 % Match",
+    "choices": {
+      "up": "↑ Cocooning maison",
+      "left": "← Escapade",
+      "right": "Cafés cosy →",
+      "down": "↓ Temps libre solo"
+    }
+  },
+  "screenshots": [
+    {
+      "output": "01-home.png",
+      "raw": "01-home.jpg",
+      "eyebrow": "Kotaeai  /  01",
+      "title": "3 questions par jour à deux.",
+      "subtitle": "Explorez vos valeurs en 30 secondes",
+      "headerTitle": "Kotaeai",
+      "showBackArrow": false,
+      "showMenuIcon": true,
+      "showQuizProgress": false,
+      "showBrandIcon": true
+    },
+    {
+      "output": "02-swipe.png",
+      "raw": "02-swipe.jpg",
+      "eyebrow": "02  /  SWIPE",
+      "title": "Swipe intuitif en 4 directions.",
+      "subtitle": "Haut, bas, gauche ou droite sans effort",
+      "headerTitle": "Quiz du jour",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": true,
+      "showBrandIcon": false
+    },
+    {
+      "output": "03-waiting.png",
+      "raw": "03-waiting.jpg",
+      "eyebrow": "03  /  LOCK",
+      "title": "Secret jusqu'au bout.",
+      "subtitle": "Débloqué dès que vous avez répondu tous les deux",
+      "headerTitle": "En attente",
+      "showBackArrow": false,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "04-result.png",
+      "raw": "04-result.jpg",
+      "eyebrow": "04  /  RESULT",
+      "title": "Même vos différences rapprochent.",
+      "subtitle": "Comparez vos choix avec le taux d'accord",
+      "headerTitle": "Résultats",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "05-history.png",
+      "raw": "05-history.jpg",
+      "eyebrow": "05  /  HISTORY",
+      "title": "Suivez votre histoire.",
+      "subtitle": "Calendrier, séries et accords par thème",
+      "headerTitle": "Historique",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "06-ai-report.png",
+      "raw": "06-ai-report.jpg",
+      "eyebrow": "06  /  AI ANALYSIS",
+      "title": "L'IA éclaire votre complicité.",
+      "subtitle": "Conseils doux pour mieux vous comprendre",
+      "headerTitle": "Bilan IA",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    }
+  ]
+}

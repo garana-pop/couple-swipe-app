@@ -1,0 +1,141 @@
+{
+  "locale": "zh-TW",
+  "appLocale": "zh-Hant",
+  "displayNameJa": "中国語（繁体字）",
+  "googlePlayCode": "zh-TW",
+  "appStoreCode": "zh-Hant",
+  "fontFamily": "\"Microsoft JhengHei UI\", \"Microsoft JhengHei\", \"Noto Sans\", sans-serif",
+  "legalBaseUrl": "https://garana-pop.github.io/couple-swipe-app/en",
+  "googlePlay": {
+    "appName": "Kotaeai",
+    "shortDescription": "每天3題四向滑動情侶問答。雙方答完同步解鎖答案，還有答題日曆與AI契合報告。",
+    "fullDescription": "「對方的真實想法，其實你了解多少？」\nKotaeai 是專為情侶與伴侶打造的每日問答 App，每天 3 道題、四方向直覺滑動，30 秒輕鬆了解彼此的價值觀與默契。\n\n■ 特色 1：每天 3 題，30 秒直覺四向滑動\n涵蓋假日安排、家事與消費觀、聯絡節奏、相處方式與未來規劃等平時較少聊到的主題，只要上下左右滑動就能輕鬆表達真心話。\n\n■ 特色 2：雙方完成前全程保密（防雷鎖定）\n只有一方作答時無法偷看對方答案；當兩人都完成 3 道題的瞬間，系統會同步解鎖契合度與雙人答案對比，並附上貼心聊天引子，讓每天都有好話題。\n\n■ 特色 3：答題日曆與成長回顧\n• 一眼掌握已答與未答日期的「答題日曆」，搭配連續天數、未答天數與分類默契率圖表。\n• 隔段時間再次遇到相同題目時，可對照過去與現在的想法變化。\n• 提供重視隱私的契合度分享卡片。\n\n■ 特色 4：安心隱私與貼心通知\n• 免註冊信箱即可匿名開始（可選綁定 Google 帳號，換機時輕鬆移轉資料）。\n• 每日定時提醒與伴侶作答完成推播通知，讓兩人輕鬆養成習慣。\n\n■ 雙人進階方案（可選訂閱）\n只要其中一人訂閱，伴侶免額外付費即可共享所有進階功能。\n• 過往漏答補答：點擊日曆上的未答日期，隨時補答並解鎖結果（完成前對方答案仍保持隱藏）。\n• 深度 AI 契合分析報告與歷史檔案：依據真實作答紀錄與節奏整理性格傾向與相處建議，也提供溫柔的關係回顧反思模式。\n\n【訂閱說明】\n• 提供年訂方案（較月訂省 50%）與月訂方案，一人訂閱兩人共享。\n• 實際費用將於付款前以商店當地幣別顯示。\n• 訂閱將自動續訂，若欲取消請於續訂日前至少 24 小時至商店訂閱設定操作。\n• 可隨時於 App 內或網頁刪除帳號與資料（刪除帳號不會自動取消商店訂閱，請另至商店取消）。\n\n※ AI 分析報告僅供溝通參考與日常娛樂之用。",
+    "releaseNotes": "• 全新支援 8 種語言：繁體中文、簡體中文、英文、日文、法文、韓文、俄文、泰文。\n• 依裝置語言或系統「應用程式語言」設定自動切換介面、120 道題庫、推播通知與 AI 報告。\n• 新增全球時區每日題目同步支援。"
+  },
+  "appStore": {
+    "name": "Kotaeai",
+    "subtitle": "每日3題情侶四向滑動默契問答",
+    "promotionalText": "每天30秒，四方向滑動回答3道情侶價值觀題目。雙方完成才同步解鎖真實答案，搭配答題日曆與AI契合報告，讓兩人更懂彼此。",
+    "keywords": "情侶,伴侶,夫妻,默契,問答,測驗,價值觀,契合度,戀愛,滑動,AI分析,感情"
+  },
+  "subscriptions": {
+    "yearly": {
+      "productId": "couple_swipe_yearly",
+      "basePlanId": "yearly-base",
+      "name": "雙人進階方案（年訂）",
+      "description": "一人訂閱兩人共享，較月訂省50%，解鎖補答與深度AI契合報告。",
+      "benefits": [
+        "一人訂閱，伴侶免費共享",
+        "日曆隨時補答漏答的過往題目",
+        "深度AI契合分析與歷史檔案",
+        "較月訂方案立省50%更划算"
+      ]
+    },
+    "monthly": {
+      "productId": "couple_swipe_monthly",
+      "basePlanId": "monthly-base",
+      "name": "雙人進階方案（月訂）",
+      "description": "一人訂閱兩人共享，解鎖過往補答與深度AI契合分析報告。",
+      "benefits": [
+        "一人訂閱，伴侶免費共享",
+        "日曆隨時補答漏答的過往題目",
+        "深度AI契合分析與歷史檔案",
+        "隨時可於商店設定取消訂閱"
+      ]
+    }
+  },
+  "featureGraphic": {
+    "brandSub": "情侶與伴侶的每日四向滑動默契問答",
+    "headlineBefore": "每天3題，",
+    "headlineAccent": "四向滑動",
+    "headlineAfter": "",
+    "headlineLine2": "看見彼此最真實的心意。",
+    "subcopyLine1": "雙方完成才同步解鎖答案，不怕被劇透。",
+    "subcopyLine2": "每天30秒問答與AI契合報告，讓日常對話更有溫度。",
+    "pills": ["雙方完成解鎖", "AI契合報告", "一人訂閱兩人享"],
+    "cardTag": "Q1 / 3 · 假日時光",
+    "cardQuestionLines": ["理想的假日", "兩個人最想", "怎麼度過？"],
+    "cardFooterLabel": "雙方均已作答",
+    "cardMatchPill": "契合度 84%",
+    "choices": {
+      "up": "↑ 在家耍廢放鬆",
+      "left": "← 輕旅行出遊",
+      "right": "跑咖啡廳 →",
+      "down": "↓ 各自自由時間"
+    }
+  },
+  "screenshots": [
+    {
+      "output": "01-home.png",
+      "raw": "01-home.jpg",
+      "eyebrow": "Kotaeai  /  01",
+      "title": "每天3題，對齊彼此心意。",
+      "subtitle": "30秒聊聊平時較少問的價值觀",
+      "headerTitle": "Kotaeai",
+      "showBackArrow": false,
+      "showMenuIcon": true,
+      "showQuizProgress": false,
+      "showBrandIcon": true
+    },
+    {
+      "output": "02-swipe.png",
+      "raw": "02-swipe.jpg",
+      "eyebrow": "02  /  SWIPE",
+      "title": "四向滑動，直覺作答。",
+      "subtitle": "上下左右輕輕一滑，輕鬆完成",
+      "headerTitle": "今日題目",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": true,
+      "showBrandIcon": false
+    },
+    {
+      "output": "03-waiting.png",
+      "raw": "03-waiting.jpg",
+      "eyebrow": "03  /  LOCK",
+      "title": "答完之前，答案保密。",
+      "subtitle": "兩人全部完成後同步解鎖結果",
+      "headerTitle": "等待對方作答",
+      "showBackArrow": false,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "04-result.png",
+      "raw": "04-result.jpg",
+      "eyebrow": "04  /  RESULT",
+      "title": "想法不同，也能聊出默契。",
+      "subtitle": "並排對照答案與今日契合度",
+      "headerTitle": "今日結果",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "05-history.png",
+      "raw": "05-history.jpg",
+      "eyebrow": "05  /  HISTORY",
+      "title": "記錄屬於兩人的變化軌跡。",
+      "subtitle": "答題日曆、連續天數與分類統計",
+      "headerTitle": "歷史紀錄",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "06-ai-report.png",
+      "raw": "06-ai-report.jpg",
+      "eyebrow": "06  /  AI ANALYSIS",
+      "title": "AI 幫你整理雙人默契。",
+      "subtitle": "依作答傾向，提供溫柔的相處建議",
+      "headerTitle": "AI 契合報告",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    }
+  ]
+}

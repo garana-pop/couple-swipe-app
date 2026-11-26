@@ -1,0 +1,141 @@
+{
+  "locale": "en-US",
+  "appLocale": "en",
+  "displayNameJa": "英語（アメリカ）",
+  "googlePlayCode": "en-US",
+  "appStoreCode": "en-US",
+  "fontFamily": "\"Noto Sans\", \"Segoe UI Variable Display\", \"Segoe UI\", sans-serif",
+  "legalBaseUrl": "https://garana-pop.github.io/couple-swipe-app/en",
+  "googlePlay": {
+    "appName": "Kotaeai",
+    "shortDescription": "3 daily couple questions via 4-way swipe. Unlock answers together & AI insights.",
+    "fullDescription": "How well do you really know your partner?\nKotaeai is a daily couples quiz app where you and your partner answer 3 thoughtful questions a day with an effortless 4-way swipe.\n\n■ Feature 1: 3 Daily Questions in 30 Seconds\nExplore topics that rarely come up in everyday small talk — weekends, chores, money, communication pace, affection, and future plans. Simply swipe up, down, left, or right to share your honest take.\n\n■ Feature 2: Answers Stay Locked Until You Both Finish\nNeither of you can peek before answering. The moment both partners complete the 3 questions, your match rate and side-by-side answers unlock with a conversation starter tailored to the topic.\n\n■ Feature 3: Answer Calendar & Relationship Timeline\n• Track streaks, missed days, and category match rates on a clean Answer Calendar.\n• When a question repeats after time passes, compare how your views have evolved together.\n• Share your match rate with privacy-friendly share cards.\n\n■ Feature 4: Private by Design & Gentle Reminders\n• Start instantly without an email address (optional Google sign-in for device transfer backup).\n• Daily reminders and instant partner-finished push notifications keep the habit effortless.\n\n■ Duo Premium (Optional Auto-Renewing Subscription)\nOnly one partner needs to subscribe — your partner unlocks all Premium features at no extra cost.\n• Catch Up on Missed Days: Tap any past date on the calendar to answer missed questions and unlock results (answers stay spoiler-protected until you finish).\n• Deep AI Compatibility Report & Archive: Analyzes your real answer history and rhythms to highlight personality types, potential friction points, and gentle tips — plus a supportive Relationship Reflection mode if you ever need closure.\n\n[Subscription Information]\n• Available as an Annual Plan (best value — 50% off vs. monthly) or Monthly Plan, shared by both partners.\n• Pricing is shown in your local currency in the store before purchase.\n• Payment is charged to your store account and renews automatically unless canceled at least 24 hours before the renewal date in your store subscription settings.\n• You can delete your account and data anytime in-app or via our web page (note: deleting your account does not automatically cancel an active store subscription).\n\n*AI reports are intended for conversation support and entertainment.",
+    "releaseNotes": "• Added full 8-language support: English, Japanese, French, Korean, Russian, Thai, Simplified Chinese, and Traditional Chinese.\n• Automatically matches your device language (and supports OS per-app language settings) across UI, 120 questions, push notifications, and AI reports.\n• Added global timezone support for daily quiz resets."
+  },
+  "appStore": {
+    "name": "Kotaeai",
+    "subtitle": "Daily 3-Question Couples Quiz",
+    "promotionalText": "Swipe 3 daily questions with your partner in 30 seconds. Answers stay secret until you both finish — spark deeper talks with match stats and AI insights.",
+    "keywords": "couples,quiz,relationship,partner,questions,daily,love,compatibility,marriage,date,swipe,values"
+  },
+  "subscriptions": {
+    "yearly": {
+      "productId": "couple_swipe_yearly",
+      "basePlanId": "yearly-base",
+      "name": "Duo Premium (Annual)",
+      "description": "1 plan covers both partners. Save 50% vs. monthly and unlock all features.",
+      "benefits": [
+        "1 plan covers both partners",
+        "Answer missed past days anytime",
+        "Deep AI compatibility & reflection",
+        "Save 50% vs. monthly billing"
+      ]
+    },
+    "monthly": {
+      "productId": "couple_swipe_monthly",
+      "basePlanId": "monthly-base",
+      "name": "Duo Premium (Monthly)",
+      "description": "1 subscription covers both partners. Unlock past catch-up days & AI reports.",
+      "benefits": [
+        "1 plan covers both partners",
+        "Answer missed past days anytime",
+        "Deep AI compatibility & reflection",
+        "Cancel anytime in store settings"
+      ]
+    }
+  },
+  "featureGraphic": {
+    "brandSub": "Daily 4-Way Swipe Quiz for Couples",
+    "headlineBefore": "3 daily questions, ",
+    "headlineAccent": "4-way swipe",
+    "headlineAfter": "",
+    "headlineLine2": "Discover what truly clicks.",
+    "subcopyLine1": "Answers stay secret until you both finish.",
+    "subcopyLine2": "30-second daily prompts & AI insights for deeper couple talks.",
+    "pills": ["Mutual Unlock", "AI Compatibility", "1 Plan for Both"],
+    "cardTag": "Q1 / 3 · Weekends",
+    "cardQuestionLines": ["What's your", "ideal weekend", "vibe together?"],
+    "cardFooterLabel": "Both answered",
+    "cardMatchPill": "84% Match",
+    "choices": {
+      "up": "↑ Cozy at home",
+      "left": "← Road trip",
+      "right": "Cafe hop →",
+      "down": "↓ Solo chill time"
+    }
+  },
+  "screenshots": [
+    {
+      "output": "01-home.png",
+      "raw": "01-home.jpg",
+      "eyebrow": "Kotaeai  /  01",
+      "title": "3 daily questions together.",
+      "subtitle": "Share honest values in 30 seconds a day",
+      "headerTitle": "Kotaeai",
+      "showBackArrow": false,
+      "showMenuIcon": true,
+      "showQuizProgress": false,
+      "showBrandIcon": true
+    },
+    {
+      "output": "02-swipe.png",
+      "raw": "02-swipe.jpg",
+      "eyebrow": "02  /  SWIPE",
+      "title": "Intuitive 4-way swipe.",
+      "subtitle": "Just swipe up, down, left, or right to answer",
+      "headerTitle": "Today's Quiz",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": true,
+      "showBrandIcon": false
+    },
+    {
+      "output": "03-waiting.png",
+      "raw": "03-waiting.jpg",
+      "eyebrow": "03  /  LOCK",
+      "title": "Secret until both finish.",
+      "subtitle": "No peeking — answers unlock together",
+      "headerTitle": "Waiting",
+      "showBackArrow": false,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "04-result.png",
+      "raw": "04-result.jpg",
+      "eyebrow": "04  /  RESULT",
+      "title": "Turn differences into talks.",
+      "subtitle": "Compare answers side-by-side with match rate",
+      "headerTitle": "Today's Results",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "05-history.png",
+      "raw": "05-history.jpg",
+      "eyebrow": "05  /  HISTORY",
+      "title": "Track your story over time.",
+      "subtitle": "Answer calendar, streaks & category stats",
+      "headerTitle": "History",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "06-ai-report.png",
+      "raw": "06-ai-report.jpg",
+      "eyebrow": "06  /  AI ANALYSIS",
+      "title": "AI insights for your bond.",
+      "subtitle": "Spot communication styles & harmony tips",
+      "headerTitle": "AI Report",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    }
+  ]
+}

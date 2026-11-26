@@ -1,0 +1,141 @@
+{
+  "locale": "ko-KR",
+  "appLocale": "ko",
+  "displayNameJa": "韓国語",
+  "googlePlayCode": "ko-KR",
+  "appStoreCode": "ko",
+  "fontFamily": "\"Malgun Gothic\", \"Noto Sans\", \"Segoe UI\", sans-serif",
+  "legalBaseUrl": "https://garana-pop.github.io/couple-swipe-app/en",
+  "googlePlay": {
+    "appName": "Kotaeai",
+    "shortDescription": "하루 3문항 4방향 스와이프 커플 질문. 둘 다 답해야 공개되는 결과와 AI 궁합 리포트까지!",
+    "fullDescription": "“연인의 속마음, 의외로 잘 모를지도 몰라요.”\nKotaeai는 연인·부부가 하루 3문항을 4방향 스와이프로 답하며 서로의 가치관을 알아가는 커플 전용 데일리 퀴즈 앱입니다.\n\n■ 특징 1: 하루 3문항, 30초 직관 4방향 스와이프\n주말 보내는 법, 집안일과 소비 기준, 연락 빈도, 미래 계획까지 — 평소 꺼내기 어려웠던 주제를 매일 3개씩 만나보세요. 상하좌우 스와이프만으로 부담 없이 솔직한 마음을 고를 수 있어요.\n\n■ 특징 2: 둘 다 답하기 전까지 비밀 (스포일러 방지 잠금)\n한 명만 답했을 때는 상대의 답이 보이지 않습니다. 두 사람 모두 답변을 마치는 순간 잠금이 풀리며 일치율과 서로의 선택이 나란히 열립니다. 대화 주제 추천과 함께 자연스럽게 이야기를 이어가 보세요.\n\n■ 특징 3: 답변 캘린더 & 변화가 보이는 기록\n• 답변 완료/미답변 날짜가 한눈에 들어오는 캘린더와 연속 기록, 카테고리별 일치율 그래프 제공\n• 시간이 지나 같은 질문이 다시 나오면 과거의 우리와 지금의 답변 변화를 비교할 수 있어요\n• 프라이버시를 지키는 일치율 카드로 결과를 간편하게 공유하세요\n\n■ 특징 4: 안심 설계 & 맞춤 알림\n• 이메일 없이 익명으로 바로 시작 (기기 변경 백업용 Google 계정 연동 지원)\n• 매일 리마인더 알림과 파트너 답변 완료 푸시 알림으로 꾸준히 이어갈 수 있어요\n\n■ 둘이서 프리미엄 (선택 구독)\n커플 중 한 명만 구독하면 파트너도 추가 비용 없이 모든 프리미엄 기능을 함께 이용합니다.\n• 지난 미답변 날짜 따라잡기: 캘린더에서 놓친 날을 눌러 언제든 답변하고 결과를 열어보세요 (완료 전까지 상대 답변 비공개).\n• 심층 AI 궁합 리포트 & 아카이브: 실제 답변 기록과 리듬을 분석해 성격 유형, 엇갈림 예방 팁은 물론 관계 회고 리포트까지 따뜻하게 정리해 드립니다.\n\n[정기 결제 안내]\n• 연간 플랜(월간 대비 50% 할인) 및 월간 플랜 제공, 1인 결제로 2인 공유.\n• 결제 금액은 구매 전 스토어 화면에 현지 통화로 표시됩니다.\n• 갱신 24시간 전까지 스토어 구독 설정에서 해지하지 않으면 자동 갱신됩니다.\n• 앱 또는 웹에서 언제든 계정과 데이터를 삭제할 수 있습니다 (계정 삭제만으로 구독은 자동 해지되지 않으므로 스토어에서 해지해 주세요).\n\n※ AI 리포트는 커플 소통 지원 및 엔터테인먼트 목적의 참고 정보입니다.",
+    "releaseNotes": "• 한국어를 포함해 일본어·영어·프랑스어·러시아어·태국어·중국어(간체/번체) 총 8개 언어를 지원합니다.\n• 기기 언어 또는 OS의 앱별 언어 설정에 따라 화면, 120개 질문, 푸시 알림, AI 리포트가 자동으로 전환됩니다.\n• 글로벌 시간대별 일일 질문 동기화를 지원합니다."
+  },
+  "appStore": {
+    "name": "Kotaeai",
+    "subtitle": "하루 3문항 커플 가치관 스와이프",
+    "promotionalText": "하루 3문항, 4방향 스와이프로 30초 만에 알아가는 연인의 속마음. 둘 다 답해야 열리는 비밀 결과와 캘린더, AI 궁합 리포트로 대화가 더 깊어져요.",
+    "keywords": "커플,연인,부부,질문,가치관,궁합,퀴즈,스와이프,AI궁합,연애,기념일,커플앱"
+  },
+  "subscriptions": {
+    "yearly": {
+      "productId": "couple_swipe_yearly",
+      "basePlanId": "yearly-base",
+      "name": "둘이서 프리미엄 (연간)",
+      "description": "1인 구독으로 2인 공유. 월간 대비 50% 할인으로 모든 기능을 함께 이용하세요.",
+      "benefits": [
+        "1명만 구독해도 파트너 무료 공유",
+        "놓친 지난 날짜 언제든 다시 답변",
+        "심층 AI 궁합 리포트 & 아카이브",
+        "월간 플랜 대비 50% 할인 혜택"
+      ]
+    },
+    "monthly": {
+      "productId": "couple_swipe_monthly",
+      "basePlanId": "monthly-base",
+      "name": "둘이서 프리미엄 (월간)",
+      "description": "1인 구독으로 2인 공유. 지난 질문 따라잡기와 심층 AI 궁합 리포트를 열어보세요.",
+      "benefits": [
+        "1명만 구독해도 파트너 무료 공유",
+        "놓친 지난 날짜 언제든 다시 답변",
+        "심층 AI 궁합 리포트 & 아카이브",
+        "스토어 설정에서 언제든 해지 가능"
+      ]
+    }
+  },
+  "featureGraphic": {
+    "brandSub": "연인·부부를 위한 4방향 가치관 스와이프",
+    "headlineBefore": "하루 3문항, ",
+    "headlineAccent": "4방향 스와이프",
+    "headlineAfter": "로",
+    "headlineLine2": "서로의 진짜 마음이 보여요.",
+    "subcopyLine1": "둘 다 답을 마쳐야 비로소 열리는 결과.",
+    "subcopyLine2": "매일 30초 질문과 AI 궁합 분석으로 대화가 더 깊어집니다.",
+    "pills": ["둘 다 완료 시 공개", "AI 궁합 리포트", "1인 구독 2인 공유"],
+    "cardTag": "Q1 / 3 · 주말 보내기",
+    "cardQuestionLines": ["이상적인 주말,", "두 사람은", "어떤 스타일?"],
+    "cardFooterLabel": "둘 다 답변 완료",
+    "cardMatchPill": "일치율 84%",
+    "choices": {
+      "up": "↑ 집에서 푹 쉬기",
+      "left": "← 근교 여행",
+      "right": "카페 투어 →",
+      "down": "↓ 각자 자유시간"
+    }
+  },
+  "screenshots": [
+    {
+      "output": "01-home.png",
+      "raw": "01-home.jpg",
+      "eyebrow": "Kotaeai  /  01",
+      "title": "하루 3문항, 마음 맞추기.",
+      "subtitle": "평소 못 물었던 가치관을 매일 조금씩",
+      "headerTitle": "Kotaeai",
+      "showBackArrow": false,
+      "showMenuIcon": true,
+      "showQuizProgress": false,
+      "showBrandIcon": true
+    },
+    {
+      "output": "02-swipe.png",
+      "raw": "02-swipe.jpg",
+      "eyebrow": "02  /  SWIPE",
+      "title": "4방향 스와이프로 직관 답변.",
+      "subtitle": "상하좌우로 밀기만 하면 30초 만에 완료",
+      "headerTitle": "오늘의 질문",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": true,
+      "showBrandIcon": false
+    },
+    {
+      "output": "03-waiting.png",
+      "raw": "03-waiting.jpg",
+      "eyebrow": "03  /  LOCK",
+      "title": "둘 다 답할 때까지 비밀.",
+      "subtitle": "함께 완료하는 순간 결과가 열려요",
+      "headerTitle": "답변 대기 중",
+      "showBackArrow": false,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "04-result.png",
+      "raw": "04-result.jpg",
+      "eyebrow": "04  /  RESULT",
+      "title": "다른 생각도 즐거운 대화로.",
+      "subtitle": "일치율과 서로의 선택을 한눈에 비교",
+      "headerTitle": "오늘의 결과",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "05-history.png",
+      "raw": "05-history.jpg",
+      "eyebrow": "05  /  HISTORY",
+      "title": "우리만의 기록을 차곡차곡.",
+      "subtitle": "답변 캘린더와 카테고리별 일치율 확인",
+      "headerTitle": "지난 기록",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    },
+    {
+      "output": "06-ai-report.png",
+      "raw": "06-ai-report.jpg",
+      "eyebrow": "06  /  AI ANALYSIS",
+      "title": "AI가 정리하는 우리 궁합.",
+      "subtitle": "답변 패턴으로 엇갈림 예방 팁까지 제안",
+      "headerTitle": "AI 궁합 리포트",
+      "showBackArrow": true,
+      "showMenuIcon": false,
+      "showQuizProgress": false,
+      "showBrandIcon": false
+    }
+  ]
+}
