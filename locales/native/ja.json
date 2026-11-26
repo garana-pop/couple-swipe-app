@@ -1,4 +1,9 @@
 {
-  "CFBundleDisplayName": "Kotaeai",
-  "CFBundleName": "Kotaeai"
+  "ios": {
+    "CFBundleDisplayName": "Kotaeai",
+    "CFBundleName": "Kotaeai"
+  },
+  "android": {
+    "app_name": "Kotaeai"
+  }
 }

@@ -50,8 +50,14 @@ for (const locale of LOCALES) {
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(nativeFile, 'utf8'));
-      if (data.CFBundleDisplayName !== 'Kotaeai') {
-        error(`Unexpected CFBundleDisplayName in ${nativeFile}: ${data.CFBundleDisplayName}`);
+      if (data.CFBundleDisplayName || data.CFBundleName) {
+        error(`Top-level iOS keys in ${nativeFile} leak into Android strings.xml; nest under "ios".`);
+      }
+      if (data.ios?.CFBundleDisplayName !== 'Kotaeai' || data.ios?.CFBundleName !== 'Kotaeai') {
+        error(`Unexpected iOS app name in ${nativeFile}: ${JSON.stringify(data.ios)}`);
+      }
+      if (data.android?.app_name !== 'Kotaeai') {
+        error(`Unexpected Android app_name in ${nativeFile}: ${JSON.stringify(data.android)}`);
       }
     } catch (e) {
       error(`Invalid JSON in ${nativeFile}: ${e.message}`);
