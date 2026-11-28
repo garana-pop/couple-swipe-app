@@ -15,6 +15,7 @@
 param(
   [string[]]$Locales = @("en-US", "fr-FR", "ko-KR", "ru-RU", "th", "zh-CN", "zh-TW"),
   [switch]$Screenshots,
+  [switch]$SkipFeatureGraphics,
   [switch]$IncludeJa,
   [string]$EdgePath = ""
 )
@@ -521,13 +522,15 @@ foreach ($loc in $Locales) {
   $meta = Get-Content -Raw -Encoding UTF8 $metaPath | ConvertFrom-Json
 
   # 1. Feature Graphic (1024x500 RGB PNG)
-  $fgHtml = Build-FeatureGraphicHtml -Meta $meta
-  $fgOut = if ($loc -eq "ja") {
-    Join-Path $storeDir "feature-graphic-1024x500.png"
-  } else {
-    Join-Path $localizedRoot "$loc\feature-graphic-1024x500.png"
+  if (-not $SkipFeatureGraphics) {
+    $fgHtml = Build-FeatureGraphicHtml -Meta $meta
+    $fgOut = if ($loc -eq "ja") {
+      Join-Path $storeDir "feature-graphic-1024x500.png"
+    } else {
+      Join-Path $localizedRoot "$loc\feature-graphic-1024x500.png"
+    }
+    Render-HtmlToPng -HtmlContent $fgHtml -Name "fg_$loc" -Width 1024 -Height 500 -OutPath $fgOut
   }
-  Render-HtmlToPng -HtmlContent $fgHtml -Name "fg_$loc" -Width 1024 -Height 500 -OutPath $fgOut
 
   # 2. Localized Screenshots (1080x1920 RGB PNG) when -Screenshots is passed
   if ($Screenshots) {
@@ -557,18 +560,54 @@ foreach ($loc in $Locales) {
       }
 
       $imgUri = "file:///" + ($rawFile -replace '\\', '/')
-      $backDisplay = if ($slide.showBackArrow) { "flex" } else { "none" }
-      $menuDisplay = if ($slide.showMenuIcon) { "flex" } else { "none" }
-      $progDisplay = if ($slide.showQuizProgress) { "block" } else { "none" }
-      $overlayHeight = if ($slide.showQuizProgress) { "192px" } else { "176px" }
       $brandDisplay = if ($slide.showBrandIcon) { "block" } else { "none" }
       $tickDisplay = if ($slide.showBrandIcon) { "none" } else { "inline-block" }
+
+      # 実機スクショの安全な背景領域（カメラ領域・角丸黒枠を避けた位置）から背景色をサンプリング
+      $sampleBmp = [System.Drawing.Bitmap]::FromFile($rawFile)
+      try {
+        $topPx = $sampleBmp.GetPixel([int]($sampleBmp.Width * 0.35), [int]($sampleBmp.Height * 0.06))
+        $botPx = $sampleBmp.GetPixel([int]($sampleBmp.Width * 0.20), [int]($sampleBmp.Height * 0.965))
+        if ($topPx.R -lt 210 -or $topPx.G -lt 200 -or $topPx.B -lt 190) {
+          $topPx = [System.Drawing.Color]::FromArgb(245, 239, 231) # #F5EFE7
+        }
+        if ($botPx.R -lt 210 -or $botPx.G -lt 200 -or $botPx.B -lt 190) {
+          $botPx = $topPx
+        }
+        $topBgHex = "#{0:X2}{1:X2}{2:X2}" -f $topPx.R, $topPx.G, $topPx.B
+        $botBgHex = "#{0:X2}{1:X2}{2:X2}" -f $botPx.R, $botPx.G, $botPx.B
+        $botBgRgba0 = "rgba($($botPx.R),$($botPx.G),$($botPx.B),0)"
+        $botBgRgba92 = "rgba($($botPx.R),$($botPx.G),$($botPx.B),0.92)"
+      } finally {
+        $sampleBmp.Dispose()
+      }
+
+      $titleText = [string]$slide.title
+      $effectiveTitleSize = if ($isCjk) {
+        if ($titleText.Length -gt 14) { "50px" } else { "54px" }
+      } elseif ($isThai) {
+        if ($titleText.Length -gt 26) { "42px" } else { "48px" }
+      } else {
+        if ($titleText.Length -gt 28) { "44px" } else { "48px" }
+      }
 
       $overrideStyle = @"
 <style>
   html, body { font-family: $locFont !important; }
-  .title { font-size: $titleSize !important; line-height: $titleLH !important; }
+  .canvas { padding: 92px 64px 0 !important; }
+  .copy-block { margin-bottom: 44px !important; min-height: 224px; justify-content: center; }
+  .title { font-size: $effectiveTitleSize !important; line-height: $titleLH !important; }
   .subtitle { font-size: $subSize !important; }
+  .phone-screen { background: $topBgHex !important; }
+  .screen-img { top: 0 !important; width: 644px !important; height: 1445px !important; object-fit: cover !important; object-position: top center !important; }
+  /* 実機スクショの本物のアプリヘッダー（Kotaeaiロゴ・進捗バー・各言語タイトル）を活かし、OSステータスバー領域のみクリーン置換 */
+  .clean-top-overlay { height: 82px !important; background: $topBgHex !important; }
+  .status-bar { height: 76px !important; padding: 14px 36px 0 !important; }
+  .app-header, .quiz-progress-wrap { display: none !important; }
+  .bottom-fade {
+    height: 30px !important;
+    background: linear-gradient(180deg, $botBgRgba0 0%, $botBgRgba92 48%, $botBgHex 100%) !important;
+  }
 </style>
 </head>
 "@
@@ -577,19 +616,14 @@ foreach ($loc in $Locales) {
 <script>
   document.documentElement.lang = $(ConvertTo-Json $loc);
   document.getElementById('eyebrow').textContent = $(ConvertTo-Json ([string]$slide.eyebrow));
-  document.getElementById('title').textContent = $(ConvertTo-Json ([string]$slide.title));
+  document.getElementById('title').textContent = $(ConvertTo-Json $titleText);
   document.getElementById('subtitle').textContent = $(ConvertTo-Json ([string]$slide.subtitle));
-  document.getElementById('header-title').textContent = $(ConvertTo-Json ([string]$slide.headerTitle));
   document.getElementById('screen-img').src = $(ConvertTo-Json $imgUri);
   document.getElementById('brand-icon-img').src = $(ConvertTo-Json $iconUri);
   document.getElementById('brand-badge').style.display = '$brandDisplay';
   document.getElementById('tick-left').style.display = '$tickDisplay';
   document.getElementById('tick-right').style.display = '$tickDisplay';
   document.getElementById('home-pair-connector').style.display = 'none';
-  document.getElementById('back-arrow').style.display = '$backDisplay';
-  document.getElementById('menu-icon').style.display = '$menuDisplay';
-  document.getElementById('quiz-progress').style.display = '$progDisplay';
-  document.getElementById('top-overlay').style.height = '$overlayHeight';
 </script>
 </body>
 "@
